@@ -7,5 +7,5 @@ import (
 
 type Resource interface {
 	client.Object
-	GetObjectMeta() *metav1.ObjectMeta
+	GetObjectMeta() metav1.ObjectMeta
 }
