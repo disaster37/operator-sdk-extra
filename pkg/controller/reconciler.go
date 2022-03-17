@@ -19,7 +19,7 @@ type Reconciler interface {
 	Create(ctx context.Context, resource resource.Resource, data map[string]interface{}, meta interface{}) (res ctrl.Result, err error)
 	Update(ctx context.Context, resource resource.Resource, data map[string]interface{}, meta interface{}) (res ctrl.Result, err error)
 	Delete(ctx context.Context, resource resource.Resource, data map[string]interface{}, meta interface{}) (err error)
-	Diff(resource resource.Resource, data map[string]interface{}) (diff Diff, err error)
+	Diff(resource resource.Resource, data map[string]interface{}, meta interface{}) (diff Diff, err error)
 }
 
 type Diff struct {
@@ -126,6 +126,7 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, resourc
 
 	// Need update
 	if diff.NeedUpdate {
+		h.log.Infof("Diff found:\n", diff.Diff)
 		return h.reconciler.Update(ctx, resource, data, meta)
 	}
 
