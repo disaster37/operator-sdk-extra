@@ -114,7 +114,7 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, resourc
 	}
 
 	//Check if diff exist
-	diff, err := h.reconciler.Diff(resource, data)
+	diff, err := h.reconciler.Diff(resource, data, meta)
 	if err != nil {
 		return res, err
 	}
