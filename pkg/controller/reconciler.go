@@ -15,7 +15,7 @@ import (
 )
 
 type Reconciler interface {
-	Read(ctx context.Context, req ctrl.Request, resource resource.Resource, data map[string]interface{}, meta interface{}) (err error)
+	Read(ctx context.Context, req ctrl.Request, resource resource.Resource, data map[string]interface{}, meta interface{}) (res *ctrl.Result, err error)
 	Create(ctx context.Context, resource resource.Resource, data map[string]interface{}, meta interface{}) (res ctrl.Result, err error)
 	Update(ctx context.Context, resource resource.Resource, data map[string]interface{}, meta interface{}) (res ctrl.Result, err error)
 	Delete(ctx context.Context, resource resource.Resource, data map[string]interface{}, meta interface{}) (err error)
@@ -68,9 +68,14 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, resourc
 	defer h.log.Info("---> Finish reconcile loop for")
 
 	// Get main resource and external resources
-	if err = h.reconciler.Read(ctx, req, resource, data, meta); err != nil {
+	resTmp, err := h.reconciler.Read(ctx, req, resource, data, meta)
+	if err != nil {
 		h.log.Errorf("Error when get resource: %s", err.Error())
 		return res, err
+	}
+	if resTmp != nil {
+		h.log.Infof("Resource not exist, skip")
+		return *resTmp, nil
 	}
 
 	// Add finalizer
