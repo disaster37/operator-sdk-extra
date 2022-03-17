@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/disaster37/operator-sdk-extra/pkg/resource"
 	"github.com/sirupsen/logrus"
 	core "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
@@ -14,11 +15,11 @@ import (
 )
 
 type Reconciler interface {
-	Read(req ctrl.Request, resource client.Object, data map[string]interface{}, meta interface{}) (err error)
-	Create(resource client.Object, data map[string]interface{}, meta interface{}) (res ctrl.Result, err error)
-	Update(resource client.Object, data map[string]interface{}, meta interface{}) (res ctrl.Result, err error)
-	Delete(resource client.Object, data map[string]interface{}, meta interface{}) (res ctrl.Result, err error)
-	Diff(resource client.Object, data map[string]interface{}) (diff Diff, err error)
+	Read(ctx context.Context, req ctrl.Request, resource resource.Resource, data map[string]interface{}, meta interface{}) (err error)
+	Create(ctx context.Context, resource resource.Resource, data map[string]interface{}, meta interface{}) (res ctrl.Result, err error)
+	Update(ctx context.Context, resource resource.Resource, data map[string]interface{}, meta interface{}) (res ctrl.Result, err error)
+	Delete(ctx context.Context, resource resource.Resource, data map[string]interface{}, meta interface{}) (err error)
+	Diff(resource resource.Resource, data map[string]interface{}) (diff Diff, err error)
 }
 
 type Diff struct {
@@ -58,7 +59,7 @@ func NewStdReconciler(client client.Client, finalizer string, reconciler Reconci
 	return stdReconciler, nil
 }
 
-func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, resource client.Object, data map[string]interface{}, meta interface{}) (res ctrl.Result, err error) {
+func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, resource resource.Resource, data map[string]interface{}, meta interface{}) (res ctrl.Result, err error) {
 	h.log = h.log.WithFields(logrus.Fields{
 		"name":      req.Name,
 		"namespace": req.Namespace,
@@ -67,7 +68,7 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, resourc
 	defer h.log.Info("---> Finish reconcile loop for")
 
 	// Get main resource and external resources
-	if err = h.reconciler.Read(req, resource, data, meta); err != nil {
+	if err = h.reconciler.Read(ctx, req, resource, data, meta); err != nil {
 		h.log.Errorf("Error when get resource: %s", err.Error())
 		return res, err
 	}
@@ -88,6 +89,26 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, resourc
 	}
 
 	// Check if resource need to be deleted
+	if !resource.GetObjectMeta().DeletionTimestamp.IsZero() {
+		if h.finalizer != "" && controllerutil.ContainsFinalizer(resource, h.finalizer) {
+			if err = h.reconciler.Delete(ctx, resource, data, meta); err != nil {
+				h.log.Errorf("Error when delete resource: %s", err.Error())
+				h.recorder.Eventf(resource, core.EventTypeWarning, "Failed", "Error when delete resource: %s", err.Error())
+				return ctrl.Result{RequeueAfter: h.waitDurationOnError}, err
+			}
+
+			controllerutil.RemoveFinalizer(resource, h.finalizer)
+			if err := h.Update(ctx, resource); err != nil {
+				h.log.Errorf("Failed to remove finalizer: %s", err.Error())
+				h.recorder.Eventf(resource, core.EventTypeWarning, "Failed", "Error when remove finalizer: %s", err.Error())
+				return ctrl.Result{RequeueAfter: h.waitDurationOnError}, err
+			}
+			h.log.Debug("Remove finalizer successfully")
+		}
+		return ctrl.Result{}, nil
+	}
+
+	//Check if diff exist
 	diff, err := h.reconciler.Diff(resource, data)
 	if err != nil {
 		return res, err
@@ -95,12 +116,12 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, resourc
 
 	// Need create
 	if diff.NeedCreate {
-		return h.reconciler.Create(resource, data, meta)
+		return h.reconciler.Create(ctx, resource, data, meta)
 	}
 
 	// Need update
 	if diff.NeedUpdate {
-		return h.reconciler.Update(resource, data, meta)
+		return h.reconciler.Update(ctx, resource, data, meta)
 	}
 
 	h.log.Info("Nothink to do")
