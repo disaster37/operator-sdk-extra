@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/disaster37/operator-sdk-extra/pkg/resource"
@@ -21,13 +22,19 @@ type Reconciler interface {
 	Delete(ctx context.Context, resource resource.Resource, data map[string]interface{}, meta interface{}) (err error)
 	Diff(resource resource.Resource, data map[string]interface{}, meta interface{}) (diff Diff, err error)
 	IsNeedUpdateStatus() bool
-	UpdateStatus(ctx context.Context, resource resource.Resource, data map[string]interface{}, meta interface{}) (err error)
+	GetRecords() (records []*Record)
 }
 
 type Diff struct {
 	NeedCreate bool
 	NeedUpdate bool
 	Diff       string
+}
+
+type Record struct {
+	EventType string
+	Reason    string
+	Message   string
 }
 
 type StdReconciler struct {
@@ -37,6 +44,14 @@ type StdReconciler struct {
 	log                 *logrus.Entry
 	recorder            record.EventRecorder
 	waitDurationOnError time.Duration
+}
+
+func NewRecord(eventType string, reason string, message string, args ...interface{}) *Record {
+	return &Record{
+		EventType: eventType,
+		Reason:    reason,
+		Message:   fmt.Sprintf(message, args...),
+	}
 }
 
 func NewStdReconciler(client client.Client, finalizer string, reconciler Reconciler, logger *logrus.Entry, recorder record.EventRecorder, waitDurationOnError time.Duration) (stdReconciler *StdReconciler, err error) {
@@ -69,10 +84,16 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, resourc
 	h.log.Infof("---> Starting reconcile loop")
 	defer h.log.Info("---> Finish reconcile loop for")
 
+	// Handler record
+	defer func() {
+		for _, record := range h.reconciler.GetRecords() {
+			h.recorder.Event(resource, record.EventType, record.Reason, record.Message)
+		}
+	}()
 	// Handle status
 	defer func() {
 		if h.reconciler.IsNeedUpdateStatus() {
-			if err = h.reconciler.UpdateStatus(ctx, resource, data, meta); err != nil {
+			if err = h.Client.Status().Update(ctx, resource); err != nil {
 				h.log.Errorf("Error when update resource status: %s", err.Error())
 			}
 		}
