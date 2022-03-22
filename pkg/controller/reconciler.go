@@ -20,6 +20,8 @@ type Reconciler interface {
 	Update(ctx context.Context, resource resource.Resource, data map[string]interface{}, meta interface{}) (res ctrl.Result, err error)
 	Delete(ctx context.Context, resource resource.Resource, data map[string]interface{}, meta interface{}) (err error)
 	Diff(resource resource.Resource, data map[string]interface{}, meta interface{}) (diff Diff, err error)
+	IsNeedUpdateStatus() bool
+	UpdateStatus(ctx context.Context, resource resource.Resource, data map[string]interface{}, meta interface{}) (err error)
 }
 
 type Diff struct {
@@ -66,6 +68,15 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, resourc
 	})
 	h.log.Infof("---> Starting reconcile loop")
 	defer h.log.Info("---> Finish reconcile loop for")
+
+	// Handle status
+	defer func() {
+		if h.reconciler.IsNeedUpdateStatus() {
+			if err = h.reconciler.UpdateStatus(ctx, resource, data, meta); err != nil {
+				h.log.Errorf("Error when update resource status: %s", err.Error())
+			}
+		}
+	}()
 
 	// Get main resource and external resources
 	resTmp, err := h.reconciler.Read(ctx, req, resource, data, meta)
