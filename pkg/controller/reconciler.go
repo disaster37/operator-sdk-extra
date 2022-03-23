@@ -106,6 +106,9 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, resourc
 		h.log.Errorf("Error when get resource: %s", err.Error())
 		return res, err
 	}
+	if res != (ctrl.Result{}) {
+		return res, nil
+	}
 	h.log.Debug("Get resource successfully")
 
 	// Check if resource need to be deleted
