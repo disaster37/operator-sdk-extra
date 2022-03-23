@@ -9,6 +9,7 @@ import (
 	"github.com/disaster37/operator-sdk-extra/pkg/resource"
 	"github.com/sirupsen/logrus"
 	core "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -17,7 +18,7 @@ import (
 
 type Reconciler interface {
 	Configure(ctx context.Context, req ctrl.Request, resource resource.Resource) (meta any, err error)
-	Read(ctx context.Context, resource resource.Resource, data map[string]any, meta any) (res *ctrl.Result, err error)
+	Read(ctx context.Context, resource resource.Resource, data map[string]any, meta any) (res ctrl.Result, err error)
 	Create(ctx context.Context, resource resource.Resource, data map[string]any, meta any) (res ctrl.Result, err error)
 	Update(ctx context.Context, resource resource.Resource, data map[string]any, meta any) (res ctrl.Result, err error)
 	Delete(ctx context.Context, resource resource.Resource, data map[string]any, meta any) (err error)
@@ -69,25 +70,12 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, resourc
 	h.log.Infof("---> Starting reconcile loop")
 	defer h.log.Info("---> Finish reconcile loop for")
 
-	// Configure to optional get driver client (call meta)
-	meta, err := h.reconciler.Configure(ctx, req, resource)
-	if err != nil {
-		h.log.Errorf("Error configure reconciler: %s", err.Error())
-		return res, err
+	// Get current resource
+	if err = h.Get(ctx, req.NamespacedName, resource); err != nil {
+		if k8serrors.IsNotFound(err) {
+			return ctrl.Result{}, nil
+		}
 	}
-	h.log.Debug("Configure reconciler successfully")
-
-	// Get main resource and external resources
-	resTmp, err := h.reconciler.Read(ctx, resource, data, meta)
-	if err != nil {
-		h.log.Errorf("Error when get resource: %s", err.Error())
-		return res, err
-	}
-	if resTmp != nil {
-		h.log.Infof("Resource not exist, skip")
-		return *resTmp, nil
-	}
-	h.log.Debug("Get resource successfully")
 
 	// Add finalizer
 	if h.finalizer != "" {
@@ -103,6 +91,22 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, resourc
 			return ctrl.Result{Requeue: true}, nil
 		}
 	}
+
+	// Configure to optional get driver client (call meta)
+	meta, err := h.reconciler.Configure(ctx, req, resource)
+	if err != nil {
+		h.log.Errorf("Error configure reconciler: %s", err.Error())
+		return res, err
+	}
+	h.log.Debug("Configure reconciler successfully")
+
+	// Read external resources
+	res, err = h.reconciler.Read(ctx, resource, data, meta)
+	if err != nil {
+		h.log.Errorf("Error when get resource: %s", err.Error())
+		return res, err
+	}
+	h.log.Debug("Get resource successfully")
 
 	// Check if resource need to be deleted
 	if !resource.GetObjectMeta().DeletionTimestamp.IsZero() {
