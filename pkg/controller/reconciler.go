@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/disaster37/operator-sdk-extra/pkg/resource"
 	"github.com/sirupsen/logrus"
 	core "k8s.io/api/core/v1"
@@ -135,6 +136,8 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, resourc
 	// Handle status
 	currentStatus := resource.GetStatus()
 	defer func() {
+		h.log.Debugf("Current status: %s", spew.Sdump(currentStatus))
+		h.log.Debugf("Expected status: %s", spew.Sdump(resource.GetStatus()))
 		if !reflect.DeepEqual(currentStatus, resource.GetStatus()) {
 			h.log.Debug("Detect that it need to update status")
 			if err = h.Client.Status().Update(ctx, resource); err != nil {
