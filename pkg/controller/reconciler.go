@@ -132,7 +132,7 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, resourc
 	// Handle status
 	currentStatus := resource.GetStatus()
 	defer func() {
-		if reflect.DeepEqual(currentStatus, resource.GetStatus()) {
+		if !reflect.DeepEqual(currentStatus, resource.GetStatus()) {
 			h.log.Debug("Detect that it need to update status")
 			if err = h.Client.Status().Update(ctx, resource); err != nil {
 				h.log.Errorf("Error when update resource status: %s", err.Error())
