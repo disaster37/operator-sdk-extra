@@ -8,4 +8,5 @@ import (
 type Resource interface {
 	client.Object
 	GetObjectMeta() metav1.ObjectMeta
+	GetStatus() any
 }

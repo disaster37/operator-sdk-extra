@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/disaster37/operator-sdk-extra/pkg/resource"
@@ -16,25 +17,18 @@ import (
 )
 
 type Reconciler interface {
-	Read(ctx context.Context, req ctrl.Request, resource resource.Resource, data map[string]interface{}, meta interface{}) (res *ctrl.Result, err error)
-	Create(ctx context.Context, resource resource.Resource, data map[string]interface{}, meta interface{}) (res ctrl.Result, err error)
-	Update(ctx context.Context, resource resource.Resource, data map[string]interface{}, meta interface{}) (res ctrl.Result, err error)
-	Delete(ctx context.Context, resource resource.Resource, data map[string]interface{}, meta interface{}) (err error)
-	Diff(resource resource.Resource, data map[string]interface{}, meta interface{}) (diff Diff, err error)
-	IsNeedUpdateStatus() bool
-	GetRecords() (records []*Record)
+	Configure(ctx context.Context, req ctrl.Request, resource resource.Resource) (meta any, err error)
+	Read(ctx context.Context, resource resource.Resource, data map[string]any, meta any) (res *ctrl.Result, err error)
+	Create(ctx context.Context, resource resource.Resource, data map[string]any, meta any) (res ctrl.Result, err error)
+	Update(ctx context.Context, resource resource.Resource, data map[string]any, meta any) (res ctrl.Result, err error)
+	Delete(ctx context.Context, resource resource.Resource, data map[string]any, meta any) (err error)
+	Diff(resource resource.Resource, data map[string]any, meta any) (diff Diff, err error)
 }
 
 type Diff struct {
 	NeedCreate bool
 	NeedUpdate bool
 	Diff       string
-}
-
-type Record struct {
-	EventType string
-	Reason    string
-	Message   string
 }
 
 type StdReconciler struct {
@@ -44,14 +38,6 @@ type StdReconciler struct {
 	log                 *logrus.Entry
 	recorder            record.EventRecorder
 	waitDurationOnError time.Duration
-}
-
-func NewRecord(eventType string, reason string, message string, args ...interface{}) *Record {
-	return &Record{
-		EventType: eventType,
-		Reason:    reason,
-		Message:   fmt.Sprintf(message, args...),
-	}
 }
 
 func NewStdReconciler(client client.Client, finalizer string, reconciler Reconciler, logger *logrus.Entry, recorder record.EventRecorder, waitDurationOnError time.Duration) (stdReconciler *StdReconciler, err error) {
@@ -76,7 +62,7 @@ func NewStdReconciler(client client.Client, finalizer string, reconciler Reconci
 	return stdReconciler, nil
 }
 
-func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, resource resource.Resource, data map[string]interface{}, meta interface{}) (res ctrl.Result, err error) {
+func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, resource resource.Resource, data map[string]interface{}) (res ctrl.Result, err error) {
 	h.log = h.log.WithFields(logrus.Fields{
 		"name":      req.Name,
 		"namespace": req.Namespace,
@@ -84,23 +70,16 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, resourc
 	h.log.Infof("---> Starting reconcile loop")
 	defer h.log.Info("---> Finish reconcile loop for")
 
-	// Handler record
-	defer func() {
-		for _, record := range h.reconciler.GetRecords() {
-			h.recorder.Event(resource, record.EventType, record.Reason, record.Message)
-		}
-	}()
-	// Handle status
-	defer func() {
-		if h.reconciler.IsNeedUpdateStatus() {
-			if err = h.Client.Status().Update(ctx, resource); err != nil {
-				h.log.Errorf("Error when update resource status: %s", err.Error())
-			}
-		}
-	}()
+	// Configure to optional get driver client (call meta)
+	meta, err := h.reconciler.Configure(ctx, req, resource)
+	if err != nil {
+		h.log.Errorf("Error configure reconciler: %s", err.Error())
+		return res, err
+	}
+	h.log.Debug("Configure reconciler successfully")
 
 	// Get main resource and external resources
-	resTmp, err := h.reconciler.Read(ctx, req, resource, data, meta)
+	resTmp, err := h.reconciler.Read(ctx, resource, data, meta)
 	if err != nil {
 		h.log.Errorf("Error when get resource: %s", err.Error())
 		return res, err
@@ -109,6 +88,7 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, resourc
 		h.log.Infof("Resource not exist, skip")
 		return *resTmp, nil
 	}
+	h.log.Debug("Get resource successfully")
 
 	// Add finalizer
 	if h.finalizer != "" {
@@ -133,6 +113,7 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, resourc
 				h.recorder.Eventf(resource, core.EventTypeWarning, "Failed", "Error when delete resource: %s", err.Error())
 				return ctrl.Result{RequeueAfter: h.waitDurationOnError}, err
 			}
+			h.log.Debug("Delete successfully")
 
 			controllerutil.RemoveFinalizer(resource, h.finalizer)
 			if err := h.Update(ctx, resource); err != nil {
@@ -144,6 +125,18 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, resourc
 		}
 		return ctrl.Result{}, nil
 	}
+
+	// Handle status
+	currentStatus := resource.GetStatus()
+	defer func() {
+		if reflect.DeepEqual(currentStatus, resource.GetStatus()) {
+			h.log.Debug("Detect that it need to update status")
+			if err = h.Client.Status().Update(ctx, resource); err != nil {
+				h.log.Errorf("Error when update resource status: %s", err.Error())
+			}
+			h.log.Debug("Update status successfully")
+		}
+	}()
 
 	//Check if diff exist
 	diff, err := h.reconciler.Diff(resource, data, meta)
