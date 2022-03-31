@@ -6,7 +6,6 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/disaster37/operator-sdk-extra/pkg/resource"
 	"github.com/sirupsen/logrus"
 	core "k8s.io/api/core/v1"
@@ -87,6 +86,9 @@ func NewStdReconciler(client client.Client, finalizer string, reconciler Reconci
 }
 
 func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r resource.Resource, data map[string]interface{}) (res ctrl.Result, err error) {
+	var meta any
+	var diff Diff
+
 	h.log = h.log.WithFields(logrus.Fields{
 		"name":      req.Name,
 		"namespace": req.Namespace,
@@ -101,11 +103,12 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r resou
 		}
 	}
 
-	// Handle status
+	// Handle post actions
 	currentStatus := r.DeepCopyObject().(resource.Resource).GetStatus()
 	defer func() {
-		h.log.Debugf("Current status: %s", spew.Sdump(currentStatus))
-		h.log.Debugf("Expected status: %s", spew.Sdump(r.GetStatus()))
+		if err != nil {
+			h.reconciler.OnError(ctx, r, data, meta, err)
+		}
 		if !reflect.DeepEqual(currentStatus, r.GetStatus()) {
 			h.log.Debug("Detect that it need to update status")
 			if err = h.Client.Status().Update(ctx, r); err != nil {
@@ -131,7 +134,7 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r resou
 	}
 
 	// Configure to optional get driver client (call meta)
-	meta, err := h.reconciler.Configure(ctx, req, r)
+	meta, err = h.reconciler.Configure(ctx, req, r)
 	if err != nil {
 		h.log.Errorf("Error configure reconciler: %s", err.Error())
 		return res, err
@@ -160,7 +163,7 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r resou
 			h.log.Debug("Delete successfully")
 
 			controllerutil.RemoveFinalizer(r, h.finalizer)
-			if err := h.Update(ctx, r); err != nil {
+			if err = h.Update(ctx, r); err != nil {
 				h.log.Errorf("Failed to remove finalizer: %s", err.Error())
 				h.recorder.Eventf(r, core.EventTypeWarning, "Failed", "Error when remove finalizer: %s", err.Error())
 				return ctrl.Result{RequeueAfter: h.waitDurationOnError}, err
@@ -171,20 +174,28 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r resou
 	}
 
 	//Check if diff exist
-	diff, err := h.reconciler.Diff(r, data, meta)
+	diff, err = h.reconciler.Diff(r, data, meta)
 	if err != nil {
 		return res, err
 	}
 
 	// Need create
 	if diff.NeedCreate {
-		return h.reconciler.Create(ctx, r, data, meta)
+		res, err = h.reconciler.Create(ctx, r, data, meta)
 	}
 
 	// Need update
 	if diff.NeedUpdate {
 		h.log.Infof("Diff found:\n", diff.Diff)
-		return h.reconciler.Update(ctx, r, data, meta)
+		res, err = h.reconciler.Update(ctx, r, data, meta)
+	}
+
+	if res != (ctrl.Result{}) {
+		return res, err
+	}
+
+	if err = h.reconciler.OnSuccess(ctx, r, data, meta, diff); err != nil {
+		return res, err
 	}
 
 	h.log.Info("Nothink to do")
