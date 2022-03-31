@@ -155,6 +155,7 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r resou
 	// Check if resource need to be deleted
 	if !r.GetObjectMeta().DeletionTimestamp.IsZero() {
 		if h.finalizer != "" && controllerutil.ContainsFinalizer(r, h.finalizer) {
+			h.log.Info("Start delete step")
 			if err = h.reconciler.Delete(ctx, r, data, meta); err != nil {
 				h.log.Errorf("Error when delete resource: %s", err.Error())
 				h.recorder.Eventf(r, core.EventTypeWarning, "Failed", "Error when delete resource: %s", err.Error())
@@ -181,12 +182,13 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r resou
 
 	// Need create
 	if diff.NeedCreate {
+		h.log.Info("Start create step")
 		res, err = h.reconciler.Create(ctx, r, data, meta)
 	}
 
 	// Need update
 	if diff.NeedUpdate {
-		h.log.Infof("Diff found:\n", diff.Diff)
+		h.log.Infof("Start update step with diff:\n%s", diff.Diff)
 		res, err = h.reconciler.Update(ctx, r, data, meta)
 	}
 
