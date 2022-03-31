@@ -18,11 +18,34 @@ import (
 )
 
 type Reconciler interface {
+	// Confirgure permit to init external provider driver (API client REST)
+	// It can also permit to init condition on status
 	Configure(ctx context.Context, req ctrl.Request, resource resource.Resource) (meta any, err error)
+
+	// Read permit to read the actual resource state from provider and set it on data map
 	Read(ctx context.Context, r resource.Resource, data map[string]any, meta any) (res ctrl.Result, err error)
+
+	// Create permit to create resource on provider
+	// It only call if diff.NeeCreated is true
 	Create(ctx context.Context, r resource.Resource, data map[string]any, meta any) (res ctrl.Result, err error)
+
+	// Update permit to update resource on provider
+	// It only call if diff.NeedUpdated is true
 	Update(ctx context.Context, r resource.Resource, data map[string]any, meta any) (res ctrl.Result, err error)
+
+	// Delete permit to delete resource on provider
+	// It only call if you have specified finalizer name when you create reconciler and if resource as marked to be deleted
 	Delete(ctx context.Context, r resource.Resource, data map[string]any, meta any) (err error)
+
+	// OnError is call when error is throwing
+	// It the right way to set status condition when error
+	OnError(ctx context.Context, r resource.Resource, data map[string]any, meta any, err error)
+
+	// OnSuccess is call at the end if no error
+	// It's the right way to set status condition when everithink is good
+	OnSuccess(ctx context.Context, r resource.Resource, data map[string]any, meta any, diff Diff) (err error)
+
+	// Diff permit to compare the actual state and the expected state
 	Diff(r resource.Resource, data map[string]any, meta any) (diff Diff, err error)
 }
 
@@ -78,6 +101,20 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r resou
 		}
 	}
 
+	// Handle status
+	currentStatus := r.DeepCopyObject().(resource.Resource).GetStatus()
+	defer func() {
+		h.log.Debugf("Current status: %s", spew.Sdump(currentStatus))
+		h.log.Debugf("Expected status: %s", spew.Sdump(r.GetStatus()))
+		if !reflect.DeepEqual(currentStatus, r.GetStatus()) {
+			h.log.Debug("Detect that it need to update status")
+			if err = h.Client.Status().Update(ctx, r); err != nil {
+				h.log.Errorf("Error when update resource status: %s", err.Error())
+			}
+			h.log.Debug("Update status successfully")
+		}
+	}()
+
 	// Add finalizer
 	if h.finalizer != "" {
 		if !controllerutil.ContainsFinalizer(r, h.finalizer) {
@@ -132,20 +169,6 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r resou
 		}
 		return ctrl.Result{}, nil
 	}
-
-	// Handle status
-	currentStatus := r.DeepCopyObject().(resource.Resource).GetStatus()
-	defer func() {
-		h.log.Debugf("Current status: %s", spew.Sdump(currentStatus))
-		h.log.Debugf("Expected status: %s", spew.Sdump(r.GetStatus()))
-		if !reflect.DeepEqual(currentStatus, r.GetStatus()) {
-			h.log.Debug("Detect that it need to update status")
-			if err = h.Client.Status().Update(ctx, r); err != nil {
-				h.log.Errorf("Error when update resource status: %s", err.Error())
-			}
-			h.log.Debug("Update status successfully")
-		}
-	}()
 
 	//Check if diff exist
 	diff, err := h.reconciler.Diff(r, data, meta)

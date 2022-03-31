@@ -38,3 +38,10 @@ func (h MockReconciler) Delete(ctx context.Context, r resource.Resource, data ma
 func (h MockReconciler) Diff(r resource.Resource, data map[string]any, meta any) (diff controller.Diff, err error) {
 	return h.reconciler.Diff(r, data, meta)
 }
+
+func (h MockReconciler) OnError(ctx context.Context, r resource.Resource, data map[string]any, meta any, err error) {
+	h.reconciler.OnError(ctx, r, data, meta, err)
+}
+func (h MockReconciler) OnSuccess(ctx context.Context, r resource.Resource, data map[string]any, meta any, diff controller.Diff) (err error) {
+	return h.reconciler.OnSuccess(ctx, r, data, meta, diff)
+}
