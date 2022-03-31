@@ -190,6 +190,11 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r resou
 		res, err = h.reconciler.Update(ctx, r, data, meta)
 	}
 
+	// Nothink to do
+	if !diff.NeedCreate && !diff.NeedUpdate {
+		h.log.Debug("Nothink to do")
+	}
+
 	if res != (ctrl.Result{}) {
 		return res, err
 	}
@@ -197,8 +202,6 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r resou
 	if err = h.reconciler.OnSuccess(ctx, r, data, meta, diff); err != nil {
 		return res, err
 	}
-
-	h.log.Info("Nothink to do")
 
 	return ctrl.Result{}, nil
 }
