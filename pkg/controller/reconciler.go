@@ -138,7 +138,7 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r resou
 	meta, err = h.reconciler.Configure(ctx, req, r)
 	if err != nil {
 		h.log.Errorf("Error configure reconciler: %s", err.Error())
-		return res, err
+		return ctrl.Result{RequeueAfter: h.waitDurationOnError}, err
 	}
 	h.log.Debug("Configure reconciler successfully")
 
@@ -146,7 +146,7 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r resou
 	res, err = h.reconciler.Read(ctx, r, data, meta)
 	if err != nil {
 		h.log.Errorf("Error when get resource: %s", err.Error())
-		return res, err
+		return ctrl.Result{RequeueAfter: h.waitDurationOnError}, err
 	}
 	if res != (ctrl.Result{}) {
 		return res, nil
@@ -178,7 +178,7 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r resou
 	//Check if diff exist
 	diff, err = h.reconciler.Diff(r, data, meta)
 	if err != nil {
-		return res, err
+		return ctrl.Result{RequeueAfter: h.waitDurationOnError}, err
 	}
 
 	// Need create
@@ -186,7 +186,7 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r resou
 		h.log.Info("Start create step")
 		res, err = h.reconciler.Create(ctx, r, data, meta)
 		if err != nil {
-			return res, err
+			return ctrl.Result{RequeueAfter: h.waitDurationOnError}, err
 		}
 	}
 
@@ -195,7 +195,7 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r resou
 		h.log.Infof("Start update step with diff:\n%s", diff.Diff)
 		res, err = h.reconciler.Update(ctx, r, data, meta)
 		if err != nil {
-			return res, err
+			return ctrl.Result{RequeueAfter: h.waitDurationOnError}, err
 		}
 	}
 
@@ -209,7 +209,7 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r resou
 	}
 
 	if err = h.reconciler.OnSuccess(ctx, r, data, meta, diff); err != nil {
-		return res, err
+		return ctrl.Result{RequeueAfter: h.waitDurationOnError}, err
 	}
 
 	return ctrl.Result{}, nil
