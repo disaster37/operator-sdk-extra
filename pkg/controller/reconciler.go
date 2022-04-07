@@ -101,9 +101,10 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r resou
 		if k8serrors.IsNotFound(err) {
 			return ctrl.Result{}, nil
 		}
+		return ctrl.Result{}, err
 	}
 
-	// Handle post actions
+	// Handle status update
 	currentStatus := r.DeepCopyObject().(resource.Resource).GetStatus()
 	defer func() {
 		if err != nil {
@@ -184,12 +185,18 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r resou
 	if diff.NeedCreate {
 		h.log.Info("Start create step")
 		res, err = h.reconciler.Create(ctx, r, data, meta)
+		if err != nil {
+			return res, err
+		}
 	}
 
 	// Need update
 	if diff.NeedUpdate {
 		h.log.Infof("Start update step with diff:\n%s", diff.Diff)
 		res, err = h.reconciler.Update(ctx, r, data, meta)
+		if err != nil {
+			return res, err
+		}
 	}
 
 	// Nothink to do
@@ -198,7 +205,7 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r resou
 	}
 
 	if res != (ctrl.Result{}) {
-		return res, err
+		return res, nil
 	}
 
 	if err = h.reconciler.OnSuccess(ctx, r, data, meta, diff); err != nil {
