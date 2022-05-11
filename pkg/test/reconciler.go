@@ -47,7 +47,7 @@ func (h *TestCase) Run() {
 	// Run pre test
 	if h.PreTest != nil {
 		if err = h.PreTest(h.data); err != nil {
-			panic(err)
+			h.t.Fatal(err)
 		}
 	}
 
@@ -55,10 +55,19 @@ func (h *TestCase) Run() {
 		if err = h.client.Get(context.Background(), h.key, h.object); err != nil {
 			if k8serrors.IsNotFound(err) {
 				h.object = nil
+			} else {
+				h.t.Fatal(err)
 			}
 		}
 		if err = step.Do(h.client, h.object, h.data); err != nil {
 			h.t.Fatal(err)
+		}
+		if err = h.client.Get(context.Background(), h.key, h.object); err != nil {
+			if k8serrors.IsNotFound(err) {
+				h.object = nil
+			} else {
+				h.t.Fatal(err)
+			}
 		}
 		if err = step.Check(h.t, h.client, h.object, h.data); err != nil {
 			h.t.Fatal(err)
