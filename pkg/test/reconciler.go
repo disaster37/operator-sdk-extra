@@ -25,7 +25,7 @@ type TestCase struct {
 }
 
 type TestStep struct {
-	Pre   func(c client.Client, mock any, data map[string]any) error
+	Pre   func(c client.Client, mock any, isSubmitted *bool data map[string]any) error
 	Do    func(c client.Client, o client.Object, data map[string]any) error
 	Check func(t *testing.T, c client.Client, o client.Object, data map[string]any) error
 }
@@ -46,6 +46,10 @@ func NewTestCase(t *testing.T, c client.Client, mock any, key types.NamespacedNa
 func (h *TestCase) Run() {
 
 	var err error
+	var isSubmitted *bool
+
+	bTrue := true
+	bFalse := false
 
 	// Run pre test
 	if h.PreTest != nil {
@@ -55,8 +59,9 @@ func (h *TestCase) Run() {
 	}
 
 	for _, step := range h.Steps {
+		isSubmitted = &bFalse
 		if step.Pre != nil {
-			if err = step.Pre(h.client, h.mock, h.data); err != nil {
+			if err = step.Pre(h.client, h.mock, isSubmitted, h.data); err != nil {
 				h.t.Fatal(err)
 			}
 		}
@@ -71,6 +76,8 @@ func (h *TestCase) Run() {
 		if err = step.Do(h.client, h.object, h.data); err != nil {
 			h.t.Fatal(err)
 		}
+		isSubmitted = &bTrue
+
 		if err = h.client.Get(context.Background(), h.key, h.object); err != nil {
 			if k8serrors.IsNotFound(err) {
 				h.object = nil
