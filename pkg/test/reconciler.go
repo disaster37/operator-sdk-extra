@@ -2,7 +2,6 @@ package test
 
 import (
 	"context"
-	"reflect"
 	"testing"
 	"time"
 
@@ -49,8 +48,6 @@ func (h *TestCase) Run() {
 		err         error
 		isSubmitted *bool
 		o           client.Object
-		oDo         any
-		oCheck      any
 	)
 
 	bTrue := true
