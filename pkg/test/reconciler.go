@@ -9,16 +9,17 @@ import (
 
 type TestCase struct {
 	// Permit to lauch some preaction, like init mock
-	PreTest func() error
+	PreTest func(data map[string]any) error
 	Steps   []TestStep
 
+	data   map[string]any
 	t      *testing.T
 	client client.Client
 }
 
 type TestStep struct {
-	Do    func(c client.Client) error
-	Check func(t *testing.T, c client.Client) error
+	Do    func(c client.Client, data map[string]any) error
+	Check func(t *testing.T, c client.Client, data map[string]any) error
 }
 
 func NewTestCase(t *testing.T, c client.Client) *TestCase {
