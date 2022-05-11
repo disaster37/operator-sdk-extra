@@ -2,6 +2,7 @@ package test
 
 import (
 	"context"
+	"reflect"
 	"testing"
 	"time"
 
@@ -44,12 +45,16 @@ func NewTestCase(t *testing.T, c client.Client, key types.NamespacedName, o clie
 
 func (h *TestCase) Run() {
 
-	var err error
-	var isSubmitted *bool
+	var (
+		err         error
+		isSubmitted *bool
+		o           client.Object
+		oDo         any
+		oCheck      any
+	)
 
 	bTrue := true
 	bFalse := false
-
 	// Run pre test
 	if h.PreTest != nil {
 		if err = h.PreTest(h.data); err != nil {
@@ -59,32 +64,35 @@ func (h *TestCase) Run() {
 
 	for _, step := range h.Steps {
 		isSubmitted = &bFalse
+
 		if step.Pre != nil {
 			if err = step.Pre(h.client, step.Mock, isSubmitted, h.data); err != nil {
 				h.t.Fatal(err)
 			}
 		}
 
-		if err = h.client.Get(context.Background(), h.key, h.object); err != nil {
+		o = h.object
+		if err = h.client.Get(context.Background(), h.key, o); err != nil {
 			if k8serrors.IsNotFound(err) {
-				h.object = nil
+				o = nil
 			} else {
 				h.t.Fatal(err)
 			}
 		}
-		if err = step.Do(h.client, h.key, h.object, h.data); err != nil {
+		if err = step.Do(h.client, h.key, o, h.data); err != nil {
 			h.t.Fatal(err)
 		}
 		isSubmitted = &bTrue
 
-		if err = h.client.Get(context.Background(), h.key, h.object); err != nil {
+		o = h.object
+		if err = h.client.Get(context.Background(), h.key, o); err != nil {
 			if k8serrors.IsNotFound(err) {
-				h.object = nil
+				o = nil
 			} else {
 				h.t.Fatal(err)
 			}
 		}
-		if err = step.Check(h.t, h.client, step.Mock, h.key, h.object, h.data); err != nil {
+		if err = step.Check(h.t, h.client, step.Mock, h.key, o, h.data); err != nil {
 			h.t.Fatal(err)
 		}
 		time.Sleep(h.wait)
