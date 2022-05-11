@@ -35,16 +35,16 @@ func (h *TestCase) Run() {
 
 	// Run pre test
 	if h.PreTest != nil {
-		if err = h.PreTest(); err != nil {
+		if err = h.PreTest(h.data); err != nil {
 			panic(err)
 		}
 	}
 
 	for _, step := range h.Steps {
-		if err = step.Do(h.client); err != nil {
+		if err = step.Do(h.client, h.data); err != nil {
 			h.t.Fatal(err)
 		}
-		if err = step.Check(h.t, h.client); err != nil {
+		if err = step.Check(h.t, h.client, h.data); err != nil {
 			h.t.Fatal(err)
 		}
 	}
