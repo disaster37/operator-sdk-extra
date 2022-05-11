@@ -12,7 +12,7 @@ import (
 
 type TestCase struct {
 	// Permit to lauch some preaction, like init mock
-	PreTest func(data map[string]any) error
+	PreTest func(stepName *string, isSubmitted *bool, data map[string]any) error
 	Steps   []TestStep
 
 	key    types.NamespacedName
@@ -24,10 +24,10 @@ type TestCase struct {
 }
 
 type TestStep struct {
-	Mock  any
-	Pre   func(c client.Client, mock any, isSubmitted *bool, data map[string]any) error
+	Name  string
+	Pre   func(c client.Client, isSubmitted *bool, data map[string]any) error
 	Do    func(c client.Client, key types.NamespacedName, o client.Object, data map[string]any) error
-	Check func(t *testing.T, c client.Client, mock any, key types.NamespacedName, o client.Object, data map[string]any) error
+	Check func(t *testing.T, c client.Client, key types.NamespacedName, o client.Object, data map[string]any) error
 }
 
 func NewTestCase(t *testing.T, c client.Client, key types.NamespacedName, o client.Object, wait time.Duration, data map[string]any) *TestCase {
@@ -47,6 +47,7 @@ func (h *TestCase) Run() {
 	var (
 		err         error
 		isSubmitted *bool
+		stepName    *string
 		o           client.Object
 	)
 
@@ -54,16 +55,17 @@ func (h *TestCase) Run() {
 	bFalse := false
 	// Run pre test
 	if h.PreTest != nil {
-		if err = h.PreTest(h.data); err != nil {
+		if err = h.PreTest(stepName, isSubmitted, h.data); err != nil {
 			h.t.Fatal(err)
 		}
 	}
 
 	for _, step := range h.Steps {
 		isSubmitted = &bFalse
+		stepName = &step.Name
 
 		if step.Pre != nil {
-			if err = step.Pre(h.client, step.Mock, isSubmitted, h.data); err != nil {
+			if err = step.Pre(h.client, isSubmitted, h.data); err != nil {
 				h.t.Fatal(err)
 			}
 		}
@@ -89,7 +91,7 @@ func (h *TestCase) Run() {
 				h.t.Fatal(err)
 			}
 		}
-		if err = step.Check(h.t, h.client, step.Mock, h.key, o, h.data); err != nil {
+		if err = step.Check(h.t, h.client, h.key, o, h.data); err != nil {
 			h.t.Fatal(err)
 		}
 		time.Sleep(h.wait)
