@@ -32,13 +32,14 @@ type TestStep struct {
 
 func NewTestCase(t *testing.T, c client.Client, key types.NamespacedName, o client.Object, wait time.Duration, data map[string]any) *TestCase {
 	return &TestCase{
-		t:      t,
-		client: c,
-		object: o,
-		wait:   wait,
-		key:    key,
-		data:   data,
-		Steps:  make([]TestStep, 0),
+		t:       t,
+		client:  c,
+		object:  o,
+		wait:    wait,
+		key:     key,
+		data:    data,
+		PreTest: nil,
+		Steps:   make([]TestStep, 0),
 	}
 }
 
@@ -70,11 +71,7 @@ func (h *TestCase) Run() {
 
 		o = h.object
 		if err = h.client.Get(context.Background(), h.key, o); err != nil {
-			if k8serrors.IsNotFound(err) {
-				o = nil
-			} else {
-				h.t.Fatal(err)
-			}
+			o = nil
 		}
 		if err = step.Do(h.client, h.key, o, h.data); err != nil {
 			h.t.Fatal(err)
@@ -83,11 +80,7 @@ func (h *TestCase) Run() {
 
 		o = h.object
 		if err = h.client.Get(context.Background(), h.key, o); err != nil {
-			if k8serrors.IsNotFound(err) {
-				o = nil
-			} else {
-				h.t.Fatal(err)
-			}
+			o = nil
 		}
 		if err = step.Check(h.t, h.client, h.key, o, h.data); err != nil {
 			h.t.Fatal(err)
