@@ -45,14 +45,12 @@ func NewTestCase(t *testing.T, c client.Client, key types.NamespacedName, o clie
 func (h *TestCase) Run() {
 
 	var (
-		err         error
-		isSubmitted *bool
-		stepName    *string
-		o           client.Object
+		err error
+		o   client.Object
 	)
 
-	bTrue := true
-	bFalse := false
+	isSubmitted := new(bool)
+	stepName := new(string)
 	// Run pre test
 	if h.PreTest != nil {
 		if err = h.PreTest(stepName, isSubmitted, h.data); err != nil {
@@ -61,8 +59,8 @@ func (h *TestCase) Run() {
 	}
 
 	for _, step := range h.Steps {
-		isSubmitted = &bFalse
-		stepName = &step.Name
+		*isSubmitted = false
+		*stepName = step.Name
 
 		if step.Pre != nil {
 			if err = step.Pre(h.client, isSubmitted, h.data); err != nil {
@@ -81,7 +79,7 @@ func (h *TestCase) Run() {
 		if err = step.Do(h.client, h.key, o, h.data); err != nil {
 			h.t.Fatal(err)
 		}
-		isSubmitted = &bTrue
+		*isSubmitted = true
 
 		o = h.object
 		if err = h.client.Get(context.Background(), h.key, o); err != nil {
