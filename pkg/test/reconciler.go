@@ -21,23 +21,22 @@ type TestCase struct {
 	data   map[string]any
 	t      *testing.T
 	client client.Client
-	mock   any
 }
 
 type TestStep struct {
-	Pre   func(c client.Client, mock any, isSubmitted *bool data map[string]any) error
-	Do    func(c client.Client, o client.Object, data map[string]any) error
-	Check func(t *testing.T, c client.Client, o client.Object, data map[string]any) error
+	Mock  any
+	Pre   func(c client.Client, mock any, isSubmitted *bool, data map[string]any) error
+	Do    func(c client.Client, key types.NamespacedName, o client.Object, data map[string]any) error
+	Check func(t *testing.T, c client.Client, mock any, key types.NamespacedName, o client.Object, data map[string]any) error
 }
 
-func NewTestCase(t *testing.T, c client.Client, mock any, key types.NamespacedName, o client.Object, wait time.Duration, data map[string]any) *TestCase {
+func NewTestCase(t *testing.T, c client.Client, key types.NamespacedName, o client.Object, wait time.Duration, data map[string]any) *TestCase {
 	return &TestCase{
 		t:      t,
 		client: c,
 		object: o,
 		wait:   wait,
 		key:    key,
-		mock:   mock,
 		data:   data,
 		Steps:  make([]TestStep, 0),
 	}
@@ -61,7 +60,7 @@ func (h *TestCase) Run() {
 	for _, step := range h.Steps {
 		isSubmitted = &bFalse
 		if step.Pre != nil {
-			if err = step.Pre(h.client, h.mock, isSubmitted, h.data); err != nil {
+			if err = step.Pre(h.client, step.Mock, isSubmitted, h.data); err != nil {
 				h.t.Fatal(err)
 			}
 		}
@@ -73,7 +72,7 @@ func (h *TestCase) Run() {
 				h.t.Fatal(err)
 			}
 		}
-		if err = step.Do(h.client, h.object, h.data); err != nil {
+		if err = step.Do(h.client, h.key, h.object, h.data); err != nil {
 			h.t.Fatal(err)
 		}
 		isSubmitted = &bTrue
@@ -85,7 +84,7 @@ func (h *TestCase) Run() {
 				h.t.Fatal(err)
 			}
 		}
-		if err = step.Check(h.t, h.client, h.object, h.data); err != nil {
+		if err = step.Check(h.t, h.client, step.Mock, h.key, h.object, h.data); err != nil {
 			h.t.Fatal(err)
 		}
 		time.Sleep(h.wait)
