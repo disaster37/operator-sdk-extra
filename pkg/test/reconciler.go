@@ -30,7 +30,7 @@ type TestStep struct {
 	Check func(t *testing.T, c client.Client, o client.Object, data map[string]any) error
 }
 
-func NewTestCase(t *testing.T, c client.Client, mock any, key types.NamespacedName, o client.Object, wait time.Duration) *TestCase {
+func NewTestCase(t *testing.T, c client.Client, mock any, key types.NamespacedName, o client.Object, wait time.Duration, data map[string]any) *TestCase {
 	return &TestCase{
 		t:      t,
 		client: c,
@@ -38,7 +38,7 @@ func NewTestCase(t *testing.T, c client.Client, mock any, key types.NamespacedNa
 		wait:   wait,
 		key:    key,
 		mock:   mock,
-		data:   map[string]any{},
+		data:   data,
 		Steps:  make([]TestStep, 0),
 	}
 }
