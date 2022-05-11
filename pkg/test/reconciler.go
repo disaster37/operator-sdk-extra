@@ -17,8 +17,8 @@ type TestCase struct {
 }
 
 type TestStep struct {
-	Do    func() error
-	Check func(t *testing.T) error
+	Do    func(c client.Client) error
+	Check func(t *testing.T, c client.Client) error
 }
 
 func NewTestCase(t *testing.T, c client.Client) *TestCase {
@@ -40,12 +40,11 @@ func (h *TestCase) Run() {
 	}
 
 	for _, step := range h.Steps {
-		if err = step.Do(); err != nil {
+		if err = step.Do(h.client); err != nil {
 			h.t.Fatal(err)
 		}
-		if err = step.Check(h.t); err != nil {
+		if err = step.Check(h.t, h.client); err != nil {
 			h.t.Fatal(err)
 		}
 	}
-
 }
