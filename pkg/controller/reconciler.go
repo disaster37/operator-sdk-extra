@@ -86,8 +86,11 @@ func NewStdReconciler(client client.Client, finalizer string, reconciler Reconci
 }
 
 func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r resource.Resource, data map[string]interface{}) (res ctrl.Result, err error) {
-	var meta any
-	var diff Diff
+	var (
+		meta any
+		diff Diff
+		o    client.Object
+	)
 
 	h.log = h.log.WithFields(logrus.Fields{
 		"name":      req.Name,
@@ -96,8 +99,19 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r resou
 	h.log.Infof("---> Starting reconcile loop")
 	defer h.log.Info("---> Finish reconcile loop for")
 
+	// Resource can be composition of real resource that we need to extract in order to use with client
+	o = r
+	rv := reflect.ValueOf(r)
+	if rv.NumField() == 1 {
+		v := rv.Field(0)
+		if v.Elem().Kind() == reflect.Struct {
+			h.log.Debugf("Detect composition of type %s", v.Kind())
+			o = v.Interface().(client.Object)
+		}
+	}
+
 	// Get current resource
-	if err = h.Get(ctx, req.NamespacedName, r); err != nil {
+	if err = h.Get(ctx, req.NamespacedName, o); err != nil {
 		if k8serrors.IsNotFound(err) {
 			return ctrl.Result{}, nil
 		}
@@ -112,7 +126,7 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r resou
 		}
 		if !reflect.DeepEqual(currentStatus, r.GetStatus()) {
 			h.log.Debug("Detect that it need to update status")
-			if err = h.Client.Status().Update(ctx, r); err != nil {
+			if err = h.Client.Status().Update(ctx, o); err != nil {
 				h.log.Errorf("Error when update resource status: %s", err.Error())
 			}
 			h.log.Debug("Update status successfully")
@@ -121,14 +135,14 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r resou
 
 	// Add finalizer
 	if h.finalizer != "" {
-		if !controllerutil.ContainsFinalizer(r, h.finalizer) {
-			controllerutil.AddFinalizer(r, h.finalizer)
-			if err = h.Update(ctx, r); err != nil {
+		if !controllerutil.ContainsFinalizer(o, h.finalizer) {
+			controllerutil.AddFinalizer(o, h.finalizer)
+			if err = h.Update(ctx, o); err != nil {
 				h.log.Errorf("Error when add finalizer: %s", err.Error())
-				h.recorder.Eventf(r, core.EventTypeWarning, "Adding finalizer", "Failed to add finalizer: %s", err)
+				h.recorder.Eventf(o, core.EventTypeWarning, "Adding finalizer", "Failed to add finalizer: %s", err)
 				return ctrl.Result{RequeueAfter: h.waitDurationOnError}, err
 			}
-			h.recorder.Event(r, core.EventTypeNormal, "Added", "Object finalizer is added")
+			h.recorder.Event(o, core.EventTypeNormal, "Added", "Object finalizer is added")
 			h.log.Debug("Add finalizer successfully")
 			return ctrl.Result{Requeue: true}, nil
 		}
@@ -155,19 +169,19 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r resou
 
 	// Check if resource need to be deleted
 	if !r.GetObjectMeta().DeletionTimestamp.IsZero() {
-		if h.finalizer != "" && controllerutil.ContainsFinalizer(r, h.finalizer) {
+		if h.finalizer != "" && controllerutil.ContainsFinalizer(o, h.finalizer) {
 			h.log.Info("Start delete step")
 			if err = h.reconciler.Delete(ctx, r, data, meta); err != nil {
 				h.log.Errorf("Error when delete resource: %s", err.Error())
-				h.recorder.Eventf(r, core.EventTypeWarning, "Failed", "Error when delete resource: %s", err.Error())
+				h.recorder.Eventf(o, core.EventTypeWarning, "Failed", "Error when delete resource: %s", err.Error())
 				return ctrl.Result{RequeueAfter: h.waitDurationOnError}, err
 			}
 			h.log.Debug("Delete successfully")
 
-			controllerutil.RemoveFinalizer(r, h.finalizer)
-			if err = h.Update(ctx, r); err != nil {
+			controllerutil.RemoveFinalizer(o, h.finalizer)
+			if err = h.Update(ctx, o); err != nil {
 				h.log.Errorf("Failed to remove finalizer: %s", err.Error())
-				h.recorder.Eventf(r, core.EventTypeWarning, "Failed", "Error when remove finalizer: %s", err.Error())
+				h.recorder.Eventf(o, core.EventTypeWarning, "Failed", "Error when remove finalizer: %s", err.Error())
 				return ctrl.Result{RequeueAfter: h.waitDurationOnError}, err
 			}
 			h.log.Debug("Remove finalizer successfully")
