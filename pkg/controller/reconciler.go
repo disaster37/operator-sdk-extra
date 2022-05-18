@@ -101,7 +101,7 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r resou
 
 	// Resource can be composition of real resource that we need to extract in order to use with client
 	o = r
-	rv := reflect.ValueOf(r)
+	rv := reflect.ValueOf(r).Elem()
 	if rv.NumField() == 1 {
 		v := rv.Field(0)
 		if v.Elem().Kind() == reflect.Struct {
