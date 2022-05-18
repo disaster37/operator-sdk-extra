@@ -102,8 +102,10 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r resou
 	// Resource can be composition of real resource that we need to extract in order to use with client
 	o = r
 	rv := reflect.ValueOf(r).Elem()
+	h.log.Debugf("Num field: %d", rv.NumField())
 	if rv.NumField() == 1 {
 		v := rv.Field(0)
+		h.log.Debugf("Kind: %s, %s", v.Kind(), v.Elem().Kind())
 		if v.Elem().Kind() == reflect.Struct {
 			h.log.Debugf("Detect composition of type %s", v.Kind())
 			o = v.Interface().(client.Object)
