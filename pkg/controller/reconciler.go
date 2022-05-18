@@ -106,6 +106,7 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r resou
 	if rv.NumField() == 1 {
 		v := rv.Field(0)
 		h.log.Debugf("Kind: %s, %s", v.Kind(), v.Type())
+		h.log.Debugf("Kind: %s, %s", v.Elem().Kind(), v.Elem().Type())
 		if v.Elem().Kind() == reflect.Struct {
 			h.log.Debugf("Detect composition of type %s", v.Kind())
 			o = v.Interface().(client.Object)
