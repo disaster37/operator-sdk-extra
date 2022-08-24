@@ -107,23 +107,26 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r clien
 		return ctrl.Result{}, err
 	}
 
-	// Handle status update
-	currentStatus, err := copystructure.Copy(getObjectStatus(r))
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-	defer func() {
+	// Handle status update if exist
+	if getObjectStatus(r) != nil {
+		currentStatus, err := copystructure.Copy(getObjectStatus(r))
 		if err != nil {
-			h.reconciler.OnError(ctx, r, data, meta, err)
+			return ctrl.Result{}, err
 		}
-		if !reflect.DeepEqual(currentStatus, getObjectStatus(r)) {
-			h.log.Debug("Detect that it need to update status")
-			if err = h.Client.Status().Update(ctx, r); err != nil {
-				h.log.Errorf("Error when update resource status: %s", err.Error())
+		defer func() {
+			if err != nil {
+				h.reconciler.OnError(ctx, r, data, meta, err)
 			}
-			h.log.Debug("Update status successfully")
-		}
-	}()
+			if !reflect.DeepEqual(currentStatus, getObjectStatus(r)) {
+				h.log.Debug("Detect that it need to update status")
+				if err = h.Client.Status().Update(ctx, r); err != nil {
+					h.log.Errorf("Error when update resource status: %s", err.Error())
+				}
+				h.log.Debug("Update status successfully")
+			}
+		}()
+	}
+	
 
 	// Add finalizer
 	if h.finalizer != "" {
