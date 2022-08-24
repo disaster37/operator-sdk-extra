@@ -6,10 +6,11 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/disaster37/operator-sdk-extra/pkg/resource"
+	"github.com/mitchellh/copystructure"
 	"github.com/sirupsen/logrus"
 	core "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -19,33 +20,33 @@ import (
 type Reconciler interface {
 	// Confirgure permit to init external provider driver (API client REST)
 	// It can also permit to init condition on status
-	Configure(ctx context.Context, req ctrl.Request, resource resource.Resource) (meta any, err error)
+	Configure(ctx context.Context, req ctrl.Request, resource client.Object) (meta any, err error)
 
 	// Read permit to read the actual resource state from provider and set it on data map
-	Read(ctx context.Context, r resource.Resource, data map[string]any, meta any) (res ctrl.Result, err error)
+	Read(ctx context.Context, r client.Object, data map[string]any, meta any) (res ctrl.Result, err error)
 
 	// Create permit to create resource on provider
 	// It only call if diff.NeeCreated is true
-	Create(ctx context.Context, r resource.Resource, data map[string]any, meta any) (res ctrl.Result, err error)
+	Create(ctx context.Context, r client.Object, data map[string]any, meta any) (res ctrl.Result, err error)
 
 	// Update permit to update resource on provider
 	// It only call if diff.NeedUpdated is true
-	Update(ctx context.Context, r resource.Resource, data map[string]any, meta any) (res ctrl.Result, err error)
+	Update(ctx context.Context, r client.Object, data map[string]any, meta any) (res ctrl.Result, err error)
 
 	// Delete permit to delete resource on provider
 	// It only call if you have specified finalizer name when you create reconciler and if resource as marked to be deleted
-	Delete(ctx context.Context, r resource.Resource, data map[string]any, meta any) (err error)
+	Delete(ctx context.Context, r client.Object, data map[string]any, meta any) (err error)
 
 	// OnError is call when error is throwing
 	// It the right way to set status condition when error
-	OnError(ctx context.Context, r resource.Resource, data map[string]any, meta any, err error)
+	OnError(ctx context.Context, r client.Object, data map[string]any, meta any, err error)
 
 	// OnSuccess is call at the end if no error
 	// It's the right way to set status condition when everithink is good
-	OnSuccess(ctx context.Context, r resource.Resource, data map[string]any, meta any, diff Diff) (err error)
+	OnSuccess(ctx context.Context, r client.Object, data map[string]any, meta any, diff Diff) (err error)
 
 	// Diff permit to compare the actual state and the expected state
-	Diff(r resource.Resource, data map[string]any, meta any) (diff Diff, err error)
+	Diff(r client.Object, data map[string]any, meta any) (diff Diff, err error)
 }
 
 type Diff struct {
@@ -85,9 +86,11 @@ func NewStdReconciler(client client.Client, finalizer string, reconciler Reconci
 	return stdReconciler, nil
 }
 
-func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r resource.Resource, data map[string]interface{}) (res ctrl.Result, err error) {
-	var meta any
-	var diff Diff
+func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r client.Object, data map[string]interface{}) (res ctrl.Result, err error) {
+	var (
+		meta any
+		diff Diff
+	)
 
 	h.log = h.log.WithFields(logrus.Fields{
 		"name":      req.Name,
@@ -105,12 +108,15 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r resou
 	}
 
 	// Handle status update
-	currentStatus := r.DeepCopyObject().(resource.Resource).GetStatus()
+	currentStatus, err := copystructure.Copy(getObjectStatus(r))
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 	defer func() {
 		if err != nil {
 			h.reconciler.OnError(ctx, r, data, meta, err)
 		}
-		if !reflect.DeepEqual(currentStatus, r.GetStatus()) {
+		if !reflect.DeepEqual(currentStatus, getObjectStatus(r)) {
 			h.log.Debug("Detect that it need to update status")
 			if err = h.Client.Status().Update(ctx, r); err != nil {
 				h.log.Errorf("Error when update resource status: %s", err.Error())
@@ -154,7 +160,7 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r resou
 	h.log.Debug("Get resource successfully")
 
 	// Check if resource need to be deleted
-	if !r.GetObjectMeta().DeletionTimestamp.IsZero() {
+	if !getObjectMeta(r).DeletionTimestamp.IsZero() {
 		if h.finalizer != "" && controllerutil.ContainsFinalizer(r, h.finalizer) {
 			h.log.Info("Start delete step")
 			if err = h.reconciler.Delete(ctx, r, data, meta); err != nil {
@@ -213,4 +219,30 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r resou
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func getObjectMeta(r client.Object) metav1.ObjectMeta {
+	rt := reflect.TypeOf(r)
+	if rt.Kind() != reflect.Ptr {
+		panic("Resource must be pointer")
+	}
+	rv := reflect.ValueOf(r).Elem()
+	om := rv.FieldByName("ObjectMeta")
+	if !om.IsValid() {
+		panic("Resouce must have field ObjectMeta")
+	}
+	return om.Interface().(metav1.ObjectMeta)
+}
+
+func getObjectStatus(r client.Object) any {
+	rt := reflect.TypeOf(r)
+	if rt.Kind() != reflect.Ptr {
+		panic("Resource must be pointer")
+	}
+	rv := reflect.ValueOf(r).Elem()
+	om := rv.FieldByName("Status")
+	if !om.IsValid() {
+		return nil
+	}
+	return om.Interface()
 }
