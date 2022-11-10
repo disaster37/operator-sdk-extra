@@ -84,7 +84,7 @@ func NewStdReconciler(client client.Client, finalizer string, reconciler Reconci
 	return stdReconciler, nil
 }
 
-func (h *StdReconciler) Reconsiles(ctx context.Context, req ctrl.Request, r client.Object, data map[string]interface{}, reconcilers ...Reconciler) (res ctrl.Result, err error) {
+func (h *StdReconciler) Reconciles(ctx context.Context, req ctrl.Request, r client.Object, data map[string]interface{}, reconcilers ...Reconciler) (res ctrl.Result, err error) {
 
 	var (
 		meta any
