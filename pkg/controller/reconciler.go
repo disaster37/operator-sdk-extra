@@ -3,8 +3,10 @@ package controller
 import (
 	"context"
 	"reflect"
+	"strings"
 
 	"github.com/mitchellh/copystructure"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	core "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -13,7 +15,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"github.com/pkg/errors"
 )
 
 type Reconciler interface {
@@ -46,12 +47,47 @@ type Reconciler interface {
 
 	// Diff permit to compare the actual state and the expected state
 	Diff(r client.Object, data map[string]any, meta any) (diff Diff, err error)
+
+}
+
+type K8sReconciler interface {
+	// Configure permit to init condition on status
+	Configure(ctx context.Context, req ctrl.Request, resource client.Object) (meta any, err error)
+
+	// Read permit to read kubernetes resources
+	Read(ctx context.Context, r client.Object, data map[string]any, meta any) (res ctrl.Result, err error)
+
+	// CreateOrUpdate permit to create or update resources on kubernetes
+	CreateOrUpdate(ctx context.Context, r client.Object, data map[string]any, meta any) (res ctrl.Result, err error)
+
+	// Delete permit to delete resources on kubernetes
+	Delete(ctx context.Context, r client.Object, data map[string]any, meta any) (res ctrl.Result, err error)
+
+	// OnError is call when error is throwing on current phase
+	// It the right way to set status condition when error
+	OnError(ctx context.Context, r client.Object, data map[string]any, meta any, currentErr error) (res ctrl.Result, err error)
+
+	// OnSuccess is call at the end of current phase, if not error
+	// It's the right way to set status condition when everithink is good
+	OnSuccess(ctx context.Context, r client.Object, data map[string]any, meta any, diff K8sDiff) (res ctrl.Result, err error)
+
+	// Diff permit to compare the actual state and the expected state
+	Diff(r client.Object, data map[string]any, meta any) (diff K8sDiff, err error)
+
+	// Name return the reconciler name
+	Name() string
 }
 
 type Diff struct {
 	NeedCreate bool
 	NeedUpdate bool
 	Diff       string
+}
+
+type K8sDiff struct {
+	NeedCreateOrUpdate bool
+	NeedDelete bool
+	Diff       strings.Builder
 }
 
 type StdReconciler struct {
@@ -84,7 +120,18 @@ func NewStdReconciler(client client.Client, finalizer string, reconciler Reconci
 	return stdReconciler, nil
 }
 
-func (h *StdReconciler) Reconciles(ctx context.Context, req ctrl.Request, r client.Object, data map[string]interface{}, reconcilers ...Reconciler) (res ctrl.Result, err error) {
+// ReconcileK8sResources permit to reconcile kubernetes resources, so the step is not the same on Reconcile.
+// When handle kubernetes resources, you should to chain the reconcile on multiple resources
+// It will run on following steps
+// 1. Read the main object
+// 2. Configure finalizer on the main object
+// 3. Execute each phase that concist of:
+// 3.1 Read kubernetes objects
+// 3.2 Diff kubernetes resources with expected resources
+// 3.3 Update / create resources if needed
+// 3.4 Delete resources if needed
+// 4. Delete finalizer if on delete action
+func (h *StdReconciler) ReconcileK8sResources(ctx context.Context, req ctrl.Request, r client.Object, data map[string]interface{}, reconcilers ...K8sReconciler) (res ctrl.Result, err error) {
 
 	var (
 		meta any
@@ -143,12 +190,12 @@ func (h *StdReconciler) Reconciles(ctx context.Context, req ctrl.Request, r clie
 	}
 
 	// Call resonsilers
-	for i, reconciler := range reconcilers {
-		h.log.Infof("Run phase %d", i)
+	for _, reconciler := range reconcilers {
+		h.log.Infof("Run phase %s", reconciler.Name())
 
 		res, err = h.reconcilePhase(ctx, req, r, data, reconciler)
 		if err != nil {
-			return res, errors.Wrapf(err, "Error when run phase %d", i)
+			return res, errors.Wrapf(err, "Error when run phase %s", reconciler.Name())
 		}
 
 		if res != (ctrl.Result{}) {
@@ -173,86 +220,14 @@ func (h *StdReconciler) Reconciles(ctx context.Context, req ctrl.Request, r clie
 	return res, nil
 }
 
-func (h *StdReconciler) reconcilePhase(ctx context.Context, req ctrl.Request, r client.Object, data map[string]interface{}, reconciler Reconciler) (res ctrl.Result, err error) {
-	
-	var (
-		meta any
-		diff Diff
-	)
-
-	// Configure 
-	meta, err = reconciler.Configure(ctx, req, r)
-	if err != nil {
-		h.log.Errorf("Error configure reconciler: %s", err.Error())
-		return res, err
-	}
-	h.log.Debug("Configure reconciler successfully")
-
-	// Read resources
-	res, err = reconciler.Read(ctx, r, data, meta)
-	if err != nil {
-		h.log.Errorf("Error when get resource: %s", err.Error())
-		return res, err
-	}
-	if res != (ctrl.Result{}) {
-		return res, nil
-	}
-	h.log.Debug("Get resource successfully")
-
-	// Check if resource need to be deleted
-	if !getObjectMeta(r).DeletionTimestamp.IsZero() {
-		if h.finalizer != "" && controllerutil.ContainsFinalizer(r, h.finalizer) {
-			h.log.Info("Start delete step")
-			if err = reconciler.Delete(ctx, r, data, meta); err != nil {
-				h.log.Errorf("Error when delete resource: %s", err.Error())
-				h.recorder.Eventf(r, core.EventTypeWarning, "Failed", "Error when delete resource: %s", err.Error())
-				return res, err
-			}
-			h.log.Debug("Delete successfully")
-		}
-		return ctrl.Result{}, nil
-	}
-
-	//Check if diff exist
-	diff, err = reconciler.Diff(r, data, meta)
-	if err != nil {
-		return res, err
-	}
-
-	// Need create
-	if diff.NeedCreate {
-		h.log.Info("Start create step")
-		res, err = reconciler.Create(ctx, r, data, meta)
-		if err != nil {
-			return res, err
-		}
-	}
-
-	// Need update
-	if diff.NeedUpdate {
-		h.log.Infof("Start update step with diff:\n%s", diff.Diff)
-		res, err = reconciler.Update(ctx, r, data, meta)
-		if err != nil {
-			return res, err
-		}
-	}
-
-	// Nothink to do
-	if !diff.NeedCreate && !diff.NeedUpdate {
-		h.log.Debug("Nothink to do")
-	}
-
-	if res != (ctrl.Result{}) {
-		return res, nil
-	}
-
-	if err = reconciler.OnSuccess(ctx, r, data, meta, diff); err != nil {
-		return res, err
-	}
-
-	return res, err
-}
-
+// Reconcile permit to reconcile resource one external service, throughtout API
+// It will handle all aspect of that
+// 1. Read resource on kubernetes
+// 2. Configure finalizer
+// 3. Read external resources
+// 4. Check if on delete phase, delete external resources if on it
+// 5. Diff external resources with the expected resources
+// 6. Create or update external resources if needed
 func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r client.Object, data map[string]interface{}) (res ctrl.Result, err error) {
 	var (
 		meta any
@@ -415,4 +390,72 @@ func getObjectStatus(r client.Object) any {
 		return nil
 	}
 	return om.Interface()
+}
+
+// reconcilePhase permit to reconcile phase
+// 1 Read kubernetes objects
+// 2 Diff kubernetes resources with expected resources
+// 3 Update / create resources if needed
+// 4 Delete resources if needed
+func (h *StdReconciler) reconcilePhase(ctx context.Context, req ctrl.Request, r client.Object, data map[string]interface{}, reconciler K8sReconciler) (res ctrl.Result, err error) {
+	
+	var (
+		meta any
+		diff K8sDiff
+	)
+
+	// Configure 
+	meta, err = reconciler.Configure(ctx, req, r)
+	if err != nil {
+		h.log.Errorf("Error configure reconciler: %s", err.Error())
+		return reconciler.OnError(ctx, r, data, meta, err)
+	}
+	h.log.Debug("Configure reconciler successfully")
+
+	// Read resources
+	res, err = reconciler.Read(ctx, r, data, meta)
+	if err != nil {
+		h.log.Errorf("Error when get resource: %s", err.Error())
+		return reconciler.OnError(ctx, r, data, meta, err)
+	}
+	if res != (ctrl.Result{}) {
+		return res, nil
+	}
+	h.log.Debug("Get resource successfully")
+
+	//Check if diff exist
+	diff, err = reconciler.Diff(r, data, meta)
+	if err != nil {
+		return reconciler.OnError(ctx, r, data, meta, err)
+	}
+	h.log.Debugf("Diff: %s", diff.Diff.String())
+
+	// Need create or update resources
+	if diff.NeedCreateOrUpdate {
+		h.log.Debug("Start create / update step")
+		res, err = reconciler.CreateOrUpdate(ctx, r, data, meta)
+		if err != nil {
+			return reconciler.OnError(ctx, r, data, meta, err)
+		}
+	}
+
+	// Need Delete
+	if diff.NeedDelete {
+		h.log.Debug("Start delete step")
+		res, err = reconciler.Delete(ctx, r, data, meta)
+		if err != nil {
+			return reconciler.OnError(ctx, r, data, meta, err)
+		}
+	}
+
+	// Nothink to do
+	if !diff.NeedCreateOrUpdate && !diff.NeedDelete {
+		h.log.Debug("Nothink to do")
+	}
+
+	if res != (ctrl.Result{}) {
+		return res, nil
+	}
+
+	return reconciler.OnSuccess(ctx, r, data, meta, diff)
 }
