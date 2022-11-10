@@ -2,9 +2,7 @@ package controller
 
 import (
 	"context"
-	"errors"
 	"reflect"
-	"time"
 
 	"github.com/mitchellh/copystructure"
 	"github.com/sirupsen/logrus"
@@ -15,6 +13,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"github.com/pkg/errors"
 )
 
 type Reconciler interface {
@@ -61,10 +60,10 @@ type StdReconciler struct {
 	reconciler          Reconciler
 	log                 *logrus.Entry
 	recorder            record.EventRecorder
-	waitDurationOnError time.Duration
 }
 
-func NewStdReconciler(client client.Client, finalizer string, reconciler Reconciler, logger *logrus.Entry, recorder record.EventRecorder, waitDurationOnError time.Duration) (stdReconciler *StdReconciler, err error) {
+
+func NewStdReconciler(client client.Client, finalizer string, reconciler Reconciler, logger *logrus.Entry, recorder record.EventRecorder) (stdReconciler *StdReconciler, err error) {
 
 	if recorder == nil {
 		return nil, errors.New("recorder can't be nil")
@@ -76,7 +75,6 @@ func NewStdReconciler(client client.Client, finalizer string, reconciler Reconci
 		reconciler:          reconciler,
 		recorder:            recorder,
 		log:                 logger,
-		waitDurationOnError: waitDurationOnError,
 	}
 
 	if stdReconciler.log == nil {
@@ -84,6 +82,23 @@ func NewStdReconciler(client client.Client, finalizer string, reconciler Reconci
 	}
 
 	return stdReconciler, nil
+}
+
+func (h *StdReconciler) Reconsiles(reconciles ...func() (res ctrl.Result, err error)) (res ctrl.Result, err error) {
+
+	for i, reconsile := range reconciles {
+		h.log.Infof("Run phase %d", i)
+		res, err = reconsile()
+		if err != nil {
+			return res, errors.Wrapf(err, "Error when run phase %d", i)
+		}
+
+		if res != (ctrl.Result{}) {
+			return res, nil
+		}
+	}
+
+	return res, nil
 }
 
 func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r client.Object, data map[string]interface{}) (res ctrl.Result, err error) {
@@ -102,16 +117,16 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r clien
 	// Get current resource
 	if err = h.Get(ctx, req.NamespacedName, r); err != nil {
 		if k8serrors.IsNotFound(err) {
-			return ctrl.Result{}, nil
+			return res, nil
 		}
-		return ctrl.Result{}, err
+		return res, err
 	}
 
 	// Handle status update if exist
 	if getObjectStatus(r) != nil {
 		currentStatus, err := copystructure.Copy(getObjectStatus(r))
 		if err != nil {
-			return ctrl.Result{}, err
+			return res, err
 		}
 		defer func() {
 			if err != nil {
@@ -135,7 +150,7 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r clien
 			if err = h.Update(ctx, r); err != nil {
 				h.log.Errorf("Error when add finalizer: %s", err.Error())
 				h.recorder.Eventf(r, core.EventTypeWarning, "Adding finalizer", "Failed to add finalizer: %s", err)
-				return ctrl.Result{RequeueAfter: h.waitDurationOnError}, err
+				return res, err
 			}
 			h.recorder.Event(r, core.EventTypeNormal, "Added", "Object finalizer is added")
 			h.log.Debug("Add finalizer successfully")
@@ -147,15 +162,15 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r clien
 	meta, err = h.reconciler.Configure(ctx, req, r)
 	if err != nil {
 		h.log.Errorf("Error configure reconciler: %s", err.Error())
-		return ctrl.Result{RequeueAfter: h.waitDurationOnError}, err
+		return res, err
 	}
 	h.log.Debug("Configure reconciler successfully")
 
-	// Read external resources
+	// Read resources
 	res, err = h.reconciler.Read(ctx, r, data, meta)
 	if err != nil {
 		h.log.Errorf("Error when get resource: %s", err.Error())
-		return ctrl.Result{RequeueAfter: h.waitDurationOnError}, err
+		return res, err
 	}
 	if res != (ctrl.Result{}) {
 		return res, nil
@@ -169,7 +184,7 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r clien
 			if err = h.reconciler.Delete(ctx, r, data, meta); err != nil {
 				h.log.Errorf("Error when delete resource: %s", err.Error())
 				h.recorder.Eventf(r, core.EventTypeWarning, "Failed", "Error when delete resource: %s", err.Error())
-				return ctrl.Result{RequeueAfter: h.waitDurationOnError}, err
+				return res, err
 			}
 			h.log.Debug("Delete successfully")
 
@@ -177,7 +192,7 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r clien
 			if err = h.Update(ctx, r); err != nil {
 				h.log.Errorf("Failed to remove finalizer: %s", err.Error())
 				h.recorder.Eventf(r, core.EventTypeWarning, "Failed", "Error when remove finalizer: %s", err.Error())
-				return ctrl.Result{RequeueAfter: h.waitDurationOnError}, err
+				return res, err
 			}
 			h.log.Debug("Remove finalizer successfully")
 		}
@@ -187,7 +202,7 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r clien
 	//Check if diff exist
 	diff, err = h.reconciler.Diff(r, data, meta)
 	if err != nil {
-		return ctrl.Result{RequeueAfter: h.waitDurationOnError}, err
+		return res, err
 	}
 
 	// Need create
@@ -195,7 +210,7 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r clien
 		h.log.Info("Start create step")
 		res, err = h.reconciler.Create(ctx, r, data, meta)
 		if err != nil {
-			return ctrl.Result{RequeueAfter: h.waitDurationOnError}, err
+			return res, err
 		}
 	}
 
@@ -204,7 +219,7 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r clien
 		h.log.Infof("Start update step with diff:\n%s", diff.Diff)
 		res, err = h.reconciler.Update(ctx, r, data, meta)
 		if err != nil {
-			return ctrl.Result{RequeueAfter: h.waitDurationOnError}, err
+			return res, err
 		}
 	}
 
@@ -218,10 +233,10 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r clien
 	}
 
 	if err = h.reconciler.OnSuccess(ctx, r, data, meta, diff); err != nil {
-		return ctrl.Result{RequeueAfter: h.waitDurationOnError}, err
+		return res, err
 	}
 
-	return ctrl.Result{}, nil
+	return res, nil
 }
 
 func getObjectMeta(r client.Object) metav1.ObjectMeta {
