@@ -84,11 +84,69 @@ func NewStdReconciler(client client.Client, finalizer string, reconciler Reconci
 	return stdReconciler, nil
 }
 
-func (h *StdReconciler) Reconsiles(reconciles ...func() (res ctrl.Result, err error)) (res ctrl.Result, err error) {
+func (h *StdReconciler) Reconsiles(ctx context.Context, req ctrl.Request, r client.Object, data map[string]interface{}, reconcilers ...Reconciler) (res ctrl.Result, err error) {
 
-	for i, reconsile := range reconciles {
+	var (
+		meta any
+	)
+
+	// Init logger
+	h.log = h.log.WithFields(logrus.Fields{
+		"name":      req.Name,
+		"namespace": req.Namespace,
+	})
+	h.log.Infof("---> Starting reconcile loop")
+	defer h.log.Info("---> Finish reconcile loop for")
+
+	// Get current resource
+	if err = h.Get(ctx, req.NamespacedName, r); err != nil {
+		if k8serrors.IsNotFound(err) {
+			return res, nil
+		}
+		return res, err
+	}
+
+	// Handle status update if exist
+	if getObjectStatus(r) != nil {
+		currentStatus, err := copystructure.Copy(getObjectStatus(r))
+		if err != nil {
+			return res, err
+		}
+		defer func() {
+			if err != nil {
+				h.reconciler.OnError(ctx, r, data, meta, err)
+			}
+			if !reflect.DeepEqual(currentStatus, getObjectStatus(r)) {
+				h.log.Debug("Detect that it need to update status")
+				if err = h.Client.Status().Update(ctx, r); err != nil {
+					h.log.Errorf("Error when update resource status: %s", err.Error())
+				}
+				h.log.Debug("Update status successfully")
+			}
+		}()
+	}
+	
+
+	// Add finalizer
+	if h.finalizer != "" {
+		if !controllerutil.ContainsFinalizer(r, h.finalizer) {
+			controllerutil.AddFinalizer(r, h.finalizer)
+			if err = h.Update(ctx, r); err != nil {
+				h.log.Errorf("Error when add finalizer: %s", err.Error())
+				h.recorder.Eventf(r, core.EventTypeWarning, "Adding finalizer", "Failed to add finalizer: %s", err)
+				return res, err
+			}
+			h.recorder.Event(r, core.EventTypeNormal, "Added", "Object finalizer is added")
+			h.log.Debug("Add finalizer successfully")
+			return ctrl.Result{Requeue: true}, nil
+		}
+	}
+
+	// Call resonsilers
+	for i, reconciler := range reconcilers {
 		h.log.Infof("Run phase %d", i)
-		res, err = reconsile()
+
+		res, err = h.reconcilePhase(ctx, req, r, data, reconciler)
 		if err != nil {
 			return res, errors.Wrapf(err, "Error when run phase %d", i)
 		}
@@ -98,7 +156,101 @@ func (h *StdReconciler) Reconsiles(reconciles ...func() (res ctrl.Result, err er
 		}
 	}
 
+	// Handle delete finalizer
+	if !getObjectMeta(r).DeletionTimestamp.IsZero() {
+		if h.finalizer != "" && controllerutil.ContainsFinalizer(r, h.finalizer) {
+			controllerutil.RemoveFinalizer(r, h.finalizer)
+			if err = h.Update(ctx, r); err != nil {
+				h.log.Errorf("Failed to remove finalizer: %s", err.Error())
+				h.recorder.Eventf(r, core.EventTypeWarning, "Failed", "Error when remove finalizer: %s", err.Error())
+				return res, err
+			}
+			h.log.Debug("Remove finalizer successfully")
+		}
+		return ctrl.Result{}, nil
+	}
+
 	return res, nil
+}
+
+func (h *StdReconciler) reconcilePhase(ctx context.Context, req ctrl.Request, r client.Object, data map[string]interface{}, reconciler Reconciler) (res ctrl.Result, err error) {
+	
+	var (
+		meta any
+		diff Diff
+	)
+
+	// Configure 
+	meta, err = reconciler.Configure(ctx, req, r)
+	if err != nil {
+		h.log.Errorf("Error configure reconciler: %s", err.Error())
+		return res, err
+	}
+	h.log.Debug("Configure reconciler successfully")
+
+	// Read resources
+	res, err = reconciler.Read(ctx, r, data, meta)
+	if err != nil {
+		h.log.Errorf("Error when get resource: %s", err.Error())
+		return res, err
+	}
+	if res != (ctrl.Result{}) {
+		return res, nil
+	}
+	h.log.Debug("Get resource successfully")
+
+	// Check if resource need to be deleted
+	if !getObjectMeta(r).DeletionTimestamp.IsZero() {
+		if h.finalizer != "" && controllerutil.ContainsFinalizer(r, h.finalizer) {
+			h.log.Info("Start delete step")
+			if err = reconciler.Delete(ctx, r, data, meta); err != nil {
+				h.log.Errorf("Error when delete resource: %s", err.Error())
+				h.recorder.Eventf(r, core.EventTypeWarning, "Failed", "Error when delete resource: %s", err.Error())
+				return res, err
+			}
+			h.log.Debug("Delete successfully")
+		}
+		return ctrl.Result{}, nil
+	}
+
+	//Check if diff exist
+	diff, err = reconciler.Diff(r, data, meta)
+	if err != nil {
+		return res, err
+	}
+
+	// Need create
+	if diff.NeedCreate {
+		h.log.Info("Start create step")
+		res, err = reconciler.Create(ctx, r, data, meta)
+		if err != nil {
+			return res, err
+		}
+	}
+
+	// Need update
+	if diff.NeedUpdate {
+		h.log.Infof("Start update step with diff:\n%s", diff.Diff)
+		res, err = reconciler.Update(ctx, r, data, meta)
+		if err != nil {
+			return res, err
+		}
+	}
+
+	// Nothink to do
+	if !diff.NeedCreate && !diff.NeedUpdate {
+		h.log.Debug("Nothink to do")
+	}
+
+	if res != (ctrl.Result{}) {
+		return res, nil
+	}
+
+	if err = reconciler.OnSuccess(ctx, r, data, meta, diff); err != nil {
+		return res, err
+	}
+
+	return res, err
 }
 
 func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r client.Object, data map[string]interface{}) (res ctrl.Result, err error) {
