@@ -23,8 +23,11 @@ type K8sReconciler interface {
 	// Read permit to read kubernetes resources
 	Read(ctx context.Context, r client.Object, data map[string]any) (res ctrl.Result, err error)
 
-	// CreateOrUpdate permit to create or update resources on kubernetes
-	CreateOrUpdate(ctx context.Context, r client.Object, data map[string]any) (res ctrl.Result, err error)
+	// Create permit to create resources on kubernetes
+	Create(ctx context.Context, r client.Object, data map[string]any) (res ctrl.Result, err error)
+
+	// Update permit to update resources on kubernetes
+	Update(ctx context.Context, r client.Object, data map[string]any) (res ctrl.Result, err error)
 
 	// Delete permit to delete resources on kubernetes
 	Delete(ctx context.Context, r client.Object, data map[string]any) (res ctrl.Result, err error)
@@ -45,7 +48,8 @@ type K8sReconciler interface {
 }
 
 type K8sDiff struct {
-	NeedCreateOrUpdate bool
+	NeedCreate bool
+	NeedUpdate bool
 	NeedDelete bool
 	Diff       strings.Builder
 }
@@ -212,10 +216,19 @@ func (h *StdK8sReconciler) reconcilePhase(ctx context.Context, req ctrl.Request,
 	}
 	h.log.Debugf("Diff: %s", diff.Diff.String())
 
-	// Need create or update resources
-	if diff.NeedCreateOrUpdate {
-		h.log.Debug("Start create / update step")
-		res, err = reconciler.CreateOrUpdate(ctx, r, data)
+	// Need create resources
+	if diff.NeedCreate {
+		h.log.Debug("Start create step")
+		res, err = reconciler.Create(ctx, r, data)
+		if err != nil {
+			return reconciler.OnError(ctx, r, data, err)
+		}
+	}
+
+	// Need update resources
+	if diff.NeedUpdate {
+		h.log.Debug("Start update step")
+		res, err = reconciler.Update(ctx, r, data)
 		if err != nil {
 			return reconciler.OnError(ctx, r, data, err)
 		}
@@ -231,7 +244,7 @@ func (h *StdK8sReconciler) reconcilePhase(ctx context.Context, req ctrl.Request,
 	}
 
 	// Nothink to do
-	if !diff.NeedCreateOrUpdate && !diff.NeedDelete {
+	if !diff.NeedCreate && !diff.NeedUpdate && !diff.NeedDelete {
 		h.log.Debug("Nothink to do")
 	}
 
