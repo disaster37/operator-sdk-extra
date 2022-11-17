@@ -41,7 +41,7 @@ type K8sReconciler interface {
 	OnSuccess(ctx context.Context, r client.Object, data map[string]any, diff K8sDiff) (res ctrl.Result, err error)
 
 	// Diff permit to compare the actual state and the expected state
-	Diff(r client.Object, data map[string]any) (diff K8sDiff, err error)
+	Diff(ctx context.Context, r client.Object, data map[string]any) (diff K8sDiff, res ctrl.Result, err error)
 
 	// Name return the reconciler name
 	Name() string
@@ -112,6 +112,21 @@ func (h *StdK8sReconciler) Reconcile(ctx context.Context, req ctrl.Request, r cl
 		return res, err
 	}
 
+	// Add finalizer
+	if h.finalizer != "" {
+		if !controllerutil.ContainsFinalizer(r, h.finalizer) {
+			controllerutil.AddFinalizer(r, h.finalizer)
+			if err = h.Update(ctx, r); err != nil {
+				h.log.Errorf("Error when add finalizer: %s", err.Error())
+				h.recorder.Eventf(r, core.EventTypeWarning, "Adding finalizer", "Failed to add finalizer: %s", err)
+				return h.reconciler.OnError(ctx, r, data, err)
+			}
+			h.recorder.Event(r, core.EventTypeNormal, "Added", "Object finalizer is added")
+			h.log.Debug("Add finalizer successfully")
+			return ctrl.Result{Requeue: true}, nil
+		}
+	}
+
 	// Handle status update if exist
 	if getObjectStatus(r) != nil {
 		currentStatus, err := copystructure.Copy(getObjectStatus(r))
@@ -128,26 +143,12 @@ func (h *StdK8sReconciler) Reconcile(ctx context.Context, req ctrl.Request, r cl
 			}
 		}()
 	}
-	
-
-	// Add finalizer
-	if h.finalizer != "" {
-		if !controllerutil.ContainsFinalizer(r, h.finalizer) {
-			controllerutil.AddFinalizer(r, h.finalizer)
-			if err = h.Update(ctx, r); err != nil {
-				h.log.Errorf("Error when add finalizer: %s", err.Error())
-				h.recorder.Eventf(r, core.EventTypeWarning, "Adding finalizer", "Failed to add finalizer: %s", err)
-				return h.reconciler.OnError(ctx, r, data, err)
-			}
-			h.recorder.Event(r, core.EventTypeNormal, "Added", "Object finalizer is added")
-			h.log.Debug("Add finalizer successfully")
-			return ctrl.Result{Requeue: true}, nil
-		}
-	}
 
 	// Call resonsilers
 	for _, reconciler := range reconcilers {
 		h.log.Infof("Run phase %s", reconciler.Name())
+
+		data := map[string]any{}
 
 		res, err = h.reconcilePhase(ctx, req, r, data, reconciler)
 		if err != nil {
@@ -210,9 +211,12 @@ func (h *StdK8sReconciler) reconcilePhase(ctx context.Context, req ctrl.Request,
 	h.log.Debug("Get resource successfully")
 
 	//Check if diff exist
-	diff, err = reconciler.Diff(r, data)
+	diff, res, err = reconciler.Diff(ctx, r, data)
 	if err != nil {
 		return reconciler.OnError(ctx, r, data, err)
+	}
+	if res != (ctrl.Result{}) {
+		return res, nil
 	}
 	h.log.Debugf("Diff: %s", diff.Diff.String())
 
