@@ -4,6 +4,7 @@ import (
 	"context"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/mitchellh/copystructure"
 	"github.com/pkg/errors"
@@ -56,10 +57,10 @@ type K8sDiff struct {
 
 type StdK8sReconciler struct {
 	client.Client
-	finalizer           string
-	reconciler          K8sReconciler
-	log                 *logrus.Entry
-	recorder            record.EventRecorder
+	finalizer  string
+	reconciler K8sReconciler
+	log        *logrus.Entry
+	recorder   record.EventRecorder
 }
 
 func NewStdK8sReconciler(client client.Client, finalizer string, reconciler K8sReconciler, logger *logrus.Entry, recorder record.EventRecorder) (stdK8sReconciler *StdK8sReconciler, err error) {
@@ -69,11 +70,11 @@ func NewStdK8sReconciler(client client.Client, finalizer string, reconciler K8sR
 	}
 
 	stdK8sReconciler = &StdK8sReconciler{
-		Client:              client,
-		finalizer:           finalizer,
-		reconciler:          reconciler,
-		recorder:            recorder,
-		log:                 logger,
+		Client:     client,
+		finalizer:  finalizer,
+		reconciler: reconciler,
+		recorder:   recorder,
+		log:        logger,
 	}
 
 	if stdK8sReconciler.log == nil {
@@ -103,6 +104,9 @@ func (h *StdK8sReconciler) Reconcile(ctx context.Context, req ctrl.Request, r cl
 	})
 	h.log.Infof("---> Starting reconcile loop")
 	defer h.log.Info("---> Finish reconcile loop for")
+
+	// Wait few second to be sure status is propaged througout ETCD
+	time.Sleep(time.Second * 5)
 
 	// Get current resource
 	if err = h.Get(ctx, req.NamespacedName, r); err != nil {
@@ -152,7 +156,7 @@ func (h *StdK8sReconciler) Reconcile(ctx context.Context, req ctrl.Request, r cl
 
 		res, err = h.reconcilePhase(ctx, req, r, data, reconciler)
 		if err != nil {
-			return h.reconciler.OnError(ctx, r, data, errors.Wrapf(err, "Error when run phase %s", reconciler.Name())) 
+			return h.reconciler.OnError(ctx, r, data, errors.Wrapf(err, "Error when run phase %s", reconciler.Name()))
 		}
 
 		if res != (ctrl.Result{}) {
@@ -167,7 +171,7 @@ func (h *StdK8sReconciler) Reconcile(ctx context.Context, req ctrl.Request, r cl
 			if err = h.Update(ctx, r); err != nil {
 				h.log.Errorf("Failed to remove finalizer: %s", err.Error())
 				h.recorder.Eventf(r, core.EventTypeWarning, "Failed", "Error when remove finalizer: %s", err.Error())
-				return  h.reconciler.OnError(ctx, r, data, err)
+				return h.reconciler.OnError(ctx, r, data, err)
 			}
 			h.log.Debug("Remove finalizer successfully")
 		}
@@ -183,12 +187,12 @@ func (h *StdK8sReconciler) Reconcile(ctx context.Context, req ctrl.Request, r cl
 // 3 Update / create resources if needed
 // 4 Delete resources if needed
 func (h *StdK8sReconciler) reconcilePhase(ctx context.Context, req ctrl.Request, r client.Object, data map[string]interface{}, reconciler K8sReconciler) (res ctrl.Result, err error) {
-	
+
 	var (
 		diff K8sDiff
 	)
 
-	// Configure 
+	// Configure
 	res, err = reconciler.Configure(ctx, req, r)
 	if err != nil {
 		h.log.Errorf("Error configure reconciler: %s", err.Error())
