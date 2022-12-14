@@ -45,7 +45,6 @@ type Reconciler interface {
 
 	// Diff permit to compare the actual state and the expected state
 	Diff(r client.Object, data map[string]any, meta any) (diff Diff, err error)
-
 }
 
 type Diff struct {
@@ -54,15 +53,13 @@ type Diff struct {
 	Diff       string
 }
 
-
 type StdReconciler struct {
 	client.Client
-	finalizer           string
-	reconciler          Reconciler
-	log                 *logrus.Entry
-	recorder            record.EventRecorder
+	finalizer  string
+	reconciler Reconciler
+	log        *logrus.Entry
+	recorder   record.EventRecorder
 }
-
 
 func NewStdReconciler(client client.Client, finalizer string, reconciler Reconciler, logger *logrus.Entry, recorder record.EventRecorder) (stdReconciler *StdReconciler, err error) {
 
@@ -71,11 +68,11 @@ func NewStdReconciler(client client.Client, finalizer string, reconciler Reconci
 	}
 
 	stdReconciler = &StdReconciler{
-		Client:              client,
-		finalizer:           finalizer,
-		reconciler:          reconciler,
-		recorder:            recorder,
-		log:                 logger,
+		Client:     client,
+		finalizer:  finalizer,
+		reconciler: reconciler,
+		recorder:   recorder,
+		log:        logger,
 	}
 
 	if stdReconciler.log == nil {
@@ -114,6 +111,21 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r clien
 		return res, err
 	}
 
+	// Add finalizer
+	if h.finalizer != "" {
+		if !controllerutil.ContainsFinalizer(r, h.finalizer) {
+			controllerutil.AddFinalizer(r, h.finalizer)
+			if err = h.Update(ctx, r); err != nil {
+				h.log.Errorf("Error when add finalizer: %s", err.Error())
+				h.recorder.Eventf(r, core.EventTypeWarning, "Adding finalizer", "Failed to add finalizer: %s", err)
+				return res, err
+			}
+			h.recorder.Event(r, core.EventTypeNormal, "Added", "Object finalizer is added")
+			h.log.Debug("Add finalizer successfully")
+			return ctrl.Result{Requeue: true}, nil
+		}
+	}
+
 	// Handle status update if exist
 	if getObjectStatus(r) != nil {
 		currentStatus, err := copystructure.Copy(getObjectStatus(r))
@@ -132,22 +144,6 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r clien
 				h.log.Debug("Update status successfully")
 			}
 		}()
-	}
-	
-
-	// Add finalizer
-	if h.finalizer != "" {
-		if !controllerutil.ContainsFinalizer(r, h.finalizer) {
-			controllerutil.AddFinalizer(r, h.finalizer)
-			if err = h.Update(ctx, r); err != nil {
-				h.log.Errorf("Error when add finalizer: %s", err.Error())
-				h.recorder.Eventf(r, core.EventTypeWarning, "Adding finalizer", "Failed to add finalizer: %s", err)
-				return res, err
-			}
-			h.recorder.Event(r, core.EventTypeNormal, "Added", "Object finalizer is added")
-			h.log.Debug("Add finalizer successfully")
-			return ctrl.Result{Requeue: true}, nil
-		}
 	}
 
 	// Configure to optional get driver client (call meta)
@@ -230,4 +226,3 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r clien
 
 	return res, nil
 }
-

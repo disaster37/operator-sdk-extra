@@ -24,6 +24,25 @@ type K8sReconciler interface {
 	// Read permit to read kubernetes resources
 	Read(ctx context.Context, r client.Object, data map[string]any) (res ctrl.Result, err error)
 
+	// Delete permit to delete resources on kubernetes
+	Delete(ctx context.Context, r client.Object, data map[string]any) (err error)
+
+	// OnError is call when error is throwing on current phase
+	// It the right way to set status condition when error
+	OnError(ctx context.Context, r client.Object, data map[string]any, currentErr error) (res ctrl.Result, err error)
+
+	// OnSuccess is call at the end of current phase, if not error
+	// It's the right way to set status condition when everithink is good
+	OnSuccess(ctx context.Context, r client.Object, data map[string]any) (res ctrl.Result, err error)
+}
+
+type K8sPhaseReconciler interface {
+	// Configure permit to init condition on status
+	Configure(ctx context.Context, req ctrl.Request, resource client.Object) (res ctrl.Result, err error)
+
+	// Read permit to read kubernetes resources
+	Read(ctx context.Context, r client.Object, data map[string]any) (res ctrl.Result, err error)
+
 	// Create permit to create resources on kubernetes
 	Create(ctx context.Context, r client.Object, data map[string]any) (res ctrl.Result, err error)
 
@@ -95,7 +114,7 @@ func NewStdK8sReconciler(client client.Client, finalizer string, reconciler K8sR
 // 3.3 Update / create resources if needed
 // 3.4 Delete resources if needed
 // 4. Delete finalizer if on delete action
-func (h *StdK8sReconciler) Reconcile(ctx context.Context, req ctrl.Request, r client.Object, data map[string]interface{}, reconcilers ...K8sReconciler) (res ctrl.Result, err error) {
+func (h *StdK8sReconciler) Reconcile(ctx context.Context, req ctrl.Request, r client.Object, data map[string]interface{}, reconcilers ...K8sPhaseReconciler) (res ctrl.Result, err error) {
 
 	// Init logger
 	h.log = h.log.WithFields(logrus.Fields{
@@ -106,7 +125,7 @@ func (h *StdK8sReconciler) Reconcile(ctx context.Context, req ctrl.Request, r cl
 	defer h.log.Info("---> Finish reconcile loop for")
 
 	// Wait few second to be sure status is propaged througout ETCD
-	time.Sleep(time.Second * 5)
+	time.Sleep(time.Second * 1)
 
 	// Get current resource
 	if err = h.Get(ctx, req.NamespacedName, r); err != nil {
@@ -148,6 +167,28 @@ func (h *StdK8sReconciler) Reconcile(ctx context.Context, req ctrl.Request, r cl
 		}()
 	}
 
+	// Configure to optional get driver client (call meta)
+	res, err = h.reconciler.Configure(ctx, req, r)
+	if err != nil {
+		h.log.Errorf("Error configure reconciler: %s", err.Error())
+		return h.reconciler.OnError(ctx, r, data, err)
+	}
+	if res != (ctrl.Result{}) {
+		return res, nil
+	}
+	h.log.Debug("Configure parent reconciler successfully")
+
+	// Read resources
+	res, err = h.reconciler.Read(ctx, r, data)
+	if err != nil {
+		h.log.Errorf("Error read reconciler: %s", err.Error())
+		return h.reconciler.OnError(ctx, r, data, err)
+	}
+	if res != (ctrl.Result{}) {
+		return res, nil
+	}
+	h.log.Debug("Read parent reconciler successfully")
+
 	// Call resonsilers
 	for _, reconciler := range reconcilers {
 		h.log.Infof("Run phase %s", reconciler.Name())
@@ -167,6 +208,13 @@ func (h *StdK8sReconciler) Reconcile(ctx context.Context, req ctrl.Request, r cl
 	// Handle delete finalizer
 	if !getObjectMeta(r).DeletionTimestamp.IsZero() {
 		if h.finalizer != "" && controllerutil.ContainsFinalizer(r, h.finalizer) {
+			if err = h.reconciler.Delete(ctx, r, data); err != nil {
+				h.log.Errorf("Error when delete resource: %s", err.Error())
+				h.recorder.Eventf(r, core.EventTypeWarning, "Failed", "Error when delete resource: %s", err.Error())
+				return h.reconciler.OnError(ctx, r, data, err)
+			}
+			h.log.Debug("Delete successfully")
+
 			controllerutil.RemoveFinalizer(r, h.finalizer)
 			if err = h.Update(ctx, r); err != nil {
 				h.log.Errorf("Failed to remove finalizer: %s", err.Error())
@@ -178,7 +226,7 @@ func (h *StdK8sReconciler) Reconcile(ctx context.Context, req ctrl.Request, r cl
 		return ctrl.Result{}, nil
 	}
 
-	return res, nil
+	return h.reconciler.OnSuccess(ctx, r, data)
 }
 
 // reconcilePhase permit to reconcile phase
@@ -186,7 +234,7 @@ func (h *StdK8sReconciler) Reconcile(ctx context.Context, req ctrl.Request, r cl
 // 2 Diff kubernetes resources with expected resources
 // 3 Update / create resources if needed
 // 4 Delete resources if needed
-func (h *StdK8sReconciler) reconcilePhase(ctx context.Context, req ctrl.Request, r client.Object, data map[string]interface{}, reconciler K8sReconciler) (res ctrl.Result, err error) {
+func (h *StdK8sReconciler) reconcilePhase(ctx context.Context, req ctrl.Request, r client.Object, data map[string]interface{}, reconciler K8sPhaseReconciler) (res ctrl.Result, err error) {
 
 	var (
 		diff K8sDiff
