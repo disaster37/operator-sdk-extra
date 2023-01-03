@@ -189,22 +189,6 @@ func (h *StdK8sReconciler) Reconcile(ctx context.Context, req ctrl.Request, r cl
 	}
 	h.log.Debug("Read parent reconciler successfully")
 
-	// Call resonsilers
-	for _, reconciler := range reconcilers {
-		h.log.Infof("Run phase %s", reconciler.Name())
-
-		data := map[string]any{}
-
-		res, err = h.reconcilePhase(ctx, req, r, data, reconciler)
-		if err != nil {
-			return h.reconciler.OnError(ctx, r, data, errors.Wrapf(err, "Error when run phase %s", reconciler.Name()))
-		}
-
-		if res != (ctrl.Result{}) {
-			return res, nil
-		}
-	}
-
 	// Handle delete finalizer
 	if !getObjectMeta(r).DeletionTimestamp.IsZero() {
 		if h.finalizer != "" && controllerutil.ContainsFinalizer(r, h.finalizer) {
@@ -225,6 +209,23 @@ func (h *StdK8sReconciler) Reconcile(ctx context.Context, req ctrl.Request, r cl
 		}
 		return ctrl.Result{}, nil
 	}
+
+	// Call resonsilers
+	for _, reconciler := range reconcilers {
+		h.log.Infof("Run phase %s", reconciler.Name())
+
+		data := map[string]any{}
+
+		res, err = h.reconcilePhase(ctx, req, r, data, reconciler)
+		if err != nil {
+			return h.reconciler.OnError(ctx, r, data, errors.Wrapf(err, "Error when run phase %s", reconciler.Name()))
+		}
+
+		if res != (ctrl.Result{}) {
+			return res, nil
+		}
+	}
+
 
 	return h.reconciler.OnSuccess(ctx, r, data)
 }
