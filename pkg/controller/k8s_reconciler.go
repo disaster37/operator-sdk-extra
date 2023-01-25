@@ -63,8 +63,8 @@ type K8sPhaseReconciler interface {
 	// Diff permit to compare the actual state and the expected state
 	Diff(ctx context.Context, r client.Object, data map[string]any) (diff K8sDiff, res ctrl.Result, err error)
 
-	// Name return the reconciler name
-	Name() string
+	// GetName return the reconciler name
+	GetName() string
 }
 
 type K8sDiff struct {
@@ -212,20 +212,19 @@ func (h *StdK8sReconciler) Reconcile(ctx context.Context, req ctrl.Request, r cl
 
 	// Call resonsilers
 	for _, reconciler := range reconcilers {
-		h.log.Infof("Run phase %s", reconciler.Name())
+		h.log.Infof("Run phase %s", reconciler.GetName())
 
 		data := map[string]any{}
 
 		res, err = h.reconcilePhase(ctx, req, r, data, reconciler)
 		if err != nil {
-			return h.reconciler.OnError(ctx, r, data, errors.Wrapf(err, "Error when run phase %s", reconciler.Name()))
+			return h.reconciler.OnError(ctx, r, data, errors.Wrapf(err, "Error when run phase %s", reconciler.GetName()))
 		}
 
 		if res != (ctrl.Result{}) {
 			return res, nil
 		}
 	}
-
 
 	return h.reconciler.OnSuccess(ctx, r, data)
 }
