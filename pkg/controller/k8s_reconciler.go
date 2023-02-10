@@ -240,27 +240,32 @@ func (h *StdK8sReconciler) reconcilePhase(ctx context.Context, req ctrl.Request,
 		diff K8sDiff
 	)
 
+	// Add setp name on logger
+	log := h.log.WithFields(logrus.Fields{
+		"setp": reconciler.GetName(),
+	})
+
 	// Configure
 	res, err = reconciler.Configure(ctx, req, r)
 	if err != nil {
-		h.log.Errorf("Error configure reconciler: %s", err.Error())
+		log.Errorf("Error configure reconciler: %s", err.Error())
 		return reconciler.OnError(ctx, r, data, err)
 	}
 	if res != (ctrl.Result{}) {
 		return res, nil
 	}
-	h.log.Debug("Configure reconciler successfully")
+	log.Debug("Configure reconciler successfully")
 
 	// Read resources
 	res, err = reconciler.Read(ctx, r, data)
 	if err != nil {
-		h.log.Errorf("Error when get resource: %s", err.Error())
+		log.Errorf("Error when get resource: %s", err.Error())
 		return reconciler.OnError(ctx, r, data, err)
 	}
 	if res != (ctrl.Result{}) {
 		return res, nil
 	}
-	h.log.Debug("Get resource successfully")
+	log.Debug("Get resource successfully")
 
 	//Check if diff exist
 	diff, res, err = reconciler.Diff(ctx, r, data)
@@ -270,11 +275,11 @@ func (h *StdK8sReconciler) reconcilePhase(ctx context.Context, req ctrl.Request,
 	if res != (ctrl.Result{}) {
 		return res, nil
 	}
-	h.log.Debugf("Diff: %s", diff.Diff.String())
+	log.Debugf("Diff: %s", diff.Diff.String())
 
 	// Need create resources
 	if diff.NeedCreate {
-		h.log.Debug("Start create step")
+		log.Debug("Start create step")
 		res, err = reconciler.Create(ctx, r, data)
 		if err != nil {
 			return reconciler.OnError(ctx, r, data, err)
@@ -283,7 +288,7 @@ func (h *StdK8sReconciler) reconcilePhase(ctx context.Context, req ctrl.Request,
 
 	// Need update resources
 	if diff.NeedUpdate {
-		h.log.Debug("Start update step")
+		log.Debug("Start update step")
 		res, err = reconciler.Update(ctx, r, data)
 		if err != nil {
 			return reconciler.OnError(ctx, r, data, err)
@@ -292,7 +297,7 @@ func (h *StdK8sReconciler) reconcilePhase(ctx context.Context, req ctrl.Request,
 
 	// Need Delete
 	if diff.NeedDelete {
-		h.log.Debug("Start delete step")
+		log.Debug("Start delete step")
 		res, err = reconciler.Delete(ctx, r, data)
 		if err != nil {
 			return reconciler.OnError(ctx, r, data, err)
@@ -301,7 +306,7 @@ func (h *StdK8sReconciler) reconcilePhase(ctx context.Context, req ctrl.Request,
 
 	// Nothink to do
 	if !diff.NeedCreate && !diff.NeedUpdate && !diff.NeedDelete {
-		h.log.Debug("Nothink to do")
+		log.Debug("Nothink to do")
 	}
 
 	if res != (ctrl.Result{}) {
