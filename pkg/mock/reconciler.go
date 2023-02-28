@@ -21,6 +21,8 @@ func NewMockReconciler(reconciler controller.Reconciler, metaMock any) controlle
 }
 
 func (h MockReconciler) Configure(ctx context.Context, req ctrl.Request, resource client.Object) (meta any, err error) {
+	// Call configure but ignore the returns
+	h.reconciler.Configure(ctx, req, resource)
 	return h.meta, nil
 }
 func (h MockReconciler) Read(ctx context.Context, r client.Object, data map[string]any, meta any) (res ctrl.Result, err error) {
