@@ -7,6 +7,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const (
+	Base_annotation = "operator-sdk-extra.webcenter.fr"
+)
+
 func getObjectMeta(r client.Object) metav1.ObjectMeta {
 	rt := reflect.TypeOf(r)
 	if rt.Kind() != reflect.Ptr {

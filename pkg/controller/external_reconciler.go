@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 
 	"github.com/mitchellh/copystructure"
@@ -185,6 +186,12 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r clien
 			h.log.Debug("Remove finalizer successfully")
 		}
 		return ctrl.Result{}, nil
+	}
+
+	// Ignore if needed by annotation
+	if r.GetAnnotations()[fmt.Sprintf("%s/ignoreReconcile", Base_annotation)] == "true" {
+		h.log.Info("Found annotation on ressource to ignore reconcile")
+		return res, nil
 	}
 
 	//Check if diff exist

@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strings"
 	"time"
@@ -208,6 +209,12 @@ func (h *StdK8sReconciler) Reconcile(ctx context.Context, req ctrl.Request, r cl
 			h.log.Debug("Remove finalizer successfully")
 		}
 		return ctrl.Result{}, nil
+	}
+
+	// Ignore if needed by annotation
+	if r.GetAnnotations()[fmt.Sprintf("%s/ignoreReconcile", Base_annotation)] == "true" {
+		h.log.Info("Found annotation on ressource to ignore reconcile")
+		return res, nil
 	}
 
 	// Call resonsilers
