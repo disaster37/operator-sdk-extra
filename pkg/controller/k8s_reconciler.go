@@ -212,7 +212,7 @@ func (h *StdK8sReconciler) Reconcile(ctx context.Context, req ctrl.Request, r cl
 	}
 
 	// Ignore if needed by annotation
-	if r.GetAnnotations()[fmt.Sprintf("%s/ignoreReconcile", Base_annotation)] == "true" {
+	if r.GetAnnotations()[fmt.Sprintf("%s/ignoreReconcile", BaseAnnotation)] == "true" {
 		h.log.Info("Found annotation on ressource to ignore reconcile")
 		return res, nil
 	}

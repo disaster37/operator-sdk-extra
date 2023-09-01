@@ -8,8 +8,35 @@ import (
 )
 
 const (
-	Base_annotation = "operator-sdk-extra.webcenter.fr"
+	BaseAnnotation string = "operator-sdk-extra.webcenter.fr"
+	ShortenError   int    = 100
+	RunningPhase PhaseName = "running"
+	StartingPhase PhaseName = "starting"
 )
+
+// PhaseName is the the current phase name (step) on controller
+type PhaseName string
+
+// String return the phase name as string
+func (o PhaseName) String() string {
+	return string(o)
+}
+
+// Condition is the condition name
+type ConditionName string
+
+// String return the condition name as string
+func (o ConditionName) String() string {
+	return string(o)
+}
+
+// FinalizerName is the finalizer name
+type FinalizerName string
+
+// String return the finalizer name as string
+func (o FinalizerName) String() string {
+	return string(o)
+}
 
 func getObjectMeta(r client.Object) metav1.ObjectMeta {
 	rt := reflect.TypeOf(r)
