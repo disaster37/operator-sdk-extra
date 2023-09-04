@@ -85,7 +85,7 @@ func NewBasicMultiPhaseStepReconciler(client client.Client, phaseName PhaseName,
 	}, nil
 }
 func (h *BasicMultiPhaseStepReconciler) Configure(ctx context.Context, req ctrl.Request, o MultiPhaseObject) (res ctrl.Result, err error) {
-	conditions := o.GetConditions()
+	conditions := o.GetStatus().GetConditions()
 
 	// Init condition
 	if condition.FindStatusCondition(conditions, h.GetConditionName().String()) == nil {
@@ -97,7 +97,7 @@ func (h *BasicMultiPhaseStepReconciler) Configure(ctx context.Context, req ctrl.
 	}
 
 	// Init phase
-	o.SetPhaseName(h.GetPhaseName())
+	o.GetStatus().SetPhaseName(h.GetPhaseName())
 
 	return res, nil
 }
@@ -145,7 +145,7 @@ func (h *BasicMultiPhaseStepReconciler) Delete(ctx context.Context, o MultiPhase
 }
 
 func (h *BasicMultiPhaseStepReconciler) OnError(ctx context.Context, o MultiPhaseObject, data map[string]any, currentErr error) (res ctrl.Result, err error) {
-	conditions := o.GetConditions()
+	conditions := o.GetStatus().GetConditions()
 
 	condition.SetStatusCondition(&conditions, metav1.Condition{
 		Type:    h.GetConditionName().String(),
@@ -190,7 +190,7 @@ func (h *BasicMultiPhaseStepReconciler) OnError(ctx context.Context, o MultiPhas
 }
 
 func (h *BasicMultiPhaseStepReconciler) OnSuccess(ctx context.Context, o MultiPhaseObject, data map[string]any, diff MultiPhaseDiff) (res ctrl.Result, err error) {
-	conditions := o.GetConditions()
+	conditions := o.GetStatus().GetConditions()
 
 	// Update condition status if needed
 	if !condition.IsStatusConditionPresentAndEqual(conditions, h.GetConditionName().String(), metav1.ConditionTrue) {

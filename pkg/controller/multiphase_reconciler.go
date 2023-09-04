@@ -84,10 +84,10 @@ func (h *BasicMultiPhaseReconciler) GetConditionName() ConditionName {
 }
 
 func (h *BasicMultiPhaseReconciler) Configure(ctx context.Context, req ctrl.Request, o MultiPhaseObject) (res ctrl.Result, err error) {
-	o.SetIsOnError(false)
-	o.SetLastErrorMessage("")
+	o.GetStatus().SetIsOnError(false)
+	o.GetStatus().SetLastErrorMessage("")
 
-	conditions := o.GetConditions()
+	conditions := o.GetStatus().GetConditions()
 
 	// Init condition status if not exist
 	if condition.FindStatusCondition(conditions, h.GetConditionName().String()) == nil {
@@ -111,10 +111,10 @@ func (h *BasicMultiPhaseReconciler) Delete(ctx context.Context, o MultiPhaseObje
 
 func (h *BasicMultiPhaseReconciler) OnError(ctx context.Context, o MultiPhaseObject, data map[string]any, currentErr error) (res ctrl.Result, err error) {
 
-	o.SetIsOnError(true)
-	o.SetLastErrorMessage(strings.ShortenString(err.Error(), ShortenError))
+	o.GetStatus().SetIsOnError(true)
+	o.GetStatus().SetLastErrorMessage(strings.ShortenString(err.Error(), ShortenError))
 
-	conditions := o.GetConditions()
+	conditions := o.GetStatus().GetConditions()
 
 	condition.SetStatusCondition(&conditions, metav1.Condition{
 		Type:    h.GetConditionName().String(),
@@ -126,7 +126,7 @@ func (h *BasicMultiPhaseReconciler) OnError(ctx context.Context, o MultiPhaseObj
 	return res, errors.Wrapf(err, "Error on %s controller", h.name)
 }
 func (h *BasicMultiPhaseReconciler) OnSuccess(ctx context.Context, o MultiPhaseObject, data map[string]any) (res ctrl.Result, err error) {
-	conditions := o.GetConditions()
+	conditions := o.GetStatus().GetConditions()
 
 	if !condition.IsStatusConditionPresentAndEqual(conditions, h.GetConditionName().String(), metav1.ConditionTrue) {
 		condition.SetStatusCondition(&conditions, metav1.Condition{
@@ -136,7 +136,7 @@ func (h *BasicMultiPhaseReconciler) OnSuccess(ctx context.Context, o MultiPhaseO
 		})
 	}
 
-	o.SetPhaseName(RunningPhase)
+	o.GetStatus().SetPhaseName(RunningPhase)
 
 	return res, nil
 }

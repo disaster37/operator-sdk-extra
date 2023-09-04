@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/disaster37/k8s-objectmatcher v1.8.2
-	github.com/disaster37/operator-sdk-extra v0.1.3-0.20230904085729-edd8174926fd
+	github.com/disaster37/operator-sdk-extra v0.1.3-0.20230904121901-cda59447f3be
 	github.com/onsi/ginkgo/v2 v2.11.0
 	github.com/onsi/gomega v1.27.10
 	k8s.io/apimachinery v0.28.1

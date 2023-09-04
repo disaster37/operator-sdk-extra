@@ -2,12 +2,30 @@ package controller
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// Object is the extension of client.Object
+// Object interface is the extension of client object
 type Object interface {
 	client.Object
+
+	// GetStatus permit to get the status interface
+	GetStatus() ObjectStatus
+}
+
+// BasicObject implement the Object interface
+type BasicObject struct {
+	client.Object
+	Status BasicObjectStatus `json:"Status,omitempty"`
+}
+
+func (h *BasicObject) GetStatus() ObjectStatus {
+	return &h.Status
+}
+
+// ObjectStatus is the interface for object status
+type ObjectStatus interface {
 
 	// GetConditions permit to get conditions from Status
 	GetConditions() []metav1.Condition
@@ -16,39 +34,20 @@ type Object interface {
 	SetConditions(conditions []metav1.Condition)
 
 	// IsOnError permit to get if the current object is on error from status
-	IsOnError() bool
+	GetIsOnError() bool
 
 	// SetIsOnError permit to set if the current object is on error from status
 	SetIsOnError(isError bool)
 
 	// LastErrorMessage display the current error
-	LastErrorMessage() string
+	GetLastErrorMessage() string
 
 	// SetLastErrorMessage permit to set the current error
 	SetLastErrorMessage(message string)
 }
 
-// RemoteObject is use when your CRD is used to call remote API (not create K8s resources)
-type RemoteObject interface {
-	Object
-
-	// IsSync permit to get if object is sync from status
-	IsSync() bool
-
-	// SetIsSync permit to set if object is sync from status
-	SetIsSync(isSync bool)
-
-	// GetOriginalObject permit to get the original object from annotations (like kubectl do)
-	// The goal is to apply 3 way patch merge
-	GetOriginalObject() string
-
-	// SetGetOriginalOject permit to set the original object from annotations (like kubectl do)
-	// The goal is to apply 3 way patch merge
-	SetGetOriginalOject(object string)
-}
-
-// BaseObjectStatus is the default status for basic Object
-type BaseObjectStatus struct {
+// BasicObjectStatus is the default status for basic Object
+type BasicObjectStatus struct {
 
 	// IsOnError is true if controller is stuck on Error
 	// +operator-sdk:csv:customresourcedefinitions:type=status
@@ -63,11 +62,30 @@ type BaseObjectStatus struct {
 	LastErrorMessage string `json:"lastErrorMessage,omitempty"`
 }
 
-// RemoteObjectStatus is the default status for CRD used to call remote API (not create K8s resources)
-type RemoteObjectStatus struct {
-	BaseObjectStatus `json:",inline"`
+func (h *BasicObjectStatus) GetConditions() []metav1.Condition {
+	return h.Conditions
+}
 
-	// IsSync is true if controller successfully apply on remote API
-	// +operator-sdk:csv:customresourcedefinitions:type=status
-	IsSync *bool `json:"isSync,omitempty"`
+func (h *BasicObjectStatus) SetConditions(conditions []metav1.Condition) {
+	h.Conditions = conditions
+}
+
+func (h *BasicObjectStatus) GetIsOnError() bool {
+	if h.IsOnError == nil || !*h.IsOnError {
+		return false
+	}
+
+	return true
+}
+
+func (h *BasicObjectStatus) SetIsOnError(isError bool) {
+	h.IsOnError = ptr.To[bool](isError)
+}
+
+func (h *BasicObjectStatus) GetLastErrorMessage() string {
+	return h.LastErrorMessage
+}
+
+func (h *BasicObjectStatus) SetLastErrorMessage(message string) {
+	h.LastErrorMessage = message
 }
