@@ -21,6 +21,8 @@ import (
 
 // MultiPhaseReconciler is the reconciler to implement whe you need to create multiple resources on k8s
 type MultiPhaseReconciler interface {
+	BaseReconciler
+
 	// Configure permit to init condition on status
 	Configure(ctx context.Context, req ctrl.Request, o MultiPhaseObject) (res ctrl.Result, err error)
 
@@ -59,8 +61,10 @@ func NewBasicMultiPhaseReconciler(client client.Client, name string, finalizer F
 
 	basicMultiPhaseReconciler := &BasicMultiPhaseReconciler{
 		BasicReconciler: BasicReconciler{
-			finalizer:     finalizer,
-			log:           logger,
+			finalizer: finalizer,
+			log: logger.WithFields(logrus.Fields{
+				"reconciler": name,
+			}),
 			recorder:      recorder,
 			Client:        client,
 			conditionName: conditionName,

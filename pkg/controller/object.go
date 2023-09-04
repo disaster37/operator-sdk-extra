@@ -56,7 +56,7 @@ type BaseObjectStatus struct {
 
 	// List of conditions
 	// +operator-sdk:csv:customresourcedefinitions:type=status
-	Conditions []metav1.Condition `json:"conditions,omitempty"`
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 
 	// LastErrorMessage is the current error message
 	// +operator-sdk:csv:customresourcedefinitions:type=status

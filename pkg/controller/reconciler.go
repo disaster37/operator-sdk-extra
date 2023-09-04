@@ -7,15 +7,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type BasicReconciler struct {
-	client.Client
-	finalizer     FinalizerName
-	conditionName ConditionName
-	log           *logrus.Entry
-	recorder      record.EventRecorder
-	name          string
-}
-
 var (
 	ErrWhenCallConfigureFromReconciler      = errors.Sentinel("Error when call 'configure' from reconciler")
 	ErrWhenCallReadFromReconciler           = errors.Sentinel("Error when call 'read' from reconciler")
@@ -30,3 +21,30 @@ var (
 	ErrWhenDeleteFinalizer                  = errors.Sentinel("Error when delete finalizer")
 	ErrWhenGetObjectStatus                  = errors.Sentinel("Error when get object status")
 )
+
+// BaseReconciler is the base interface for all reconciler
+type BaseReconciler interface {
+
+	// GetLogger permit to get logger
+	GetLogger() *logrus.Entry
+
+	// GetRecorder permit to get recorder
+	GetRecorder() record.EventRecorder
+}
+
+type BasicReconciler struct {
+	client.Client
+	finalizer     FinalizerName
+	conditionName ConditionName
+	log           *logrus.Entry
+	recorder      record.EventRecorder
+	name          string
+}
+
+func (h *BasicReconciler) GetLogger() *logrus.Entry {
+	return h.log
+}
+
+func (h *BasicReconciler) GetRecorder() record.EventRecorder {
+	return h.recorder
+}

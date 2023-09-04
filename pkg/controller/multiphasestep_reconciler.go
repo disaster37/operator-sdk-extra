@@ -73,8 +73,10 @@ func NewBasicMultiPhaseStepReconciler(client client.Client, phaseName PhaseName,
 	}
 
 	return &BasicMultiPhaseStepReconciler{
-		recorder:      recorder,
-		log:           logger,
+		recorder: recorder,
+		log: logger.WithFields(logrus.Fields{
+			"phase": phaseName.String(),
+		}),
 		scheme:        scheme,
 		phaseName:     phaseName,
 		conditionName: conditionName,
@@ -109,7 +111,7 @@ func (h *BasicMultiPhaseStepReconciler) Create(ctx context.Context, o MultiPhase
 		if err = h.Client.Create(ctx, oChild); err != nil {
 			return res, errors.Wrapf(err, "Error when create object of type '%s' with name '%s'", oChild.GetObjectKind().GroupVersionKind().Kind, oChild.GetName())
 		}
-		h.log.Debug("Create object '%s' of type '%s' successfully", oChild.GetName(), oChild.GetObjectKind().GroupVersionKind().Kind)
+		h.log.Debugf("Create object '%s' of type '%s' successfully", oChild.GetName(), oChild.GetObjectKind().GroupVersionKind().Kind)
 		h.recorder.Eventf(o, corev1.EventTypeNormal, "CreateCompleted", "Object '%s' of type '%s' successfully created", oChild.GetName(), oChild.GetObjectKind().GroupVersionKind().Kind)
 	}
 
@@ -122,7 +124,7 @@ func (h *BasicMultiPhaseStepReconciler) Update(ctx context.Context, o MultiPhase
 		if err = h.Client.Update(ctx, oChild); err != nil {
 			return res, errors.Wrapf(err, "Error when update object of type '%s' with name '%s'", oChild.GetObjectKind().GroupVersionKind().Kind, oChild.GetName())
 		}
-		h.log.Debug("Update object '%s' of type '%s' successfully", oChild.GetName(), oChild.GetObjectKind().GroupVersionKind().Kind)
+		h.log.Debugf("Update object '%s' of type '%s' successfully", oChild.GetName(), oChild.GetObjectKind().GroupVersionKind().Kind)
 		h.recorder.Eventf(o, corev1.EventTypeNormal, "UpdateCompleted", "Object '%s' of type '%s' successfully created", oChild.GetName(), oChild.GetObjectKind().GroupVersionKind().Kind)
 	}
 
@@ -135,7 +137,7 @@ func (h *BasicMultiPhaseStepReconciler) Delete(ctx context.Context, o MultiPhase
 		if err = h.Client.Delete(ctx, oChild); err != nil {
 			return res, errors.Wrapf(err, "Error when delete object of type '%s' with name '%s'", oChild.GetObjectKind().GroupVersionKind().Kind, oChild.GetName())
 		}
-		h.log.Debug("Delete object '%s' of type '%s' successfully", oChild.GetName(), oChild.GetObjectKind().GroupVersionKind().Kind)
+		h.log.Debugf("Delete object '%s' of type '%s' successfully", oChild.GetName(), oChild.GetObjectKind().GroupVersionKind().Kind)
 		h.recorder.Eventf(o, corev1.EventTypeNormal, "DeleteCompleted", "Object '%s' of type '%s' successfully created", oChild.GetName(), oChild.GetObjectKind().GroupVersionKind().Kind)
 	}
 

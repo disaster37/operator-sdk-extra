@@ -19,23 +19,44 @@ package controllers
 import (
 	"context"
 
-	"k8s.io/apimachinery/pkg/runtime"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/disaster37/operator-sdk-extra/pkg/controller"
+	"github.com/disaster37/operator-sdk-extra/testdata/memcached-operator/api/v1alpha1"
 	cachev1alpha1 "github.com/disaster37/operator-sdk-extra/testdata/memcached-operator/api/v1alpha1"
+	"github.com/sirupsen/logrus"
+)
+
+const (
+	MemcachedCondition controller.ConditionName = "MemcachedReady"
 )
 
 // MemcachedReconciler reconciles a Memcached object
 type MemcachedReconciler struct {
-	client.Client
-	Scheme *runtime.Scheme
+	controller.BasicMultiPhaseReconciler
+}
+
+func NewMemcachedReconciler(client client.Client, name string, finalizer controller.FinalizerName, conditionName controller.ConditionName, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseReconciler controller.MultiPhaseReconciler, err error) {
+	return controller.NewBasicMultiPhaseReconciler(
+		client,
+		"memcached",
+		"memcached.cache.example.com/finalizer",
+		MemcachedCondition,
+		logger,
+		recorder,
+	)
 }
 
 //+kubebuilder:rbac:groups=cache.example.com,resources=memcacheds,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=cache.example.com,resources=memcacheds/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=cache.example.com,resources=memcacheds/finalizers,verbs=update
+//+kubebuilder:rbac:groups="core",resources=events,verbs=patch;get;create
+//+kubebuilder:rbac:groups="core",resources=configmaps,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups="apps",resources=deployments,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -47,16 +68,29 @@ type MemcachedReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
 func (r *MemcachedReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	mc := &v1alpha1.Memcached{}
+	data := map[string]any{}
 
-	// TODO(user): your logic here
+	return r.BasicMultiPhaseReconciler.Reconcile(
+		ctx,
+		req,
+		mc,
+		data,
+		NewConfigMapReconciler(
+			r.Client,
+			r.Log,
+		),
+	)
 
-	return ctrl.Result{}, nil
 }
+
+// client client.Client, logger *logrus.Entry, recorder record.EventRecorder, scheme *runtime.Scheme, ignoresDiff ...patch.CalculateOption
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *MemcachedReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&cachev1alpha1.Memcached{}).
+		Owns(&appsv1.Deployment{}).
+		Owns(&corev1.ConfigMap{}).
 		Complete(r)
 }
