@@ -47,17 +47,6 @@ type RemoteObject interface {
 	SetGetOriginalOject(object string)
 }
 
-// MultiPhaseObject is used when your CRD is used to create multiple K8s resources
-type MultiPhaseObject interface {
-	Object
-
-	// GetPhaseName permit to get the current phase name
-	GetPhaseName() PhaseName
-
-	// SetPhaseName permit to set the current phase
-	SetPhaseName(name PhaseName)
-}
-
 // BaseObjectStatus is the default status for basic Object
 type BaseObjectStatus struct {
 
@@ -81,13 +70,4 @@ type RemoteObjectStatus struct {
 	// IsSync is true if controller successfully apply on remote API
 	// +operator-sdk:csv:customresourcedefinitions:type=status
 	IsSync *bool `json:"isSync,omitempty"`
-}
-
-// MultiPhaseObjectStatus is the default status for CRD used to create multiple K8s resources
-type MultiPhaseObjectStatus struct {
-	BaseObjectStatus `json:",inline"`
-
-	// Phase is the current phase
-	// +operator-sdk:csv:customresourcedefinitions:type=status
-	Phase string `json:"phase,omitempty"`
 }
