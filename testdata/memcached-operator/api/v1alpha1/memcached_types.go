@@ -48,21 +48,6 @@ type MemcachedSpec struct {
 	ContainerPort int32 `json:"containerPort,omitempty"`
 }
 
-// MemcachedStatus defines the observed state of Memcached
-type MemcachedStatus struct {
-	// Represents the observations of a Memcached's current state.
-	// Memcached.status.conditions.type are: "Available", "Progressing", and "Degraded"
-	// Memcached.status.conditions.status are one of True, False, Unknown.
-	// Memcached.status.conditions.reason the value should be a CamelCase string and producers of specific
-	// condition types may define expected values and meanings for this field, and whether the values
-	// are considered a guaranteed API.
-	// Memcached.status.conditions.Message is a human readable message indicating details about the transition.
-	// For further information see: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties
-
-	// Conditions store the status conditions of the Memcached instances
-	// +operator-sdk:csv:customresourcedefinitions:type=status
-	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
-}
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
@@ -75,7 +60,6 @@ type Memcached struct {
 	metav1.ObjectMeta                `json:"metadata,omitempty"`
 
 	Spec   MemcachedSpec   `json:"spec,omitempty"`
-	Status MemcachedStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true

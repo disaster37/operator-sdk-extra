@@ -4,6 +4,7 @@ import (
 	"emperror.dev/errors"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/tools/record"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -30,6 +31,9 @@ type BaseReconciler interface {
 
 	// GetRecorder permit to get recorder
 	GetRecorder() record.EventRecorder
+
+	// SetupWithManager permit to setup controller with manager
+	SetupWithManager(mgr ctrl.Manager) error
 }
 
 type BasicReconciler struct {
@@ -47,4 +51,8 @@ func (h *BasicReconciler) GetLogger() *logrus.Entry {
 
 func (h *BasicReconciler) GetRecorder() record.EventRecorder {
 	return h.recorder
+}
+
+func (h *BasicReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	return errors.New("You need implement 'SetupWithManager'")
 }

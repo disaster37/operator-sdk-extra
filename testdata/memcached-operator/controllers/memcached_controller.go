@@ -19,6 +19,8 @@ package controllers
 import (
 	"context"
 
+	"emperror.dev/errors"
+	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -39,7 +41,7 @@ type MemcachedReconciler struct {
 	controller.BasicMultiPhaseReconciler
 }
 
-func NewMemcachedReconciler(client client.Client, name string, finalizer controller.FinalizerName, conditionName controller.ConditionName, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseReconciler controller.MultiPhaseReconciler, err error) {
+func NewMemcachedReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseReconciler controller.MultiPhaseReconciler, err error) {
 	return controller.NewBasicMultiPhaseReconciler(
 		client,
 		"memcached",
@@ -67,19 +69,34 @@ func NewMemcachedReconciler(client client.Client, name string, finalizer control
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
-func (r *MemcachedReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *MemcachedReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
 	mc := &v1alpha1.Memcached{}
 	data := map[string]any{}
+
+	configMapReconciler, err := NewConfigMapReconciler(
+		r.Client,
+		r.GetLogger(),
+		r.GetRecorder(),
+		r.Scheme(),
+	)
+	if err != nil {
+		return res, errors.Wrap(err, "Error when create configMap reconciler")
+	}
+
+	deploymentReconciler, err := NewDeploymentReconciler(
+		r.Client,
+		r.GetLogger(),
+		r.GetRecorder(),
+		r.Scheme(),
+	)
 
 	return r.BasicMultiPhaseReconciler.Reconcile(
 		ctx,
 		req,
 		mc,
 		data,
-		NewConfigMapReconciler(
-			r.Client,
-			r.Log,
-		),
+		configMapReconciler,
+		deploymentReconciler,
 	)
 
 }
@@ -90,7 +107,7 @@ func (r *MemcachedReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 func (r *MemcachedReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&cachev1alpha1.Memcached{}).
-		Owns(&appsv1.Deployment{}).
+		Owns(&appv1.Deployment{}).
 		Owns(&corev1.ConfigMap{}).
 		Complete(r)
 }
