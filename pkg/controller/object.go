@@ -16,8 +16,8 @@ type Object interface {
 
 // BasicObject implement the Object interface
 type BasicObject struct {
-	client.Object
-	Status BasicObjectStatus `json:"Status,omitempty"`
+	client.Object `json:"-"`
+	Status        BasicObjectStatus `json:"Status,omitempty"`
 }
 
 func (h *BasicObject) GetStatus() ObjectStatus {

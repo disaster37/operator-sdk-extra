@@ -12,8 +12,8 @@ type MultiPhaseObject interface {
 
 // BasicMultiPhaseObject is the implementation of MultiPhaseObject interface
 type BasicMultiPhaseObject struct {
-	client.Object
-	Status BasicMultiPhaseObjectStatus `json:"Status,omitempty"`
+	client.Object `json:"-"`
+	Status        BasicMultiPhaseObjectStatus `json:"Status,omitempty"`
 }
 
 func (h *BasicMultiPhaseObject) GetStatus() MultiPhaseObjectStatus {

@@ -24,8 +24,8 @@ type RemoteObject interface {
 
 // BasicMultiPhaseObject is the implementation of MultiPhaseObject interface
 type BasicRemoteObject struct {
-	client.Object
-	Status BasicRemoteObjectStatus `json:"Status,omitempty"`
+	client.Object `json:"-"`
+	Status        BasicRemoteObjectStatus `json:"Status,omitempty"`
 }
 
 func (h *BasicRemoteObject) GetStatus() RemoteObjectStatus {
