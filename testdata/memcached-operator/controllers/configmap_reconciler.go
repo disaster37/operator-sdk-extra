@@ -29,8 +29,8 @@ type ConfigMapReconciler struct {
 	controller.MultiPhaseStepReconciler
 }
 
-func NewConfigMapReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder, scheme *runtime.Scheme, ignoresDiff ...patch.CalculateOption) (multiPhaseStepReconciler controller.MultiPhaseStepReconciler, err error) {
-	return controller.NewBasicMultiPhaseStepReconciler(
+func NewConfigMapReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder, scheme *runtime.Scheme, ignoresDiff ...patch.CalculateOption) (multiPhaseStepReconciler *ConfigMapReconciler, err error) {
+	basicMultiPhaseStep, err := controller.NewBasicMultiPhaseStepReconciler(
 		client,
 		ConfigmapPhase,
 		ConfigmapCondition,
@@ -39,6 +39,13 @@ func NewConfigMapReconciler(client client.Client, logger *logrus.Entry, recorder
 		scheme,
 		ignoresDiff...,
 	)
+	if err != nil {
+		return nil, errors.Wrap(err, "Error when create basicMultiPhaseStep reconciler")
+	}
+
+	return &ConfigMapReconciler{
+		MultiPhaseStepReconciler: basicMultiPhaseStep,
+	}, nil
 }
 
 func (r *ConfigMapReconciler) Read(ctx context.Context, o object.MultiPhaseObject, data map[string]any) (read controller.MultiPhaseRead, res ctrl.Result, err error) {
@@ -51,7 +58,7 @@ func (r *ConfigMapReconciler) Read(ctx context.Context, o object.MultiPhaseObjec
 	if err != nil {
 		return read, res, errors.Wrap(err, "Error when generate label selector")
 	}
-	if err = r..List(ctx, cmList, &client.ListOptions{Namespace: o.GetNamespace(), LabelSelector: labelSelectors}); err != nil {
+	if err = r.GetClient().List(ctx, cmList, &client.ListOptions{Namespace: o.GetNamespace(), LabelSelector: labelSelectors}); err != nil {
 		return read, res, errors.Wrapf(err, "Error when read configmaps")
 	}
 

@@ -4,7 +4,6 @@ import (
 	"emperror.dev/errors"
 	"github.com/disaster37/operator-sdk-extra/pkg/apis/shared"
 	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -39,19 +38,20 @@ type BaseReconciler interface {
 
 	// GetClient permit to get the client
 	GetClient() client.Client
-
-	// GetScheme permit to get the Scheme
-	GetScheme() *runtime.Scheme
 }
 
 type BasicReconciler struct {
 	client.Client
-	finalizer     shared.FinalizerName
+	finalizer shared.FinalizerName
+	log       *logrus.Entry
+	recorder  record.EventRecorder
+}
+
+type BasicReconcilerAction struct {
+	client.Client
 	conditionName shared.ConditionName
 	log           *logrus.Entry
 	recorder      record.EventRecorder
-	name          string
-	scheme        *runtime.Scheme
 }
 
 func (h *BasicReconciler) GetLogger() *logrus.Entry {
@@ -64,10 +64,6 @@ func (h *BasicReconciler) GetRecorder() record.EventRecorder {
 
 func (h *BasicReconciler) GetClient() client.Client {
 	return h.Client
-}
-
-func (h *BasicReconciler) GetScheme() *runtime.Scheme {
-	return h.scheme
 }
 
 func (h *BasicReconciler) SetupWithManager(mgr ctrl.Manager) error {

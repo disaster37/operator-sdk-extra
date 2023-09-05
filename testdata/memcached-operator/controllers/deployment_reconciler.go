@@ -26,11 +26,11 @@ const (
 )
 
 type DeploymentReconciler struct {
-	controller.BasicMultiPhaseStepReconciler
+	controller.MultiPhaseStepReconciler
 }
 
-func NewDeploymentReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder, scheme *runtime.Scheme, ignoresDiff ...patch.CalculateOption) (multiPhaseStepReconciler controller.MultiPhaseStepReconciler, err error) {
-	return controller.NewBasicMultiPhaseStepReconciler(
+func NewDeploymentReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder, scheme *runtime.Scheme, ignoresDiff ...patch.CalculateOption) (multiPhaseStepReconciler *DeploymentReconciler, err error) {
+	basicMultiPhaseStepReconciler, err := controller.NewBasicMultiPhaseStepReconciler(
 		client,
 		DeploymentPhase,
 		DeploymentCondition,
@@ -39,6 +39,13 @@ func NewDeploymentReconciler(client client.Client, logger *logrus.Entry, recorde
 		scheme,
 		ignoresDiff...,
 	)
+	if err != nil {
+		return nil, errors.Wrap(err, "Error when create basicMultiPhaseStep reconciler")
+	}
+
+	return &DeploymentReconciler{
+		MultiPhaseStepReconciler: basicMultiPhaseStepReconciler,
+	}, nil
 }
 
 func (r *DeploymentReconciler) Read(ctx context.Context, o object.MultiPhaseObject, data map[string]any) (read controller.MultiPhaseRead, res ctrl.Result, err error) {
@@ -51,7 +58,7 @@ func (r *DeploymentReconciler) Read(ctx context.Context, o object.MultiPhaseObje
 	if err != nil {
 		return read, res, errors.Wrap(err, "Error when generate label selector")
 	}
-	if err = r.Client.List(ctx, deploymentList, &client.ListOptions{Namespace: o.GetNamespace(), LabelSelector: labelSelectors}); err != nil {
+	if err = r.GetClient().List(ctx, deploymentList, &client.ListOptions{Namespace: o.GetNamespace(), LabelSelector: labelSelectors}); err != nil {
 		return read, res, errors.Wrapf(err, "Error when read deployments")
 	}
 
