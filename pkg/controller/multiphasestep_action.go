@@ -57,9 +57,8 @@ type MultiPhaseStepReconcilerAction interface {
 
 type BasicMultiPhaseStepReconcilerAction struct {
 	BasicReconcilerAction
-	scheme        *runtime.Scheme
-	phaseName     shared.PhaseName
-	conditionName shared.ConditionName
+	scheme    *runtime.Scheme
+	phaseName shared.PhaseName
 }
 
 func NewBasicMultiPhaseStepReconcilerAction(client client.Client, phaseName shared.PhaseName, conditionName shared.ConditionName, logger *logrus.Entry, recorder record.EventRecorder, scheme *runtime.Scheme) (multiPhaseStepReconciler MultiPhaseStepReconcilerAction, err error) {
@@ -73,11 +72,11 @@ func NewBasicMultiPhaseStepReconcilerAction(client client.Client, phaseName shar
 			log: logger.WithFields(logrus.Fields{
 				"phase": phaseName.String(),
 			}),
-			Client: client,
+			Client:        client,
+			conditionName: conditionName,
 		},
-		scheme:        scheme,
-		phaseName:     phaseName,
-		conditionName: conditionName,
+		scheme:    scheme,
+		phaseName: phaseName,
 	}, nil
 }
 

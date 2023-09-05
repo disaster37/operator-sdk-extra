@@ -39,6 +39,7 @@ const (
 
 // MemcachedReconciler reconciles a Memcached object
 type MemcachedReconciler struct {
+	controller.MultiPhaseReconcilerAction
 	controller.MultiPhaseReconciler
 }
 
@@ -47,14 +48,15 @@ func NewMemcachedReconciler(client client.Client, logger *logrus.Entry, recorder
 		client,
 		"memcached",
 		"memcached.cache.example.com/finalizer",
-		MemcachedCondition,
 		logger,
 		recorder,
-		scheme,
 	)
 	if err != nil {
 		return nil, errors.Wrap(err, "Error when create basicMultiphaseReconciler")
 	}
+
+	basicMultiphaseReconcilerAction, err := controller.NewBasicMultiPhaseStepReconcilerAction(client, name, )
+
 	return &MemcachedReconciler{
 		MultiPhaseReconciler: basicMultiphaseReconciler,
 	}, nil

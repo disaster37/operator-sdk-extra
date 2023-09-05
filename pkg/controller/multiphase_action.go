@@ -37,10 +37,9 @@ type MultiPhaseReconcilerAction interface {
 
 type BasicMultiPhaseReconcilerAction struct {
 	BasicReconcilerAction
-	finalizerName shared.FinalizerName
 }
 
-func NewBasicMultiPhaseReconcilerAction(client client.Client, name string, finalizer shared.FinalizerName, conditionName shared.ConditionName, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseReconciler MultiPhaseReconcilerAction, err error) {
+func NewBasicMultiPhaseReconcilerAction(client client.Client, conditionName shared.ConditionName, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseReconciler MultiPhaseReconcilerAction, err error) {
 
 	if recorder == nil {
 		return nil, errors.New("recorder can't be nil")
@@ -52,7 +51,6 @@ func NewBasicMultiPhaseReconcilerAction(client client.Client, name string, final
 			log:           logger,
 			conditionName: conditionName,
 		},
-		finalizerName: finalizer,
 	}
 
 	if basicMultiPhaseReconciler.log == nil {

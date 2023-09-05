@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"emperror.dev/errors"
-	"github.com/disaster37/k8s-objectmatcher/patch"
 	"github.com/disaster37/operator-sdk-extra/pkg/apis/shared"
 	"github.com/disaster37/operator-sdk-extra/pkg/controller"
 	"github.com/disaster37/operator-sdk-extra/pkg/helper"
@@ -26,25 +25,24 @@ const (
 )
 
 type DeploymentReconciler struct {
-	controller.MultiPhaseStepReconciler
+	controller.MultiPhaseStepReconcilerAction
 }
 
-func NewDeploymentReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder, scheme *runtime.Scheme, ignoresDiff ...patch.CalculateOption) (multiPhaseStepReconciler *DeploymentReconciler, err error) {
-	basicMultiPhaseStepReconciler, err := controller.NewBasicMultiPhaseStepReconciler(
+func NewDeploymentReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder, scheme *runtime.Scheme) (multiPhaseStepReconciler *DeploymentReconciler, err error) {
+	basicMultiPhaseStepReconcilerAction, err := controller.NewBasicMultiPhaseStepReconcilerAction(
 		client,
 		DeploymentPhase,
 		DeploymentCondition,
 		logger,
 		recorder,
 		scheme,
-		ignoresDiff...,
 	)
 	if err != nil {
 		return nil, errors.Wrap(err, "Error when create basicMultiPhaseStep reconciler")
 	}
 
 	return &DeploymentReconciler{
-		MultiPhaseStepReconciler: basicMultiPhaseStepReconciler,
+		MultiPhaseStepReconcilerAction: basicMultiPhaseStepReconcilerAction,
 	}, nil
 }
 

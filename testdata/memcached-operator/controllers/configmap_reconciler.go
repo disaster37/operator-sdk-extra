@@ -56,7 +56,7 @@ func (r *ConfigMapReconciler) Read(ctx context.Context, o object.MultiPhaseObjec
 	if err != nil {
 		return read, res, errors.Wrap(err, "Error when generate label selector")
 	}
-	if err = r..List(ctx, cmList, &client.ListOptions{Namespace: o.GetNamespace(), LabelSelector: labelSelectors}); err != nil {
+	if err = r.GetClient().List(ctx, cmList, &client.ListOptions{Namespace: o.GetNamespace(), LabelSelector: labelSelectors}); err != nil {
 		return read, res, errors.Wrapf(err, "Error when read configmaps")
 	}
 
