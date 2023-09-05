@@ -22,6 +22,7 @@ import (
 	"emperror.dev/errors"
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -41,7 +42,7 @@ type MemcachedReconciler struct {
 	controller.MultiPhaseReconciler
 }
 
-func NewMemcachedReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseReconciler *MemcachedReconciler, err error) {
+func NewMemcachedReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder, scheme *runtime.Scheme) (multiPhaseReconciler *MemcachedReconciler, err error) {
 	basicMultiphaseReconciler, err := controller.NewBasicMultiPhaseReconciler(
 		client,
 		"memcached",
@@ -49,6 +50,7 @@ func NewMemcachedReconciler(client client.Client, logger *logrus.Entry, recorder
 		MemcachedCondition,
 		logger,
 		recorder,
+		scheme,
 	)
 	if err != nil {
 		return nil, errors.Wrap(err, "Error when create basicMultiphaseReconciler")
@@ -80,26 +82,26 @@ func (r *MemcachedReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	data := map[string]any{}
 
 	configMapReconciler, err := NewConfigMapReconciler(
-		r.Client,
+		r.GetClient(),
 		r.GetLogger(),
 		r.GetRecorder(),
-		r.Scheme(),
+		r.GetScheme(),
 	)
 	if err != nil {
 		return res, errors.Wrap(err, "Error when create configMap reconciler")
 	}
 
 	deploymentReconciler, err := NewDeploymentReconciler(
-		r.Client,
+		r.GetClient(),
 		r.GetLogger(),
 		r.GetRecorder(),
-		r.Scheme(),
+		r.GetScheme(),
 	)
 	if err != nil {
 		return res, errors.Wrap(err, "Error when create deployment reconciler")
 	}
 
-	return r.BasicMultiPhaseReconciler.Reconcile(
+	return r.MultiPhaseReconciler.Reconcile(
 		ctx,
 		req,
 		mc,

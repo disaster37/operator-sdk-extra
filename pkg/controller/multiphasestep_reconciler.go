@@ -57,6 +57,12 @@ type MultiPhaseStepReconciler interface {
 
 	// Reconcile permit to reconcile the step (one K8s resource)
 	Reconcile(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject, data map[string]interface{}) (res ctrl.Result, err error)
+
+	// GetClient permit to get the client
+	GetClient() client.Client
+
+	// GetLogger permit to get logger
+	GetLogger() *logrus.Entry
 }
 
 type BasicMultiPhaseStepReconciler struct {
@@ -86,6 +92,15 @@ func NewBasicMultiPhaseStepReconciler(client client.Client, phaseName shared.Pha
 		ignoresDiff:   ignoresDiff,
 	}, nil
 }
+
+func (h *BasicMultiPhaseStepReconciler) GetClient() client.Client {
+	return h.Client
+}
+
+func (h *BasicMultiPhaseStepReconciler) GetLogger() *logrus.Entry {
+	return h.GetLogger()
+}
+
 func (h *BasicMultiPhaseStepReconciler) Configure(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject) (res ctrl.Result, err error) {
 	conditions := o.GetStatus().GetConditions()
 

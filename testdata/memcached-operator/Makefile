@@ -286,9 +286,6 @@ kwok:
 	kwokctl scale node node --replicas 10
 	kubectl config use-context kwok-kwok
 	kubectl config set-context --current --namespace=default
-	unset KUBERNETES_SERVICE_HOST
-	unset KUBERNETES_SERVICE_PORT
-	export KUBECONFIG=$HOME/.kube/config
 	make install
 	make run
 
