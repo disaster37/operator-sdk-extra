@@ -6,6 +6,9 @@ import (
 )
 
 // BasicMultiPhaseObject is the implementation of MultiPhaseObject interface
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:storageversion
 type BasicMultiPhaseObject struct {
 	Status BasicMultiPhaseObjectStatus `json:"Status,omitempty"`
 }
