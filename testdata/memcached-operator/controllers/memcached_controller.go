@@ -26,23 +26,23 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/disaster37/operator-sdk-extra/pkg/apis/shared"
 	"github.com/disaster37/operator-sdk-extra/pkg/controller"
-	"github.com/disaster37/operator-sdk-extra/testdata/memcached-operator/api/v1alpha1"
-	cachev1alpha1 "github.com/disaster37/operator-sdk-extra/testdata/memcached-operator/api/v1alpha1"
+	cachecrd "github.com/disaster37/operator-sdk-extra/testdata/memcached-operator/api/v1alpha1"
 	"github.com/sirupsen/logrus"
 )
 
 const (
-	MemcachedCondition controller.ConditionName = "MemcachedReady"
+	MemcachedCondition shared.ConditionName = "MemcachedReady"
 )
 
 // MemcachedReconciler reconciles a Memcached object
 type MemcachedReconciler struct {
-	controller.BasicMultiPhaseReconciler
+	controller.MultiPhaseReconciler
 }
 
-func NewMemcachedReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseReconciler controller.MultiPhaseReconciler, err error) {
-	return controller.NewBasicMultiPhaseReconciler(
+func NewMemcachedReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseReconciler *MemcachedReconciler, err error) {
+	basicMultiphaseReconciler, err := controller.NewBasicMultiPhaseReconciler(
 		client,
 		"memcached",
 		"memcached.cache.example.com/finalizer",
@@ -50,6 +50,12 @@ func NewMemcachedReconciler(client client.Client, logger *logrus.Entry, recorder
 		logger,
 		recorder,
 	)
+	if err != nil {
+		return nil, errors.Wrap(err, "Error when create basicMultiphaseReconciler")
+	}
+	return &MemcachedReconciler{
+		MultiPhaseReconciler: basicMultiphaseReconciler,
+	}, nil
 }
 
 //+kubebuilder:rbac:groups=cache.example.com,resources=memcacheds,verbs=get;list;watch;create;update;patch;delete
@@ -70,7 +76,7 @@ func NewMemcachedReconciler(client client.Client, logger *logrus.Entry, recorder
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
 func (r *MemcachedReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
-	mc := &v1alpha1.Memcached{}
+	mc := &cachecrd.Memcached{}
 	data := map[string]any{}
 
 	configMapReconciler, err := NewConfigMapReconciler(
@@ -89,6 +95,9 @@ func (r *MemcachedReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		r.GetRecorder(),
 		r.Scheme(),
 	)
+	if err != nil {
+		return res, errors.Wrap(err, "Error when create deployment reconciler")
+	}
 
 	return r.BasicMultiPhaseReconciler.Reconcile(
 		ctx,
@@ -106,7 +115,7 @@ func (r *MemcachedReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 // SetupWithManager sets up the controller with the Manager.
 func (r *MemcachedReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&cachev1alpha1.Memcached{}).
+		For(&cachecrd.Memcached{}).
 		Owns(&appv1.Deployment{}).
 		Owns(&corev1.ConfigMap{}).
 		Complete(r)

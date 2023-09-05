@@ -6,8 +6,10 @@ import (
 
 	"emperror.dev/errors"
 	"github.com/disaster37/k8s-objectmatcher/patch"
+	"github.com/disaster37/operator-sdk-extra/pkg/apis/shared"
 	"github.com/disaster37/operator-sdk-extra/pkg/controller"
 	"github.com/disaster37/operator-sdk-extra/pkg/helper"
+	"github.com/disaster37/operator-sdk-extra/pkg/object"
 	"github.com/disaster37/operator-sdk-extra/testdata/memcached-operator/api/v1alpha1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -19,8 +21,8 @@ import (
 )
 
 const (
-	ConfigmapCondition controller.ConditionName = "ConfigmapReady"
-	ConfigmapPhase     controller.PhaseName     = "Configmap"
+	ConfigmapCondition shared.ConditionName = "ConfigmapReady"
+	ConfigmapPhase     shared.PhaseName     = "Configmap"
 )
 
 type ConfigMapReconciler struct {
@@ -39,7 +41,7 @@ func NewConfigMapReconciler(client client.Client, logger *logrus.Entry, recorder
 	)
 }
 
-func (r *ConfigMapReconciler) Read(ctx context.Context, o controller.MultiPhaseObject, data map[string]any) (read controller.MultiPhaseRead, res ctrl.Result, err error) {
+func (r *ConfigMapReconciler) Read(ctx context.Context, o object.MultiPhaseObject, data map[string]any) (read controller.MultiPhaseRead, res ctrl.Result, err error) {
 	mc := o.(*v1alpha1.Memcached)
 	cmList := &corev1.ConfigMapList{}
 	read = controller.NewBasicMultiPhaseRead()

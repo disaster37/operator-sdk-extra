@@ -4,6 +4,7 @@ import (
 	"emperror.dev/errors"
 	"github.com/disaster37/operator-sdk-extra/pkg/apis/shared"
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -35,6 +36,12 @@ type BaseReconciler interface {
 
 	// SetupWithManager permit to setup controller with manager
 	SetupWithManager(mgr ctrl.Manager) error
+
+	// GetClient permit to get the client
+	GetClient() client.Client
+
+	// GetScheme permit to get the Scheme
+	GetScheme() *runtime.Scheme
 }
 
 type BasicReconciler struct {
@@ -44,6 +51,7 @@ type BasicReconciler struct {
 	log           *logrus.Entry
 	recorder      record.EventRecorder
 	name          string
+	scheme        *runtime.Scheme
 }
 
 func (h *BasicReconciler) GetLogger() *logrus.Entry {
@@ -52,6 +60,14 @@ func (h *BasicReconciler) GetLogger() *logrus.Entry {
 
 func (h *BasicReconciler) GetRecorder() record.EventRecorder {
 	return h.recorder
+}
+
+func (h *BasicReconciler) GetClient() client.Client {
+	return h.Client
+}
+
+func (h *BasicReconciler) GetScheme() *runtime.Scheme {
+	return h.scheme
 }
 
 func (h *BasicReconciler) SetupWithManager(mgr ctrl.Manager) error {

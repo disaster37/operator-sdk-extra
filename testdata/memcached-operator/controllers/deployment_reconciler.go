@@ -6,8 +6,10 @@ import (
 
 	"emperror.dev/errors"
 	"github.com/disaster37/k8s-objectmatcher/patch"
+	"github.com/disaster37/operator-sdk-extra/pkg/apis/shared"
 	"github.com/disaster37/operator-sdk-extra/pkg/controller"
 	"github.com/disaster37/operator-sdk-extra/pkg/helper"
+	"github.com/disaster37/operator-sdk-extra/pkg/object"
 	"github.com/disaster37/operator-sdk-extra/testdata/memcached-operator/api/v1alpha1"
 	"github.com/sirupsen/logrus"
 	appv1 "k8s.io/api/apps/v1"
@@ -19,8 +21,8 @@ import (
 )
 
 const (
-	DeploymentCondition controller.ConditionName = "DeploymentReady"
-	DeploymentPhase     controller.PhaseName     = "Deployment"
+	DeploymentCondition shared.ConditionName = "DeploymentReady"
+	DeploymentPhase     shared.PhaseName     = "Deployment"
 )
 
 type DeploymentReconciler struct {
@@ -39,7 +41,7 @@ func NewDeploymentReconciler(client client.Client, logger *logrus.Entry, recorde
 	)
 }
 
-func (r *DeploymentReconciler) Read(ctx context.Context, o controller.MultiPhaseObject, data map[string]any) (read controller.MultiPhaseRead, res ctrl.Result, err error) {
+func (r *DeploymentReconciler) Read(ctx context.Context, o object.MultiPhaseObject, data map[string]any) (read controller.MultiPhaseRead, res ctrl.Result, err error) {
 	mc := o.(*v1alpha1.Memcached)
 	deploymentList := &appv1.DeploymentList{}
 	read = controller.NewBasicMultiPhaseRead()

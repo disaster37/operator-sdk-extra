@@ -279,3 +279,19 @@ catalog-build: opm ## Build a catalog image.
 .PHONY: catalog-push
 catalog-push: ## Push a catalog image.
 	$(MAKE) docker-push IMG=$(CATALOG_IMG)
+
+.PHONY: kwok
+kwok:
+	kwokctl create cluster -c ./.ci/kwok/pod-general.yaml
+	kwokctl scale node node --replicas 10
+	kubectl config use-context kwok-kwok
+	kubectl config set-context --current --namespace=default
+	unset KUBERNETES_SERVICE_HOST
+	unset KUBERNETES_SERVICE_PORT
+	export KUBECONFIG=$HOME/.kube/config
+	make install
+	make run
+
+.PHONY: clean-kwok
+clean-kwok:
+	kwokctl delete cluster
