@@ -28,22 +28,17 @@ type ConfigMapReconciler struct {
 	controller.MultiPhaseStepReconcilerAction
 }
 
-func NewConfigMapReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder, scheme *runtime.Scheme) (multiPhaseStepReconciler controller.MultiPhaseStepReconcilerAction, err error) {
-	basicMultiPhaseStepAction, err := controller.NewBasicMultiPhaseStepReconcilerAction(
-		client,
-		ConfigmapPhase,
-		ConfigmapCondition,
-		logger,
-		recorder,
-		scheme,
-	)
-	if err != nil {
-		return nil, errors.Wrap(err, "Error when create basicMultiPhaseStep reconciler")
-	}
-
+func NewConfigMapReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder, scheme *runtime.Scheme) (multiPhaseStepReconcilerAction controller.MultiPhaseStepReconcilerAction) {
 	return &ConfigMapReconciler{
-		MultiPhaseStepReconcilerAction: basicMultiPhaseStepAction,
-	}, nil
+		MultiPhaseStepReconcilerAction: controller.NewBasicMultiPhaseStepReconcilerAction(
+			client,
+			ConfigmapPhase,
+			ConfigmapCondition,
+			logger,
+			recorder,
+			scheme,
+		),
+	}
 }
 
 func (r *ConfigMapReconciler) Read(ctx context.Context, o object.MultiPhaseObject, data map[string]any) (read controller.MultiPhaseRead, res ctrl.Result, err error) {

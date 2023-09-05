@@ -19,7 +19,6 @@ package controllers
 import (
 	"context"
 
-	"emperror.dev/errors"
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -43,22 +42,23 @@ type MemcachedReconciler struct {
 	controller.MultiPhaseReconciler
 }
 
-func NewMemcachedReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder, scheme *runtime.Scheme) (multiPhaseReconciler *MemcachedReconciler, err error) {
-	basicMultiphaseReconcilerAction, err := controller.NewBasicMultiPhaseReconcilerAction(
-		client,
-		MemcachedCondition,
-		logger,
-		recorder,
-	)
-	if err != nil {
-		return nil, errors.Wrap(err, "Error when create basicMultiphaseReconciler")
-	}
-
-	controller.NewBasicMultiPhaseReconciler(client, "memcached", "finalizer", logger, recorder)
+func NewMemcachedReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder, scheme *runtime.Scheme) (multiPhaseReconciler *MemcachedReconciler) {
 
 	return &MemcachedReconciler{
-		MultiPhaseReconcilerAction: basicMultiphaseReconcilerAction,
-	}, nil
+		MultiPhaseReconcilerAction: controller.NewBasicMultiPhaseReconcilerAction(
+			client,
+			MemcachedCondition,
+			logger,
+			recorder,
+		),
+		MultiPhaseReconciler: controller.NewBasicMultiPhaseReconciler(
+			client,
+			"memcached",
+			"memcached.cache.example.com/finalizer",
+			logger,
+			recorder,
+		),
+	}
 }
 
 //+kubebuilder:rbac:groups=cache.example.com,resources=memcacheds,verbs=get;list;watch;create;update;patch;delete
@@ -82,33 +82,24 @@ func (r *MemcachedReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	mc := &cachecrd.Memcached{}
 	data := map[string]any{}
 
-	configMapReconcilerAction, err := NewConfigMapReconciler(
-		r.GetClient(),
-		r.GetLogger(),
-		r.GetRecorder(),
-		r.GetScheme(),
-	)
-	if err != nil {
-		return res, errors.Wrap(err, "Error when create configMap reconciler")
-	}
-
-	deploymentReconciler, err := NewDeploymentReconciler(
-		r.GetClient(),
-		r.GetLogger(),
-		r.GetRecorder(),
-		r.GetScheme(),
-	)
-	if err != nil {
-		return res, errors.Wrap(err, "Error when create deployment reconciler")
-	}
-
 	return r.MultiPhaseReconciler.Reconcile(
 		ctx,
 		req,
 		mc,
 		data,
-		configMapReconciler,
-		deploymentReconciler,
+		r,
+		NewConfigMapReconciler(
+			r.GetClient(),
+			r.GetLogger(),
+			r.GetRecorder(),
+			r.GetScheme(),
+		),
+		NewDeploymentReconciler(
+			r.GetClient(),
+			r.GetLogger(),
+			r.GetRecorder(),
+			r.GetScheme(),
+		),
 	)
 
 }

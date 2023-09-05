@@ -66,6 +66,10 @@ func NewBasicMultiPhaseStepReconcilerAction(client client.Client, phaseName shar
 		panic("recorder can't be nil")
 	}
 
+	if scheme == nil {
+		panic("scheme can't be nil")
+	}
+
 	return &BasicMultiPhaseStepReconcilerAction{
 		BasicReconcilerAction: BasicReconcilerAction{
 			recorder: recorder,

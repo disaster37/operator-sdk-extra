@@ -28,22 +28,18 @@ type DeploymentReconciler struct {
 	controller.MultiPhaseStepReconcilerAction
 }
 
-func NewDeploymentReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder, scheme *runtime.Scheme) (multiPhaseStepReconciler *DeploymentReconciler, err error) {
-	basicMultiPhaseStepReconcilerAction, err := controller.NewBasicMultiPhaseStepReconcilerAction(
-		client,
-		DeploymentPhase,
-		DeploymentCondition,
-		logger,
-		recorder,
-		scheme,
-	)
-	if err != nil {
-		return nil, errors.Wrap(err, "Error when create basicMultiPhaseStep reconciler")
-	}
+func NewDeploymentReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder, scheme *runtime.Scheme) (multiPhaseStepReconcilerAction *DeploymentReconciler) {
 
 	return &DeploymentReconciler{
-		MultiPhaseStepReconcilerAction: basicMultiPhaseStepReconcilerAction,
-	}, nil
+		MultiPhaseStepReconcilerAction: controller.NewBasicMultiPhaseStepReconcilerAction(
+			client,
+			DeploymentPhase,
+			DeploymentCondition,
+			logger,
+			recorder,
+			scheme,
+		),
+	}
 }
 
 func (r *DeploymentReconciler) Read(ctx context.Context, o object.MultiPhaseObject, data map[string]any) (read controller.MultiPhaseRead, res ctrl.Result, err error) {
