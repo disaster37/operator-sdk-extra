@@ -40,7 +40,7 @@ const (
 // MemcachedReconciler reconciles a Memcached object
 type MemcachedReconciler struct {
 	controller.MultiPhaseReconcilerAction
-	controller.BasicMultiPhaseReconciler
+	controller.MultiPhaseReconciler
 }
 
 func NewMemcachedReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder, scheme *runtime.Scheme) (multiPhaseReconciler *MemcachedReconciler, err error) {

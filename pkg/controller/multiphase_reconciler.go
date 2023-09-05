@@ -20,6 +20,7 @@ import (
 
 // MultiPhaseReconciler the reconciler to implement whe you need to create multiple resources on k8s
 type MultiPhaseReconciler interface {
+	BaseReconciler
 
 	// Reconcile permit to orchestrate all phase needed to successfully reconcile the object
 	Reconcile(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject, data map[string]interface{}, reconciler MultiPhaseReconcilerAction, reconcilersStep ...MultiPhaseStepReconcilerAction) (res ctrl.Result, err error)
