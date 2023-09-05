@@ -7,7 +7,9 @@ import (
 
 	"emperror.dev/errors"
 	"github.com/disaster37/k8s-objectmatcher/patch"
+	"github.com/disaster37/operator-sdk-extra/pkg/apis/shared"
 	"github.com/disaster37/operator-sdk-extra/pkg/helper"
+	"github.com/disaster37/operator-sdk-extra/pkg/object"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	condition "k8s.io/apimachinery/pkg/api/meta"
@@ -22,39 +24,39 @@ import (
 // MultiPhaseStepReconciler is the reconciler to implement to create one step for MultiPhaseReconciler
 type MultiPhaseStepReconciler interface {
 	// Configure permit to init condition on status
-	Configure(ctx context.Context, req ctrl.Request, o MultiPhaseObject) (res ctrl.Result, err error)
+	Configure(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject) (res ctrl.Result, err error)
 
 	// Read permit to read kubernetes resources
-	Read(ctx context.Context, o MultiPhaseObject, data map[string]any) (read MultiPhaseRead, res ctrl.Result, err error)
+	Read(ctx context.Context, o object.MultiPhaseObject, data map[string]any) (read MultiPhaseRead, res ctrl.Result, err error)
 
 	// Create permit to create resources on kubernetes
-	Create(ctx context.Context, o MultiPhaseObject, data map[string]any, objects []client.Object) (res ctrl.Result, err error)
+	Create(ctx context.Context, o object.MultiPhaseObject, data map[string]any, objects []client.Object) (res ctrl.Result, err error)
 
 	// Update permit to update resources on kubernetes
-	Update(ctx context.Context, o MultiPhaseObject, data map[string]any, objects []client.Object) (res ctrl.Result, err error)
+	Update(ctx context.Context, o object.MultiPhaseObject, data map[string]any, objects []client.Object) (res ctrl.Result, err error)
 
 	// Delete permit to delete resources on kubernetes
-	Delete(ctx context.Context, o MultiPhaseObject, data map[string]any, objects []client.Object) (res ctrl.Result, err error)
+	Delete(ctx context.Context, o object.MultiPhaseObject, data map[string]any, objects []client.Object) (res ctrl.Result, err error)
 
 	// OnError is call when error is throwing on current phase
 	// It the right way to set status condition when error
-	OnError(ctx context.Context, o MultiPhaseObject, data map[string]any, currentErr error) (res ctrl.Result, err error)
+	OnError(ctx context.Context, o object.MultiPhaseObject, data map[string]any, currentErr error) (res ctrl.Result, err error)
 
 	// OnSuccess is call at the end of current phase, if not error
 	// It's the right way to set status condition when everithink is good
-	OnSuccess(ctx context.Context, o MultiPhaseObject, data map[string]any, diff MultiPhaseDiff) (res ctrl.Result, err error)
+	OnSuccess(ctx context.Context, o object.MultiPhaseObject, data map[string]any, diff MultiPhaseDiff) (res ctrl.Result, err error)
 
 	// Diff permit to compare the actual state and the expected state
-	Diff(ctx context.Context, o MultiPhaseObject, read MultiPhaseRead, data map[string]any, ignoreDiff ...patch.CalculateOption) (diff MultiPhaseDiff, res ctrl.Result, err error)
+	Diff(ctx context.Context, o object.MultiPhaseObject, read MultiPhaseRead, data map[string]any, ignoreDiff ...patch.CalculateOption) (diff MultiPhaseDiff, res ctrl.Result, err error)
 
 	// GetPhaseName permit to get the phase name
-	GetPhaseName() PhaseName
+	GetPhaseName() shared.PhaseName
 
 	// GetConditionName permit to get the main condition name
-	GetConditionName() ConditionName
+	GetConditionName() shared.ConditionName
 
 	// Reconcile permit to reconcile the step (one K8s resource)
-	Reconcile(ctx context.Context, req ctrl.Request, o MultiPhaseObject, data map[string]interface{}) (res ctrl.Result, err error)
+	Reconcile(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject, data map[string]interface{}) (res ctrl.Result, err error)
 }
 
 type BasicMultiPhaseStepReconciler struct {
@@ -62,12 +64,12 @@ type BasicMultiPhaseStepReconciler struct {
 	client.Client
 	log           *logrus.Entry
 	scheme        *runtime.Scheme
-	phaseName     PhaseName
-	conditionName ConditionName
+	phaseName     shared.PhaseName
+	conditionName shared.ConditionName
 	ignoresDiff   []patch.CalculateOption
 }
 
-func NewBasicMultiPhaseStepReconciler(client client.Client, phaseName PhaseName, conditionName ConditionName, logger *logrus.Entry, recorder record.EventRecorder, scheme *runtime.Scheme, ignoresDiff ...patch.CalculateOption) (multiPhaseStepReconciler MultiPhaseStepReconciler, err error) {
+func NewBasicMultiPhaseStepReconciler(client client.Client, phaseName shared.PhaseName, conditionName shared.ConditionName, logger *logrus.Entry, recorder record.EventRecorder, scheme *runtime.Scheme, ignoresDiff ...patch.CalculateOption) (multiPhaseStepReconciler MultiPhaseStepReconciler, err error) {
 	if recorder == nil {
 		return nil, errors.New("recorder can't be nil")
 	}
@@ -84,7 +86,7 @@ func NewBasicMultiPhaseStepReconciler(client client.Client, phaseName PhaseName,
 		ignoresDiff:   ignoresDiff,
 	}, nil
 }
-func (h *BasicMultiPhaseStepReconciler) Configure(ctx context.Context, req ctrl.Request, o MultiPhaseObject) (res ctrl.Result, err error) {
+func (h *BasicMultiPhaseStepReconciler) Configure(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject) (res ctrl.Result, err error) {
 	conditions := o.GetStatus().GetConditions()
 
 	// Init condition
@@ -101,11 +103,11 @@ func (h *BasicMultiPhaseStepReconciler) Configure(ctx context.Context, req ctrl.
 
 	return res, nil
 }
-func (h *BasicMultiPhaseStepReconciler) Read(ctx context.Context, o MultiPhaseObject, data map[string]any) (read MultiPhaseRead, res ctrl.Result, err error) {
+func (h *BasicMultiPhaseStepReconciler) Read(ctx context.Context, o object.MultiPhaseObject, data map[string]any) (read MultiPhaseRead, res ctrl.Result, err error) {
 	panic("You need implement it")
 }
 
-func (h *BasicMultiPhaseStepReconciler) Create(ctx context.Context, o MultiPhaseObject, data map[string]any, objects []client.Object) (res ctrl.Result, err error) {
+func (h *BasicMultiPhaseStepReconciler) Create(ctx context.Context, o object.MultiPhaseObject, data map[string]any, objects []client.Object) (res ctrl.Result, err error) {
 
 	for _, oChild := range objects {
 		if err = h.Client.Create(ctx, oChild); err != nil {
@@ -118,7 +120,7 @@ func (h *BasicMultiPhaseStepReconciler) Create(ctx context.Context, o MultiPhase
 	return res, nil
 }
 
-func (h *BasicMultiPhaseStepReconciler) Update(ctx context.Context, o MultiPhaseObject, data map[string]any, objects []client.Object) (res ctrl.Result, err error) {
+func (h *BasicMultiPhaseStepReconciler) Update(ctx context.Context, o object.MultiPhaseObject, data map[string]any, objects []client.Object) (res ctrl.Result, err error) {
 
 	for _, oChild := range objects {
 		if err = h.Client.Update(ctx, oChild); err != nil {
@@ -131,7 +133,7 @@ func (h *BasicMultiPhaseStepReconciler) Update(ctx context.Context, o MultiPhase
 	return res, nil
 }
 
-func (h *BasicMultiPhaseStepReconciler) Delete(ctx context.Context, o MultiPhaseObject, data map[string]any, objects []client.Object) (res ctrl.Result, err error) {
+func (h *BasicMultiPhaseStepReconciler) Delete(ctx context.Context, o object.MultiPhaseObject, data map[string]any, objects []client.Object) (res ctrl.Result, err error) {
 
 	for _, oChild := range objects {
 		if err = h.Client.Delete(ctx, oChild); err != nil {
@@ -144,14 +146,14 @@ func (h *BasicMultiPhaseStepReconciler) Delete(ctx context.Context, o MultiPhase
 	return res, nil
 }
 
-func (h *BasicMultiPhaseStepReconciler) OnError(ctx context.Context, o MultiPhaseObject, data map[string]any, currentErr error) (res ctrl.Result, err error) {
+func (h *BasicMultiPhaseStepReconciler) OnError(ctx context.Context, o object.MultiPhaseObject, data map[string]any, currentErr error) (res ctrl.Result, err error) {
 	conditions := o.GetStatus().GetConditions()
 
 	condition.SetStatusCondition(&conditions, metav1.Condition{
 		Type:    h.GetConditionName().String(),
 		Status:  metav1.ConditionFalse,
 		Reason:  "Failed",
-		Message: k8sstrings.ShortenString(currentErr.Error(), ShortenError),
+		Message: k8sstrings.ShortenString(currentErr.Error(), shared.ShortenError),
 	})
 
 	var (
@@ -189,7 +191,7 @@ func (h *BasicMultiPhaseStepReconciler) OnError(ctx context.Context, o MultiPhas
 
 }
 
-func (h *BasicMultiPhaseStepReconciler) OnSuccess(ctx context.Context, o MultiPhaseObject, data map[string]any, diff MultiPhaseDiff) (res ctrl.Result, err error) {
+func (h *BasicMultiPhaseStepReconciler) OnSuccess(ctx context.Context, o object.MultiPhaseObject, data map[string]any, diff MultiPhaseDiff) (res ctrl.Result, err error) {
 	conditions := o.GetStatus().GetConditions()
 
 	// Update condition status if needed
@@ -205,7 +207,7 @@ func (h *BasicMultiPhaseStepReconciler) OnSuccess(ctx context.Context, o MultiPh
 	return res, nil
 }
 
-func (h *BasicMultiPhaseStepReconciler) Diff(ctx context.Context, o MultiPhaseObject, read MultiPhaseRead, data map[string]any, ignoreDiff ...patch.CalculateOption) (diff MultiPhaseDiff, res ctrl.Result, err error) {
+func (h *BasicMultiPhaseStepReconciler) Diff(ctx context.Context, o object.MultiPhaseObject, read MultiPhaseRead, data map[string]any, ignoreDiff ...patch.CalculateOption) (diff MultiPhaseDiff, res ctrl.Result, err error) {
 
 	tmpCurrentObjects := make([]client.Object, len(read.GetCurrentObjects()))
 	copy(tmpCurrentObjects, read.GetCurrentObjects())
@@ -281,15 +283,15 @@ func (h *BasicMultiPhaseStepReconciler) Diff(ctx context.Context, o MultiPhaseOb
 	return diff, res, nil
 }
 
-func (h *BasicMultiPhaseStepReconciler) GetPhaseName() PhaseName {
+func (h *BasicMultiPhaseStepReconciler) GetPhaseName() shared.PhaseName {
 	return h.phaseName
 }
 
-func (h *BasicMultiPhaseStepReconciler) GetConditionName() ConditionName {
+func (h *BasicMultiPhaseStepReconciler) GetConditionName() shared.ConditionName {
 	return h.conditionName
 }
 
-func (h *BasicMultiPhaseStepReconciler) Reconcile(ctx context.Context, req ctrl.Request, o MultiPhaseObject, data map[string]interface{}) (res ctrl.Result, err error) {
+func (h *BasicMultiPhaseStepReconciler) Reconcile(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject, data map[string]interface{}) (res ctrl.Result, err error) {
 
 	var (
 		diff MultiPhaseDiff

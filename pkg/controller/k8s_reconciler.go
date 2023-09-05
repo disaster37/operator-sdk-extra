@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/disaster37/operator-sdk-extra/pkg/apis/shared"
 	"github.com/mitchellh/copystructure"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -212,7 +213,7 @@ func (h *StdK8sReconciler) Reconcile(ctx context.Context, req ctrl.Request, r cl
 	}
 
 	// Ignore if needed by annotation
-	if r.GetAnnotations()[fmt.Sprintf("%s/ignoreReconcile", BaseAnnotation)] == "true" {
+	if r.GetAnnotations()[fmt.Sprintf("%s/ignoreReconcile", shared.BaseAnnotation)] == "true" {
 		h.log.Info("Found annotation on ressource to ignore reconcile")
 		return res, nil
 	}

@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"emperror.dev/errors"
+	"github.com/disaster37/operator-sdk-extra/pkg/apis/shared"
+	"github.com/disaster37/operator-sdk-extra/pkg/object"
 	"github.com/mitchellh/copystructure"
 	"github.com/sirupsen/logrus"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -24,27 +26,27 @@ type MultiPhaseReconciler interface {
 	BaseReconciler
 
 	// Configure permit to init condition on status
-	Configure(ctx context.Context, req ctrl.Request, o MultiPhaseObject) (res ctrl.Result, err error)
+	Configure(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject) (res ctrl.Result, err error)
 
 	// Read permit to read kubernetes resources
-	Read(ctx context.Context, o MultiPhaseObject, data map[string]any) (res ctrl.Result, err error)
+	Read(ctx context.Context, o object.MultiPhaseObject, data map[string]any) (res ctrl.Result, err error)
 
 	// Delete permit to delete resources on kubernetes
-	Delete(ctx context.Context, o MultiPhaseObject, data map[string]any) (err error)
+	Delete(ctx context.Context, o object.MultiPhaseObject, data map[string]any) (err error)
 
 	// OnError is call when error is throwing on current phase
 	// It the right way to set status condition when error
-	OnError(ctx context.Context, o MultiPhaseObject, data map[string]any, currentErr error) (res ctrl.Result, err error)
+	OnError(ctx context.Context, o object.MultiPhaseObject, data map[string]any, currentErr error) (res ctrl.Result, err error)
 
 	// OnSuccess is call at the end of current phase, if not error
 	// It's the right way to set status condition when everithink is good
-	OnSuccess(ctx context.Context, o MultiPhaseObject, data map[string]any) (res ctrl.Result, err error)
+	OnSuccess(ctx context.Context, o object.MultiPhaseObject, data map[string]any) (res ctrl.Result, err error)
 
 	// Reconcile permit to orchestrate all phase needed to successfully reconcile the object
-	Reconcile(ctx context.Context, req ctrl.Request, o MultiPhaseObject, data map[string]interface{}, reconcilers ...MultiPhaseStepReconciler) (res ctrl.Result, err error)
+	Reconcile(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject, data map[string]interface{}, reconcilers ...MultiPhaseStepReconciler) (res ctrl.Result, err error)
 
 	// GetConditionName permit to get the main condition name
-	GetConditionName() ConditionName
+	GetConditionName() shared.ConditionName
 }
 
 // BasicMultiPhaseReconciler is the basic multi phase reconsiler you can used whe  you should to create multiple k8s resources
@@ -53,7 +55,7 @@ type BasicMultiPhaseReconciler struct {
 }
 
 // NewBasicMultiPhaseReconciler permit to instanciate new basic multiphase resonciler
-func NewBasicMultiPhaseReconciler(client client.Client, name string, finalizer FinalizerName, conditionName ConditionName, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseReconciler MultiPhaseReconciler, err error) {
+func NewBasicMultiPhaseReconciler(client client.Client, name string, finalizer shared.FinalizerName, conditionName shared.ConditionName, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseReconciler MultiPhaseReconciler, err error) {
 
 	if recorder == nil {
 		return nil, errors.New("recorder can't be nil")
@@ -79,11 +81,11 @@ func NewBasicMultiPhaseReconciler(client client.Client, name string, finalizer F
 	return basicMultiPhaseReconciler, nil
 }
 
-func (h *BasicMultiPhaseReconciler) GetConditionName() ConditionName {
+func (h *BasicMultiPhaseReconciler) GetConditionName() shared.ConditionName {
 	return h.conditionName
 }
 
-func (h *BasicMultiPhaseReconciler) Configure(ctx context.Context, req ctrl.Request, o MultiPhaseObject) (res ctrl.Result, err error) {
+func (h *BasicMultiPhaseReconciler) Configure(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject) (res ctrl.Result, err error) {
 	o.GetStatus().SetIsOnError(false)
 	o.GetStatus().SetLastErrorMessage("")
 
@@ -101,18 +103,18 @@ func (h *BasicMultiPhaseReconciler) Configure(ctx context.Context, req ctrl.Requ
 	return res, nil
 }
 
-func (h *BasicMultiPhaseReconciler) Read(ctx context.Context, o MultiPhaseObject, data map[string]any) (res ctrl.Result, err error) {
+func (h *BasicMultiPhaseReconciler) Read(ctx context.Context, o object.MultiPhaseObject, data map[string]any) (res ctrl.Result, err error) {
 	return
 }
 
-func (h *BasicMultiPhaseReconciler) Delete(ctx context.Context, o MultiPhaseObject, data map[string]any) (err error) {
+func (h *BasicMultiPhaseReconciler) Delete(ctx context.Context, o object.MultiPhaseObject, data map[string]any) (err error) {
 	return
 }
 
-func (h *BasicMultiPhaseReconciler) OnError(ctx context.Context, o MultiPhaseObject, data map[string]any, currentErr error) (res ctrl.Result, err error) {
+func (h *BasicMultiPhaseReconciler) OnError(ctx context.Context, o object.MultiPhaseObject, data map[string]any, currentErr error) (res ctrl.Result, err error) {
 
 	o.GetStatus().SetIsOnError(true)
-	o.GetStatus().SetLastErrorMessage(strings.ShortenString(err.Error(), ShortenError))
+	o.GetStatus().SetLastErrorMessage(strings.ShortenString(err.Error(), shared.ShortenError))
 
 	conditions := o.GetStatus().GetConditions()
 
@@ -120,12 +122,12 @@ func (h *BasicMultiPhaseReconciler) OnError(ctx context.Context, o MultiPhaseObj
 		Type:    h.GetConditionName().String(),
 		Status:  metav1.ConditionFalse,
 		Reason:  "Failed",
-		Message: strings.ShortenString(err.Error(), ShortenError),
+		Message: strings.ShortenString(err.Error(), shared.ShortenError),
 	})
 
 	return res, errors.Wrapf(err, "Error on %s controller", h.name)
 }
-func (h *BasicMultiPhaseReconciler) OnSuccess(ctx context.Context, o MultiPhaseObject, data map[string]any) (res ctrl.Result, err error) {
+func (h *BasicMultiPhaseReconciler) OnSuccess(ctx context.Context, o object.MultiPhaseObject, data map[string]any) (res ctrl.Result, err error) {
 	conditions := o.GetStatus().GetConditions()
 
 	if !condition.IsStatusConditionPresentAndEqual(conditions, h.GetConditionName().String(), metav1.ConditionTrue) {
@@ -136,11 +138,11 @@ func (h *BasicMultiPhaseReconciler) OnSuccess(ctx context.Context, o MultiPhaseO
 		})
 	}
 
-	o.GetStatus().SetPhaseName(RunningPhase)
+	o.GetStatus().SetPhaseName(shared.RunningPhase)
 
 	return res, nil
 }
-func (h *BasicMultiPhaseReconciler) Reconcile(ctx context.Context, req ctrl.Request, o MultiPhaseObject, data map[string]interface{}, reconcilers ...MultiPhaseStepReconciler) (res ctrl.Result, err error) {
+func (h *BasicMultiPhaseReconciler) Reconcile(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject, data map[string]interface{}, reconcilers ...MultiPhaseStepReconciler) (res ctrl.Result, err error) {
 
 	// Init logger
 	h.log = h.log.WithFields(logrus.Fields{
@@ -241,7 +243,7 @@ func (h *BasicMultiPhaseReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	// Ignore if needed by annotation
-	if o.GetAnnotations()[fmt.Sprintf("%s/ignoreReconcile", BaseAnnotation)] == "true" {
+	if o.GetAnnotations()[fmt.Sprintf("%s/ignoreReconcile", shared.BaseAnnotation)] == "true" {
 		log.Info("Found annotation on ressource to ignore reconcile")
 		return res, nil
 	}

@@ -2,6 +2,7 @@ package controller
 
 import (
 	"emperror.dev/errors"
+	"github.com/disaster37/operator-sdk-extra/pkg/apis/shared"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -38,8 +39,8 @@ type BaseReconciler interface {
 
 type BasicReconciler struct {
 	client.Client
-	finalizer     FinalizerName
-	conditionName ConditionName
+	finalizer     shared.FinalizerName
+	conditionName shared.ConditionName
 	log           *logrus.Entry
 	recorder      record.EventRecorder
 	name          string
