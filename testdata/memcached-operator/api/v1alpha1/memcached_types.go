@@ -17,7 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"github.com/disaster37/operator-sdk-extra/pkg/controller"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -48,18 +47,17 @@ type MemcachedSpec struct {
 	ContainerPort int32 `json:"containerPort,omitempty"`
 }
 
-
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 // +operator-sdk:csv:customresourcedefinitions:resources={{Deployment,v1,memcached-deployment}}
 
 // Memcached is the Schema for the memcacheds API
 type Memcached struct {
-	controller.BasicMultiPhaseObject `json:",inline"`
-	metav1.TypeMeta                  `json:",inline"`
-	metav1.ObjectMeta                `json:"metadata,omitempty"`
+	apis.BasicMultiPhaseObject `json:",inline"`
+	metav1.TypeMeta            `json:",inline"`
+	metav1.ObjectMeta          `json:"metadata,omitempty"`
 
-	Spec   MemcachedSpec   `json:"spec,omitempty"`
+	Spec MemcachedSpec `json:"spec,omitempty"`
 }
 
 //+kubebuilder:object:root=true

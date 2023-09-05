@@ -1,4 +1,4 @@
-package object
+package apis
 
 import (
 	"github.com/disaster37/operator-sdk-extra/pkg/object"
