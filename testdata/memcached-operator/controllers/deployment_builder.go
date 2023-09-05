@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"fmt"
 	"os"
 	"strings"
 
@@ -27,6 +26,7 @@ func NewDeploymentsBuilder(memcached *v1alpha1.Memcached) (deployments []appsv1.
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      memcached.Name,
 			Namespace: memcached.Namespace,
+			Labels:    ls,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
@@ -134,10 +134,12 @@ func labelsForMemcached(name string) map[string]string {
 		imageTag = strings.Split(image, ":")[1]
 	}
 	return map[string]string{"app.kubernetes.io/name": "Memcached",
-		"app.kubernetes.io/instance":   name,
-		"app.kubernetes.io/version":    imageTag,
-		"app.kubernetes.io/part-of":    "memcached-operator",
-		"app.kubernetes.io/created-by": "controller-manager",
+		"app.kubernetes.io/instance":    name,
+		"app.kubernetes.io/version":     imageTag,
+		"app.kubernetes.io/part-of":     "memcached-operator",
+		"app.kubernetes.io/created-by":  "controller-manager",
+		"name":                          name,
+		v1alpha1.MemcachedAnnotationKey: "true",
 	}
 }
 
@@ -147,7 +149,7 @@ func imageForMemcached() (string, error) {
 	var imageEnvVar = "MEMCACHED_IMAGE"
 	image, found := os.LookupEnv(imageEnvVar)
 	if !found {
-		return "", fmt.Errorf("unable to find %s environment variable with the image", imageEnvVar)
+		return "memcached:1.4.36-alpine", nil
 	}
 	return image, nil
 }

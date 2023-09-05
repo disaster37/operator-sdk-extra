@@ -9,6 +9,7 @@ import (
 	"emperror.dev/errors"
 	"github.com/disaster37/operator-sdk-extra/pkg/apis/shared"
 	"github.com/disaster37/operator-sdk-extra/pkg/object"
+	"github.com/google/go-cmp/cmp"
 	"github.com/mitchellh/copystructure"
 	"github.com/sirupsen/logrus"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -106,7 +107,7 @@ func (h *BasicMultiPhaseReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 		defer func() {
 			if !reflect.DeepEqual(currentStatus, getObjectStatus(o)) {
-				h.log.Debug("Detect that it need to update status")
+				h.log.Debugf("Detect that it need to update status with diff:\n%s", cmp.Diff(currentStatus, getObjectStatus(o)))
 				if err = h.Client.Status().Update(ctx, o); err != nil {
 					h.log.Errorf("Error when update resource status: %s", err.Error())
 				}

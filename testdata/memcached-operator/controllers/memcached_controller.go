@@ -57,6 +57,7 @@ func NewMemcachedReconciler(client client.Client, logger *logrus.Entry, recorder
 			"memcached.cache.example.com/finalizer",
 			logger,
 			recorder,
+			scheme,
 		),
 	}
 }

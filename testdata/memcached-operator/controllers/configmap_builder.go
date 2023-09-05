@@ -13,6 +13,10 @@ func NewConfigMapsBuilder(o *v1alpha1.Memcached) (configMaps []corev1.ConfigMap,
 		ObjectMeta: v1.ObjectMeta{
 			Name:      o.Name,
 			Namespace: o.Namespace,
+			Labels: map[string]string{
+				"name":                          o.GetName(),
+				v1alpha1.MemcachedAnnotationKey: "true",
+			},
 		},
 		Data: map[string]string{
 			"INSTANCE_NAME": o.Name,

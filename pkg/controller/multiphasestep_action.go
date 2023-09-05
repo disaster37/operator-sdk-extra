@@ -117,10 +117,10 @@ func (h *BasicMultiPhaseStepReconcilerAction) Create(ctx context.Context, o obje
 
 	for _, oChild := range objects {
 		if err = h.Client.Create(ctx, oChild); err != nil {
-			return res, errors.Wrapf(err, "Error when create object of type '%s' with name '%s'", oChild.GetObjectKind().GroupVersionKind().Kind, oChild.GetName())
+			return res, errors.Wrapf(err, "Error when create object '%s'", oChild.GetName())
 		}
-		h.log.Debugf("Create object '%s' of type '%s' successfully", oChild.GetName(), oChild.GetObjectKind().GroupVersionKind().Kind)
-		h.recorder.Eventf(o, corev1.EventTypeNormal, "CreateCompleted", "Object '%s' of type '%s' successfully created", oChild.GetName(), oChild.GetObjectKind().GroupVersionKind().Kind)
+		h.log.Debugf("Create object '%s' successfully", oChild.GetName())
+		h.recorder.Eventf(o, corev1.EventTypeNormal, "CreateCompleted", "Object '%s' successfully created", oChild.GetName())
 	}
 
 	return res, nil
@@ -130,10 +130,10 @@ func (h *BasicMultiPhaseStepReconcilerAction) Update(ctx context.Context, o obje
 
 	for _, oChild := range objects {
 		if err = h.Client.Update(ctx, oChild); err != nil {
-			return res, errors.Wrapf(err, "Error when update object of type '%s' with name '%s'", oChild.GetObjectKind().GroupVersionKind().Kind, oChild.GetName())
+			return res, errors.Wrapf(err, "Error when update object '%s'", oChild.GetName())
 		}
-		h.log.Debugf("Update object '%s' of type '%s' successfully", oChild.GetName(), oChild.GetObjectKind().GroupVersionKind().Kind)
-		h.recorder.Eventf(o, corev1.EventTypeNormal, "UpdateCompleted", "Object '%s' of type '%s' successfully created", oChild.GetName(), oChild.GetObjectKind().GroupVersionKind().Kind)
+		h.log.Debugf("Update object '%s' successfully", oChild.GetName())
+		h.recorder.Eventf(o, corev1.EventTypeNormal, "UpdateCompleted", "Object '%s' successfully updated", oChild.GetName())
 	}
 
 	return res, nil
@@ -143,10 +143,10 @@ func (h *BasicMultiPhaseStepReconcilerAction) Delete(ctx context.Context, o obje
 
 	for _, oChild := range objects {
 		if err = h.Client.Delete(ctx, oChild); err != nil {
-			return res, errors.Wrapf(err, "Error when delete object of type '%s' with name '%s'", oChild.GetObjectKind().GroupVersionKind().Kind, oChild.GetName())
+			return res, errors.Wrapf(err, "Error when delete object '%s'", oChild.GetName())
 		}
-		h.log.Debugf("Delete object '%s' of type '%s' successfully", oChild.GetName(), oChild.GetObjectKind().GroupVersionKind().Kind)
-		h.recorder.Eventf(o, corev1.EventTypeNormal, "DeleteCompleted", "Object '%s' of type '%s' successfully created", oChild.GetName(), oChild.GetObjectKind().GroupVersionKind().Kind)
+		h.log.Debugf("Delete object '%s' successfully", oChild.GetName())
+		h.recorder.Eventf(o, corev1.EventTypeNormal, "DeleteCompleted", "Object '%s' successfully deleted", oChild.GetName())
 	}
 
 	return res, nil
@@ -240,13 +240,13 @@ func (h *BasicMultiPhaseStepReconcilerAction) Diff(ctx context.Context, o object
 				mustInjectTypeMeta(currentObject, expectedObject)
 				patchResult, err := patch.DefaultPatchMaker.Calculate(currentObject, expectedObject, patchOptions...)
 				if err != nil {
-					return diff, res, errors.Wrapf(err, "Error when diffing object '%s' of type '%s'", currentObject.GetName(), currentObject.GetObjectKind().GroupVersionKind().Kind)
+					return diff, res, errors.Wrapf(err, "Error when diffing object '%s'", currentObject.GetName())
 				}
 				if !patchResult.IsEmpty() {
 					updatedObject := patchResult.Patched.(client.Object)
 					diff.AddDiff(fmt.Sprintf("diff %s: %s", updatedObject.GetName(), string(patchResult.Patch)))
 					toUpdate = append(toUpdate, updatedObject)
-					h.log.Debugf("Need update object '%s' of type '%s'", updatedObject.GetName(), updatedObject.GetObjectKind().GroupVersionKind().Kind)
+					h.log.Debugf("Need update object '%s'", updatedObject.GetName())
 				}
 
 				// Remove items found
@@ -258,27 +258,27 @@ func (h *BasicMultiPhaseStepReconcilerAction) Diff(ctx context.Context, o object
 
 		if !isFound {
 			// Need create object
-			diff.AddDiff(fmt.Sprintf("Need Create object '%s' of type '%s'", expectedObject.GetName(), expectedObject.GetObjectKind().GroupVersionKind().Kind))
+			diff.AddDiff(fmt.Sprintf("Need Create object '%s'", expectedObject.GetName()))
 
 			// Set owner
 			err = ctrl.SetControllerReference(o, expectedObject, h.scheme)
 			if err != nil {
-				return diff, res, errors.Wrapf(err, "Error when set owner reference on object '%s' of type '%s'", expectedObject.GetName(), expectedObject.GetObjectKind().GroupVersionKind().Kind)
+				return diff, res, errors.Wrapf(err, "Error when set owner reference on object '%s'", expectedObject.GetName())
 			}
 
 			if err := patch.DefaultAnnotator.SetLastAppliedAnnotation(expectedObject); err != nil {
-				return diff, res, errors.Wrapf(err, "Error when set annotation for 3-way diff on  object '%s' of type '%s'", expectedObject.GetName(), expectedObject.GetObjectKind().GroupVersionKind().Kind)
+				return diff, res, errors.Wrapf(err, "Error when set annotation for 3-way diff on  object '%s'", expectedObject.GetName())
 			}
 
 			toCreate = append(toCreate, expectedObject)
 
-			h.log.Debugf("Need create object '%s' of type '%s'", expectedObject.GetName(), expectedObject.GetObjectKind().GroupVersionKind().Kind)
+			h.log.Debugf("Need create object '%s'", expectedObject.GetName())
 		}
 	}
 
 	if len(tmpCurrentObjects) > 0 {
 		for _, object := range tmpCurrentObjects {
-			diff.AddDiff(fmt.Sprintf("Need delete object '%s' of type '%s'", object.GetName(), object.GetObjectKind().GroupVersionKind().Kind))
+			diff.AddDiff(fmt.Sprintf("Need delete object '%s'", object.GetName()))
 		}
 	}
 
