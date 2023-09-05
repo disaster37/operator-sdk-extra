@@ -65,8 +65,6 @@ func (h *BasicMultiPhaseReconcilerAction) Configure(ctx context.Context, req ctr
 	o.GetStatus().SetLastErrorMessage("")
 
 	conditions := o.GetStatus().GetConditions()
-
-	// Init condition status if not exist
 	if condition.FindStatusCondition(conditions, h.conditionName.String()) == nil {
 		condition.SetStatusCondition(&conditions, metav1.Condition{
 			Type:   h.conditionName.String(),
@@ -74,6 +72,7 @@ func (h *BasicMultiPhaseReconcilerAction) Configure(ctx context.Context, req ctr
 			Reason: "Initialize",
 		})
 	}
+	o.GetStatus().SetConditions(conditions)
 
 	return res, nil
 }
@@ -92,19 +91,19 @@ func (h *BasicMultiPhaseReconcilerAction) OnError(ctx context.Context, o object.
 	o.GetStatus().SetLastErrorMessage(strings.ShortenString(err.Error(), shared.ShortenError))
 
 	conditions := o.GetStatus().GetConditions()
-
 	condition.SetStatusCondition(&conditions, metav1.Condition{
 		Type:    h.conditionName.String(),
 		Status:  metav1.ConditionFalse,
 		Reason:  "Failed",
 		Message: strings.ShortenString(err.Error(), shared.ShortenError),
 	})
+	o.GetStatus().SetConditions(conditions)
 
 	return res, errors.Wrap(err, "Error on reconciler")
 }
 func (h *BasicMultiPhaseReconcilerAction) OnSuccess(ctx context.Context, o object.MultiPhaseObject, data map[string]any) (res ctrl.Result, err error) {
-	conditions := o.GetStatus().GetConditions()
 
+	conditions := o.GetStatus().GetConditions()
 	if !condition.IsStatusConditionPresentAndEqual(conditions, h.conditionName.String(), metav1.ConditionTrue) {
 		condition.SetStatusCondition(&conditions, metav1.Condition{
 			Type:   h.conditionName.String(),
@@ -112,6 +111,7 @@ func (h *BasicMultiPhaseReconcilerAction) OnSuccess(ctx context.Context, o objec
 			Reason: "Ready",
 		})
 	}
+	o.GetStatus().SetConditions(conditions)
 
 	o.GetStatus().SetPhaseName(shared.RunningPhase)
 
