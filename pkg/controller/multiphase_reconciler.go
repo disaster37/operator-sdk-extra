@@ -14,6 +14,7 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	condition "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/strings"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -55,7 +56,7 @@ type BasicMultiPhaseReconciler struct {
 }
 
 // NewBasicMultiPhaseReconciler permit to instanciate new basic multiphase resonciler
-func NewBasicMultiPhaseReconciler(client client.Client, name string, finalizer shared.FinalizerName, conditionName shared.ConditionName, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseReconciler MultiPhaseReconciler, err error) {
+func NewBasicMultiPhaseReconciler(client client.Client, name string, finalizer shared.FinalizerName, conditionName shared.ConditionName, logger *logrus.Entry, recorder record.EventRecorder, scheme *runtime.Scheme) (multiPhaseReconciler MultiPhaseReconciler, err error) {
 
 	if recorder == nil {
 		return nil, errors.New("recorder can't be nil")
@@ -71,6 +72,7 @@ func NewBasicMultiPhaseReconciler(client client.Client, name string, finalizer s
 			Client:        client,
 			conditionName: conditionName,
 			name:          name,
+			scheme:        scheme,
 		},
 	}
 
