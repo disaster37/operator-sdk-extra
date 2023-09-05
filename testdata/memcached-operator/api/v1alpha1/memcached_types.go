@@ -48,6 +48,10 @@ type MemcachedSpec struct {
 	ContainerPort int32 `json:"containerPort,omitempty"`
 }
 
+type MemcachedStatus struct {
+	apis.BasicMultiPhaseObjectStatus `json:",inline"`
+}
+
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 // +operator-sdk:csv:customresourcedefinitions:resources={{Deployment,v1,memcached-deployment}}
@@ -58,7 +62,8 @@ type Memcached struct {
 	metav1.TypeMeta            `json:",inline"`
 	metav1.ObjectMeta          `json:"metadata,omitempty"`
 
-	Spec MemcachedSpec `json:"spec,omitempty"`
+	Spec   MemcachedSpec   `json:"spec,omitempty"`
+	Status MemcachedStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
