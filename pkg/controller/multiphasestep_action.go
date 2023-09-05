@@ -51,6 +51,8 @@ type MultiPhaseStepReconcilerAction interface {
 	GetPhaseName() shared.PhaseName
 
 	GetIgnoresDiff() []patch.CalculateOption
+
+	GetClient() client.Client
 }
 
 type BasicMultiPhaseStepReconcilerAction struct {
@@ -81,6 +83,10 @@ func NewBasicMultiPhaseStepReconcilerAction(client client.Client, phaseName shar
 
 func (h *BasicMultiPhaseStepReconcilerAction) GetIgnoresDiff() []patch.CalculateOption {
 	return make([]patch.CalculateOption, 0)
+}
+
+func (h *BasicMultiPhaseStepReconcilerAction) GetClient() client.Client {
+	return h.Client
 }
 
 func (h *BasicMultiPhaseStepReconcilerAction) Configure(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject) (res ctrl.Result, err error) {

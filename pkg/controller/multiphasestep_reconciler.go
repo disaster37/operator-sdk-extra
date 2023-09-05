@@ -15,7 +15,7 @@ import (
 
 // MultiPhaseStepReconciler is the reconciler to implement to create one step for MultiPhaseReconciler
 type MultiPhaseStepReconciler interface {
-	GetClient() client.Client
+	
 
 	GetLogger() *logrus.Entry
 
@@ -41,9 +41,7 @@ func NewBasicMultiPhaseStepReconciler(client client.Client, logger *logrus.Entry
 	}, nil
 }
 
-func (h *BasicMultiPhaseStepReconciler) GetClient() client.Client {
-	return h.Client
-}
+
 
 func (h *BasicMultiPhaseStepReconciler) GetLogger() *logrus.Entry {
 	return h.log

@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"emperror.dev/errors"
-	"github.com/disaster37/k8s-objectmatcher/patch"
 	"github.com/disaster37/operator-sdk-extra/pkg/apis/shared"
 	"github.com/disaster37/operator-sdk-extra/pkg/controller"
 	"github.com/disaster37/operator-sdk-extra/pkg/helper"
@@ -26,25 +25,24 @@ const (
 )
 
 type ConfigMapReconciler struct {
-	controller.MultiPhaseStepReconciler
+	controller.MultiPhaseStepReconcilerAction
 }
 
-func NewConfigMapReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder, scheme *runtime.Scheme, ignoresDiff ...patch.CalculateOption) (multiPhaseStepReconciler *ConfigMapReconciler, err error) {
-	basicMultiPhaseStep, err := controller.NewBasicMultiPhaseStepReconciler(
+func NewConfigMapReconcilerAction(client client.Client, logger *logrus.Entry, recorder record.EventRecorder, scheme *runtime.Scheme) (multiPhaseStepReconciler controller.MultiPhaseStepReconcilerAction, err error) {
+	basicMultiPhaseStepAction, err := controller.NewBasicMultiPhaseStepReconcilerAction(
 		client,
 		ConfigmapPhase,
 		ConfigmapCondition,
 		logger,
 		recorder,
 		scheme,
-		ignoresDiff...,
 	)
 	if err != nil {
 		return nil, errors.Wrap(err, "Error when create basicMultiPhaseStep reconciler")
 	}
 
 	return &ConfigMapReconciler{
-		MultiPhaseStepReconciler: basicMultiPhaseStep,
+		MultiPhaseStepReconcilerAction: basicMultiPhaseStepAction,
 	}, nil
 }
 
@@ -58,7 +56,7 @@ func (r *ConfigMapReconciler) Read(ctx context.Context, o object.MultiPhaseObjec
 	if err != nil {
 		return read, res, errors.Wrap(err, "Error when generate label selector")
 	}
-	if err = r.GetClient().List(ctx, cmList, &client.ListOptions{Namespace: o.GetNamespace(), LabelSelector: labelSelectors}); err != nil {
+	if err = r..List(ctx, cmList, &client.ListOptions{Namespace: o.GetNamespace(), LabelSelector: labelSelectors}); err != nil {
 		return read, res, errors.Wrapf(err, "Error when read configmaps")
 	}
 

@@ -5,7 +5,7 @@ go 1.19
 require (
 	emperror.dev/errors v0.8.1
 	github.com/disaster37/k8s-objectmatcher v1.8.2
-	github.com/disaster37/operator-sdk-extra v0.1.3-0.20230905102908-722ecb78c33d
+	github.com/disaster37/operator-sdk-extra v0.1.3-0.20230905134431-b05ff0db38d1
 	github.com/onsi/ginkgo/v2 v2.11.0
 	github.com/onsi/gomega v1.27.10
 	github.com/sirupsen/logrus v1.9.3
