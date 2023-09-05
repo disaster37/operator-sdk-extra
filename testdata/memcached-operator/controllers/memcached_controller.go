@@ -40,14 +40,13 @@ const (
 // MemcachedReconciler reconciles a Memcached object
 type MemcachedReconciler struct {
 	controller.MultiPhaseReconcilerAction
-	controller.MultiPhaseReconciler
+	controller.BasicMultiPhaseReconciler
 }
 
 func NewMemcachedReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder, scheme *runtime.Scheme) (multiPhaseReconciler *MemcachedReconciler, err error) {
-	basicMultiphaseReconciler, err := controller.NewBasicMultiPhaseReconciler(
+	basicMultiphaseReconcilerAction, err := controller.NewBasicMultiPhaseReconcilerAction(
 		client,
-		"memcached",
-		"memcached.cache.example.com/finalizer",
+		MemcachedCondition,
 		logger,
 		recorder,
 	)
@@ -55,10 +54,8 @@ func NewMemcachedReconciler(client client.Client, logger *logrus.Entry, recorder
 		return nil, errors.Wrap(err, "Error when create basicMultiphaseReconciler")
 	}
 
-	basicMultiphaseReconcilerAction, err := controller.NewBasicMultiPhaseStepReconcilerAction(client, name, )
-
 	return &MemcachedReconciler{
-		MultiPhaseReconciler: basicMultiphaseReconciler,
+		MultiPhaseReconcilerAction: basicMultiphaseReconcilerAction,
 	}, nil
 }
 
@@ -83,7 +80,7 @@ func (r *MemcachedReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	mc := &cachecrd.Memcached{}
 	data := map[string]any{}
 
-	configMapReconciler, err := NewConfigMapReconciler(
+	configMapReconcilerAction, err := NewConfigMapReconciler(
 		r.GetClient(),
 		r.GetLogger(),
 		r.GetRecorder(),

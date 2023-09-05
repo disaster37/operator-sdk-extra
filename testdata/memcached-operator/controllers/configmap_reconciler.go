@@ -28,7 +28,7 @@ type ConfigMapReconciler struct {
 	controller.MultiPhaseStepReconcilerAction
 }
 
-func NewConfigMapReconcilerAction(client client.Client, logger *logrus.Entry, recorder record.EventRecorder, scheme *runtime.Scheme) (multiPhaseStepReconciler controller.MultiPhaseStepReconcilerAction, err error) {
+func NewConfigMapReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder, scheme *runtime.Scheme) (multiPhaseStepReconciler controller.MultiPhaseStepReconcilerAction, err error) {
 	basicMultiPhaseStepAction, err := controller.NewBasicMultiPhaseStepReconcilerAction(
 		client,
 		ConfigmapPhase,
