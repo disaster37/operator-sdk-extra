@@ -54,6 +54,8 @@ func NewMemcachedReconciler(client client.Client, logger *logrus.Entry, recorder
 		return nil, errors.Wrap(err, "Error when create basicMultiphaseReconciler")
 	}
 
+	controller.NewBasicMultiPhaseReconciler(client, "memcached", "finalizer", logger, recorder)
+
 	return &MemcachedReconciler{
 		MultiPhaseReconcilerAction: basicMultiphaseReconcilerAction,
 	}, nil

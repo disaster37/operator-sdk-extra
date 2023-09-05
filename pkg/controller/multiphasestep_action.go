@@ -61,9 +61,9 @@ type BasicMultiPhaseStepReconcilerAction struct {
 	phaseName shared.PhaseName
 }
 
-func NewBasicMultiPhaseStepReconcilerAction(client client.Client, phaseName shared.PhaseName, conditionName shared.ConditionName, logger *logrus.Entry, recorder record.EventRecorder, scheme *runtime.Scheme) (multiPhaseStepReconciler MultiPhaseStepReconcilerAction, err error) {
+func NewBasicMultiPhaseStepReconcilerAction(client client.Client, phaseName shared.PhaseName, conditionName shared.ConditionName, logger *logrus.Entry, recorder record.EventRecorder, scheme *runtime.Scheme) (multiPhaseStepReconciler MultiPhaseStepReconcilerAction) {
 	if recorder == nil {
-		return nil, errors.New("recorder can't be nil")
+		panic("recorder can't be nil")
 	}
 
 	return &BasicMultiPhaseStepReconcilerAction{
@@ -77,7 +77,7 @@ func NewBasicMultiPhaseStepReconcilerAction(client client.Client, phaseName shar
 		},
 		scheme:    scheme,
 		phaseName: phaseName,
-	}, nil
+	}
 }
 
 func (h *BasicMultiPhaseStepReconcilerAction) GetIgnoresDiff() []patch.CalculateOption {

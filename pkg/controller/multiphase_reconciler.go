@@ -32,10 +32,10 @@ type BasicMultiPhaseReconciler struct {
 }
 
 // NewBasicMultiPhaseReconciler permit to instanciate new basic multiphase resonciler
-func NewBasicMultiPhaseReconciler(client client.Client, name string, finalizer shared.FinalizerName, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseReconciler MultiPhaseReconciler, err error) {
+func NewBasicMultiPhaseReconciler(client client.Client, name string, finalizer shared.FinalizerName, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseReconciler MultiPhaseReconciler) {
 
 	if recorder == nil {
-		return nil, errors.New("recorder can't be nil")
+		panic("recorder can't be nil")
 	}
 
 	basicMultiPhaseReconciler := &BasicMultiPhaseReconciler{
@@ -53,7 +53,7 @@ func NewBasicMultiPhaseReconciler(client client.Client, name string, finalizer s
 		basicMultiPhaseReconciler.log = logrus.NewEntry(logrus.New())
 	}
 
-	return basicMultiPhaseReconciler, nil
+	return basicMultiPhaseReconciler
 }
 
 func (h *BasicMultiPhaseReconciler) Reconcile(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject, data map[string]interface{}, reconcilerAction MultiPhaseReconcilerAction, reconcilersStepAction ...MultiPhaseStepReconcilerAction) (res ctrl.Result, err error) {
@@ -67,10 +67,7 @@ func (h *BasicMultiPhaseReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	h.log.Infof("---> Starting reconcile loop")
 	defer h.log.Info("---> Finish reconcile loop for")
 
-	stepReconciler, err := NewBasicMultiPhaseStepReconciler(h.Client, h.log, h.recorder)
-	if err != nil {
-		return res, errors.Wrap(err, "Error when create step reconciler")
-	}
+	stepReconciler := NewBasicMultiPhaseStepReconciler(h.Client, h.log, h.recorder)
 
 	// Wait few second to be sure status is propaged througout ETCD
 	time.Sleep(time.Second * 1)

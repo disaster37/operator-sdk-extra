@@ -39,10 +39,10 @@ type BasicMultiPhaseReconcilerAction struct {
 	BasicReconcilerAction
 }
 
-func NewBasicMultiPhaseReconcilerAction(client client.Client, conditionName shared.ConditionName, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseReconciler MultiPhaseReconcilerAction, err error) {
+func NewBasicMultiPhaseReconcilerAction(client client.Client, conditionName shared.ConditionName, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseReconciler MultiPhaseReconcilerAction) {
 
 	if recorder == nil {
-		return nil, errors.New("recorder can't be nil")
+		panic("recorder can't be nil")
 	}
 
 	basicMultiPhaseReconciler := &BasicMultiPhaseReconcilerAction{
@@ -57,7 +57,7 @@ func NewBasicMultiPhaseReconcilerAction(client client.Client, conditionName shar
 		basicMultiPhaseReconciler.log = logrus.NewEntry(logrus.New())
 	}
 
-	return basicMultiPhaseReconciler, nil
+	return basicMultiPhaseReconciler
 }
 
 func (h *BasicMultiPhaseReconcilerAction) Configure(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject) (res ctrl.Result, err error) {

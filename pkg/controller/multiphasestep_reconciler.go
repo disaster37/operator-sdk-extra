@@ -15,8 +15,6 @@ import (
 
 // MultiPhaseStepReconciler is the reconciler to implement to create one step for MultiPhaseReconciler
 type MultiPhaseStepReconciler interface {
-	
-
 	GetLogger() *logrus.Entry
 
 	// Reconcile permit to reconcile the step (one K8s resource)
@@ -29,19 +27,17 @@ type BasicMultiPhaseStepReconciler struct {
 	log *logrus.Entry
 }
 
-func NewBasicMultiPhaseStepReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseStepReconciler MultiPhaseStepReconciler, err error) {
+func NewBasicMultiPhaseStepReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseStepReconciler MultiPhaseStepReconciler) {
 	if recorder == nil {
-		return nil, errors.New("recorder can't be nil")
+		panic("recorder can't be nil")
 	}
 
 	return &BasicMultiPhaseStepReconciler{
 		recorder: recorder,
 		log:      logger,
 		Client:   client,
-	}, nil
+	}
 }
-
-
 
 func (h *BasicMultiPhaseStepReconciler) GetLogger() *logrus.Entry {
 	return h.log
