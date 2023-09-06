@@ -54,12 +54,16 @@ type MemcachedStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
-// +operator-sdk:csv:customresourcedefinitions:resources={{Deployment,v1,memcached-deployment}}
+// +operator-sdk:csv:customresourcedefinitions:resources={{Deployment,v1,memcached-deployment},{ConfigMap,v1,memcached-configmap}}
+// +kubebuilder:printcolumn:name="Phase",type="string",JSONPath=".status.phase",description="Cluster deployment status"
+// +kubebuilder:printcolumn:name="Error",type="boolean",JSONPath=".status.isOnError",description="Is on error"
+// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[?(@.type=='MemcachedReady')].status",description="Cluster health"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // Memcached is the Schema for the memcacheds API
 type Memcached struct {
-	metav1.TypeMeta            `json:",inline"`
-	metav1.ObjectMeta          `json:"metadata,omitempty"`
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	Spec   MemcachedSpec   `json:"spec,omitempty"`
 	Status MemcachedStatus `json:"status,omitempty"`

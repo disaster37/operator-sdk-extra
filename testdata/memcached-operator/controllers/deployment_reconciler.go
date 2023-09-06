@@ -13,7 +13,6 @@ import (
 	"github.com/sirupsen/logrus"
 	appv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -29,7 +28,7 @@ type DeploymentReconciler struct {
 	BaseReconciler
 }
 
-func NewDeploymentReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder, scheme *runtime.Scheme) (multiPhaseStepReconcilerAction *DeploymentReconciler) {
+func NewDeploymentReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseStepReconcilerAction *DeploymentReconciler) {
 
 	return &DeploymentReconciler{
 		MultiPhaseStepReconcilerAction: controller.NewBasicMultiPhaseStepReconcilerAction(
@@ -38,7 +37,6 @@ func NewDeploymentReconciler(client client.Client, logger *logrus.Entry, recorde
 			DeploymentCondition,
 			logger,
 			recorder,
-			scheme,
 		),
 		BaseReconciler: BaseReconciler{
 			client:   client,

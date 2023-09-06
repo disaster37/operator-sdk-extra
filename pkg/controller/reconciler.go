@@ -32,6 +32,8 @@ type BaseReconciler interface {
 	SetupWithManager(mgr ctrl.Manager) error
 }
 
+// BasicReconciler is the basic implementation of BaseReconciler
+// It also provide attributes needed by all reconciler
 type BasicReconciler struct {
 	client.Client
 	finalizer shared.FinalizerName
@@ -40,13 +42,13 @@ type BasicReconciler struct {
 	scheme    *runtime.Scheme
 }
 
+// BasicReconcilerAction provide attribute needed by all reconciler action
 type BasicReconcilerAction struct {
 	client.Client
 	conditionName shared.ConditionName
 	log           *logrus.Entry
 	recorder      record.EventRecorder
 }
-
 
 func (h *BasicReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return errors.New("You need implement 'SetupWithManager'")

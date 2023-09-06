@@ -63,6 +63,7 @@ type BasicMultiPhaseDiff struct {
 	diff strings.Builder
 }
 
+// NewBasicMultiPhaseDiff is the basic contructor of MultiPhaseDiff interface
 func NewBasicMultiPhaseDiff() MultiPhaseDiff {
 	return &BasicMultiPhaseDiff{}
 }

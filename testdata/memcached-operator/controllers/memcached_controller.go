@@ -99,19 +99,15 @@ func (r *MemcachedReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			r.client,
 			r.logger,
 			r.recorder,
-			r.client.Scheme(),
 		),
 		NewDeploymentReconciler(
 			r.client,
 			r.logger,
 			r.recorder,
-			r.client.Scheme(),
 		),
 	)
 
 }
-
-// client client.Client, logger *logrus.Entry, recorder record.EventRecorder, scheme *runtime.Scheme, ignoresDiff ...patch.CalculateOption
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *MemcachedReconciler) SetupWithManager(mgr ctrl.Manager) error {

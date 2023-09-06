@@ -19,7 +19,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// MultiPhaseStepReconcilerAction is the interface that use by reconciler step to reconcile your intermediate K8s resources
 type MultiPhaseStepReconcilerAction interface {
+
 	// Configure permit to init condition on status
 	Configure(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject) (res ctrl.Result, err error)
 
@@ -52,11 +54,13 @@ type MultiPhaseStepReconcilerAction interface {
 	GetIgnoresDiff() []patch.CalculateOption
 }
 
+// BasicMultiPhaseStepReconcilerAction is the basic implementation of MultiPhaseStepReconcilerAction
 type BasicMultiPhaseStepReconcilerAction struct {
 	BasicReconcilerAction
 	phaseName shared.PhaseName
 }
 
+// NewBasicMultiPhaseStepReconcilerAction is the basic constructor of MultiPhaseStepReconcilerAction interface
 func NewBasicMultiPhaseStepReconcilerAction(client client.Client, phaseName shared.PhaseName, conditionName shared.ConditionName, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseStepReconciler MultiPhaseStepReconcilerAction) {
 	if recorder == nil {
 		panic("recorder can't be nil")

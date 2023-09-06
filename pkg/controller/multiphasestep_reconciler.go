@@ -20,12 +20,14 @@ type MultiPhaseStepReconciler interface {
 	Reconcile(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject, data map[string]interface{}, reconciler MultiPhaseStepReconcilerAction, ignoresDiff ...patch.CalculateOption) (res ctrl.Result, err error)
 }
 
+// BasicMultiPhaseStepReconciler is the basic implementation of MultiPhaseStepReconciler interface
 type BasicMultiPhaseStepReconciler struct {
 	recorder record.EventRecorder
 	client.Client
 	log *logrus.Entry
 }
 
+// NewBasicMultiPhaseStepReconciler is the basic constructor of MultiPhaseStepReconciler interface
 func NewBasicMultiPhaseStepReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseStepReconciler MultiPhaseStepReconciler) {
 	if recorder == nil {
 		panic("recorder can't be nil")

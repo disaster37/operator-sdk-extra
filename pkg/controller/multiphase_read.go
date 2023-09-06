@@ -24,6 +24,7 @@ type BasicMultiPhaseRead struct {
 	expectedObjects []client.Object
 }
 
+// NewBasicMultiPhaseRead is the basic constructor of MultiPhaseRead interface
 func NewBasicMultiPhaseRead() MultiPhaseRead {
 	return &BasicMultiPhaseRead{}
 }

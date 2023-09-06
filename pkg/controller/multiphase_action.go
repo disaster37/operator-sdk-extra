@@ -15,6 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// MultiPhaseReconcilerAction is the methode needed by step reconciler to reconcile your custom resource
 type MultiPhaseReconcilerAction interface {
 
 	// Configure permit to init condition on status
@@ -35,10 +36,12 @@ type MultiPhaseReconcilerAction interface {
 	OnSuccess(ctx context.Context, o object.MultiPhaseObject, data map[string]any) (res ctrl.Result, err error)
 }
 
+// BasicMultiPhaseReconcilerAction is the basic implementation of MultiPhaseReconcilerAction interface
 type BasicMultiPhaseReconcilerAction struct {
 	BasicReconcilerAction
 }
 
+// NewBasicMultiPhaseReconcilerAction is the basic contructor of MultiPhaseReconcilerAction interface
 func NewBasicMultiPhaseReconcilerAction(client client.Client, conditionName shared.ConditionName, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseReconciler MultiPhaseReconcilerAction) {
 
 	if recorder == nil {
@@ -101,6 +104,7 @@ func (h *BasicMultiPhaseReconcilerAction) OnError(ctx context.Context, o object.
 
 	return res, errors.Wrap(err, "Error on reconciler")
 }
+
 func (h *BasicMultiPhaseReconcilerAction) OnSuccess(ctx context.Context, o object.MultiPhaseObject, data map[string]any) (res ctrl.Result, err error) {
 
 	conditions := o.GetStatus().GetConditions()
