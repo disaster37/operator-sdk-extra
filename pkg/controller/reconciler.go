@@ -32,8 +32,8 @@ type BaseReconciler interface {
 	// SetupWithManager permit to setup controller with manager
 	SetupWithManager(mgr ctrl.Manager) error
 
-	// SetupIndexerWithManager permit to setup indexers with manager
-	SetupIndexerWithManager(mgr ctrl.Manager, indexers ...object.Indexer)
+	// SetupIndexerWithManager permit to setup indexer with manager
+	SetupIndexerWithManager(mgr ctrl.Manager, indexer object.Indexer)
 }
 
 // BasicReconciler is the basic implementation of BaseReconciler
@@ -58,8 +58,6 @@ func (h *BasicReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return errors.New("You need implement 'SetupWithManager'")
 }
 
-func (h *BasicReconciler) SetupIndexerWithManager(mgr ctrl.Manager, indexers ...object.Indexer) {
-	for _, indexer := range indexers {
-		indexer.SetupIndexer(mgr)
-	}
+func (h *BasicReconciler) SetupIndexerWithManager(mgr ctrl.Manager, indexer object.Indexer) {
+	indexer.SetupIndexer(mgr)
 }
