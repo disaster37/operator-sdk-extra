@@ -28,19 +28,8 @@ var (
 // BaseReconciler is the base interface for all reconciler
 type BaseReconciler interface {
 
-	// GetLogger permit to get logger
-	GetLogger() *logrus.Entry
-
-	// GetRecorder permit to get recorder
-	GetRecorder() record.EventRecorder
-
 	// SetupWithManager permit to setup controller with manager
 	SetupWithManager(mgr ctrl.Manager) error
-
-	// GetClient permit to get the client
-	GetClient() client.Client
-
-	GetScheme() *runtime.Scheme
 }
 
 type BasicReconciler struct {
@@ -58,22 +47,7 @@ type BasicReconcilerAction struct {
 	recorder      record.EventRecorder
 }
 
-func (h *BasicReconciler) GetLogger() *logrus.Entry {
-	return h.log
-}
-
-func (h *BasicReconciler) GetRecorder() record.EventRecorder {
-	return h.recorder
-}
-
-func (h *BasicReconciler) GetClient() client.Client {
-	return h.Client
-}
 
 func (h *BasicReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return errors.New("You need implement 'SetupWithManager'")
-}
-
-func (h *BasicReconciler) GetScheme() *runtime.Scheme {
-	return h.scheme
 }

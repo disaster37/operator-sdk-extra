@@ -15,7 +15,6 @@ import (
 
 // MultiPhaseStepReconciler is the reconciler to implement to create one step for MultiPhaseReconciler
 type MultiPhaseStepReconciler interface {
-	GetLogger() *logrus.Entry
 
 	// Reconcile permit to reconcile the step (one K8s resource)
 	Reconcile(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject, data map[string]interface{}, reconciler MultiPhaseStepReconcilerAction, ignoresDiff ...patch.CalculateOption) (res ctrl.Result, err error)

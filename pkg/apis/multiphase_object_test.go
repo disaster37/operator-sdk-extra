@@ -6,17 +6,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestMultiPhaseObjectGetStatus(t *testing.T) {
-	status := BasicMultiPhaseObjectStatus{
-		PhaseName: "test",
-	}
-	o := &BasicMultiPhaseObject{
-		Status: status,
-	}
-
-	assert.Equal(t, &status, o.GetStatus())
-}
-
 func TestBasicMultiPhaseObjectStatusPhase(t *testing.T) {
 	// With default object
 	o := &BasicMultiPhaseObjectStatus{}

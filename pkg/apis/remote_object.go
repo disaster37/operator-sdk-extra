@@ -1,18 +1,8 @@
 package apis
 
 import (
-	"github.com/disaster37/operator-sdk-extra/pkg/object"
 	"k8s.io/utils/ptr"
 )
-
-// BasicMultiPhaseObject is the implementation of MultiPhaseObject interface
-type BasicRemoteObject struct {
-	Status BasicRemoteObjectStatus `json:"Status,omitempty"`
-}
-
-func (h *BasicRemoteObject) GetStatus() object.RemoteObjectStatus {
-	return &h.Status
-}
 
 // RemoteObjectStatus is the default status for CRD used to call remote API (not create K8s resources)
 type BasicRemoteObjectStatus struct {

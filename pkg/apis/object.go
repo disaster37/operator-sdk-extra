@@ -1,19 +1,9 @@
 package apis
 
 import (
-	"github.com/disaster37/operator-sdk-extra/pkg/object"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 )
-
-// BasicObject implement the Object interface
-type BasicObject struct {
-	Status BasicObjectStatus `json:"Status,omitempty"`
-}
-
-func (h *BasicObject) GetStatus() object.ObjectStatus {
-	return &h.Status
-}
 
 // BasicObjectStatus is the default status for basic Object
 type BasicObjectStatus struct {

@@ -51,8 +51,6 @@ type MultiPhaseStepReconcilerAction interface {
 	GetPhaseName() shared.PhaseName
 
 	GetIgnoresDiff() []patch.CalculateOption
-
-	GetClient() client.Client
 }
 
 type BasicMultiPhaseStepReconcilerAction struct {

@@ -2,17 +2,7 @@ package apis
 
 import (
 	"github.com/disaster37/operator-sdk-extra/pkg/apis/shared"
-	"github.com/disaster37/operator-sdk-extra/pkg/object"
 )
-
-// BasicMultiPhaseObject is the implementation of MultiPhaseObject interface
-type BasicMultiPhaseObject struct {
-	Status BasicMultiPhaseObjectStatus `json:"Status,omitempty"`
-}
-
-func (h *BasicMultiPhaseObject) GetStatus() object.MultiPhaseObjectStatus {
-	return &h.Status
-}
 
 // MultiPhaseObjectStatus is the default status for CRD used to create multiple K8s resources
 type BasicMultiPhaseObjectStatus struct {

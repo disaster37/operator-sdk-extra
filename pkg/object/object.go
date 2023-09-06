@@ -2,16 +2,7 @@ package object
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
-
-// Object interface is the extension of client object
-type Object interface {
-	client.Object
-
-	// GetStatus permit to get the status interface
-	GetStatus() ObjectStatus
-}
 
 // ObjectStatus is the interface for object status
 type ObjectStatus interface {
