@@ -13,7 +13,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	condition "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	k8sstrings "k8s.io/utils/strings"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -55,17 +54,12 @@ type MultiPhaseStepReconcilerAction interface {
 
 type BasicMultiPhaseStepReconcilerAction struct {
 	BasicReconcilerAction
-	scheme    *runtime.Scheme
 	phaseName shared.PhaseName
 }
 
-func NewBasicMultiPhaseStepReconcilerAction(client client.Client, phaseName shared.PhaseName, conditionName shared.ConditionName, logger *logrus.Entry, recorder record.EventRecorder, scheme *runtime.Scheme) (multiPhaseStepReconciler MultiPhaseStepReconcilerAction) {
+func NewBasicMultiPhaseStepReconcilerAction(client client.Client, phaseName shared.PhaseName, conditionName shared.ConditionName, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseStepReconciler MultiPhaseStepReconcilerAction) {
 	if recorder == nil {
 		panic("recorder can't be nil")
-	}
-
-	if scheme == nil {
-		panic("scheme can't be nil")
 	}
 
 	return &BasicMultiPhaseStepReconcilerAction{
@@ -77,17 +71,12 @@ func NewBasicMultiPhaseStepReconcilerAction(client client.Client, phaseName shar
 			Client:        client,
 			conditionName: conditionName,
 		},
-		scheme:    scheme,
 		phaseName: phaseName,
 	}
 }
 
 func (h *BasicMultiPhaseStepReconcilerAction) GetIgnoresDiff() []patch.CalculateOption {
 	return make([]patch.CalculateOption, 0)
-}
-
-func (h *BasicMultiPhaseStepReconcilerAction) GetClient() client.Client {
-	return h.Client
 }
 
 func (h *BasicMultiPhaseStepReconcilerAction) Configure(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject) (res ctrl.Result, err error) {
@@ -259,7 +248,7 @@ func (h *BasicMultiPhaseStepReconcilerAction) Diff(ctx context.Context, o object
 			diff.AddDiff(fmt.Sprintf("Need Create object '%s'", expectedObject.GetName()))
 
 			// Set owner
-			err = ctrl.SetControllerReference(o, expectedObject, h.scheme)
+			err = ctrl.SetControllerReference(o, expectedObject, h.Client.Scheme())
 			if err != nil {
 				return diff, res, errors.Wrapf(err, "Error when set owner reference on object '%s'", expectedObject.GetName())
 			}

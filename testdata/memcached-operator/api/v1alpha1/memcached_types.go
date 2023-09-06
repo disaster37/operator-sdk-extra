@@ -58,7 +58,6 @@ type MemcachedStatus struct {
 
 // Memcached is the Schema for the memcacheds API
 type Memcached struct {
-	apis.BasicMultiPhaseObject `json:",inline"`
 	metav1.TypeMeta            `json:",inline"`
 	metav1.ObjectMeta          `json:"metadata,omitempty"`
 

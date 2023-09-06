@@ -4,8 +4,7 @@ go 1.19
 
 require (
 	emperror.dev/errors v0.8.1
-	github.com/disaster37/k8s-objectmatcher v1.8.2
-	github.com/disaster37/operator-sdk-extra v0.1.3-0.20230905153423-7d6f8931f983
+	github.com/disaster37/operator-sdk-extra v0.1.3-0.20230906074532-d4273451a029
 	github.com/onsi/ginkgo/v2 v2.11.0
 	github.com/onsi/gomega v1.27.10
 	github.com/sirupsen/logrus v1.9.3
@@ -19,6 +18,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/disaster37/k8s-objectmatcher v1.8.2 // indirect
 	github.com/emicklei/go-restful/v3 v3.9.0 // indirect
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect

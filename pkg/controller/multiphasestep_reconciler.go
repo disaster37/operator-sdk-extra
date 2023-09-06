@@ -38,10 +38,6 @@ func NewBasicMultiPhaseStepReconciler(client client.Client, logger *logrus.Entry
 	}
 }
 
-func (h *BasicMultiPhaseStepReconciler) GetLogger() *logrus.Entry {
-	return h.log
-}
-
 // Reconcile permit to reconcile the step (one K8s resource)
 func (h *BasicMultiPhaseStepReconciler) Reconcile(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject, data map[string]interface{}, reconcilerAction MultiPhaseStepReconcilerAction, ignoresDiff ...patch.CalculateOption) (res ctrl.Result, err error) {
 
