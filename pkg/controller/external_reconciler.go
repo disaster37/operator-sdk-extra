@@ -17,6 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
+// Deprecated: Use RemoteReconcilerAction instead
 type Reconciler interface {
 	// Confirgure permit to init external provider driver (API client REST)
 	// It can also permit to init condition on status
@@ -92,6 +93,7 @@ func NewStdReconciler(client client.Client, finalizer string, reconciler Reconci
 // 4. Check if on delete phase, delete external resources if on it
 // 5. Diff external resources with the expected resources
 // 6. Create or update external resources if needed
+// Deprecated: Use RemoteReconciler instead
 func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r client.Object, data map[string]interface{}) (res ctrl.Result, err error) {
 	var (
 		meta any

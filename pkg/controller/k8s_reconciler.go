@@ -19,6 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
+// Deprecated: use MultiPhaseReconcilerAction instead
 type K8sReconciler interface {
 	// Configure permit to init condition on status
 	Configure(ctx context.Context, req ctrl.Request, resource client.Object) (res ctrl.Result, err error)
@@ -38,6 +39,7 @@ type K8sReconciler interface {
 	OnSuccess(ctx context.Context, r client.Object, data map[string]any) (res ctrl.Result, err error)
 }
 
+// Deprecated: use MultiPhaseStepReconcilerAction instead
 type K8sPhaseReconciler interface {
 	// Configure permit to init condition on status
 	Configure(ctx context.Context, req ctrl.Request, resource client.Object) (res ctrl.Result, err error)
@@ -116,6 +118,7 @@ func NewStdK8sReconciler(client client.Client, finalizer string, reconciler K8sR
 // 3.3 Update / create resources if needed
 // 3.4 Delete resources if needed
 // 4. Delete finalizer if on delete action
+// Deprecated: Use MultiPhaseReconciler instead
 func (h *StdK8sReconciler) Reconcile(ctx context.Context, req ctrl.Request, r client.Object, data map[string]interface{}, reconcilers ...K8sPhaseReconciler) (res ctrl.Result, err error) {
 
 	// Init logger
