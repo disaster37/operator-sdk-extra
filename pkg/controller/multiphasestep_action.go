@@ -68,11 +68,13 @@ func NewBasicMultiPhaseStepReconcilerAction(client client.Client, phaseName shar
 
 	return &BasicMultiPhaseStepReconcilerAction{
 		BasicReconcilerAction: BasicReconcilerAction{
-			recorder: recorder,
-			log: logger.WithFields(logrus.Fields{
-				"phase": phaseName.String(),
-			}),
-			Client:        client,
+			BaseReconciler: BaseReconciler{
+				Client: client,
+				Log: logger.WithFields(logrus.Fields{
+					"phase": phaseName.String(),
+				}),
+				Recorder: recorder,
+			},
 			conditionName: conditionName,
 		},
 		phaseName: phaseName,
@@ -110,8 +112,8 @@ func (h *BasicMultiPhaseStepReconcilerAction) Create(ctx context.Context, o obje
 		if err = h.Client.Create(ctx, oChild); err != nil {
 			return res, errors.Wrapf(err, "Error when create object '%s'", oChild.GetName())
 		}
-		h.log.Debugf("Create object '%s' successfully", oChild.GetName())
-		h.recorder.Eventf(o, corev1.EventTypeNormal, "CreateCompleted", "Object '%s' successfully created", oChild.GetName())
+		h.Log.Debugf("Create object '%s' successfully", oChild.GetName())
+		h.Recorder.Eventf(o, corev1.EventTypeNormal, "CreateCompleted", "Object '%s' successfully created", oChild.GetName())
 	}
 
 	return res, nil
@@ -123,8 +125,8 @@ func (h *BasicMultiPhaseStepReconcilerAction) Update(ctx context.Context, o obje
 		if err = h.Client.Update(ctx, oChild); err != nil {
 			return res, errors.Wrapf(err, "Error when update object '%s'", oChild.GetName())
 		}
-		h.log.Debugf("Update object '%s' successfully", oChild.GetName())
-		h.recorder.Eventf(o, corev1.EventTypeNormal, "UpdateCompleted", "Object '%s' successfully updated", oChild.GetName())
+		h.Log.Debugf("Update object '%s' successfully", oChild.GetName())
+		h.Recorder.Eventf(o, corev1.EventTypeNormal, "UpdateCompleted", "Object '%s' successfully updated", oChild.GetName())
 	}
 
 	return res, nil
@@ -136,8 +138,8 @@ func (h *BasicMultiPhaseStepReconcilerAction) Delete(ctx context.Context, o obje
 		if err = h.Client.Delete(ctx, oChild); err != nil {
 			return res, errors.Wrapf(err, "Error when delete object '%s'", oChild.GetName())
 		}
-		h.log.Debugf("Delete object '%s' successfully", oChild.GetName())
-		h.recorder.Eventf(o, corev1.EventTypeNormal, "DeleteCompleted", "Object '%s' successfully deleted", oChild.GetName())
+		h.Log.Debugf("Delete object '%s' successfully", oChild.GetName())
+		h.Recorder.Eventf(o, corev1.EventTypeNormal, "DeleteCompleted", "Object '%s' successfully deleted", oChild.GetName())
 	}
 
 	return res, nil
@@ -183,7 +185,7 @@ func (h *BasicMultiPhaseStepReconcilerAction) OnError(ctx context.Context, o obj
 		errorMessage = fmt.Sprintf("Framework error on step %s", h.GetPhaseName().String())
 		reason = "FrameworkFailed"
 	}
-	h.recorder.Event(o, corev1.EventTypeWarning, reason, errorMessage)
+	h.Recorder.Event(o, corev1.EventTypeWarning, reason, errorMessage)
 	return res, errors.New(errorMessage)
 
 }
@@ -237,7 +239,7 @@ func (h *BasicMultiPhaseStepReconcilerAction) Diff(ctx context.Context, o object
 					updatedObject := patchResult.Patched.(client.Object)
 					diff.AddDiff(fmt.Sprintf("diff %s: %s", updatedObject.GetName(), string(patchResult.Patch)))
 					toUpdate = append(toUpdate, updatedObject)
-					h.log.Debugf("Need update object '%s'", updatedObject.GetName())
+					h.Log.Debugf("Need update object '%s'", updatedObject.GetName())
 				}
 
 				// Remove items found
@@ -263,7 +265,7 @@ func (h *BasicMultiPhaseStepReconcilerAction) Diff(ctx context.Context, o object
 
 			toCreate = append(toCreate, expectedObject)
 
-			h.log.Debugf("Need create object '%s'", expectedObject.GetName())
+			h.Log.Debugf("Need create object '%s'", expectedObject.GetName())
 		}
 	}
 

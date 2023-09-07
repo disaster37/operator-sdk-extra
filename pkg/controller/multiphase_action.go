@@ -50,14 +50,17 @@ func NewBasicMultiPhaseReconcilerAction(client client.Client, conditionName shar
 
 	basicMultiPhaseReconciler := &BasicMultiPhaseReconcilerAction{
 		BasicReconcilerAction: BasicReconcilerAction{
-			recorder:      recorder,
-			log:           logger,
+			BaseReconciler: BaseReconciler{
+				Client:   client,
+				Log:      logger,
+				Recorder: recorder,
+			},
 			conditionName: conditionName,
 		},
 	}
 
-	if basicMultiPhaseReconciler.log == nil {
-		basicMultiPhaseReconciler.log = logrus.NewEntry(logrus.New())
+	if basicMultiPhaseReconciler.Log == nil {
+		basicMultiPhaseReconciler.Log = logrus.NewEntry(logrus.New())
 	}
 
 	return basicMultiPhaseReconciler

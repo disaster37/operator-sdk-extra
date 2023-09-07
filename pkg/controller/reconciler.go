@@ -23,19 +23,22 @@ var (
 	ErrWhenGetObjectStatus                  = errors.Sentinel("Error when get object status")
 )
 
+// BaseReconciler is the base attributes for all reconciler
+type BaseReconciler struct {
+	client.Client
+	Log      *logrus.Entry
+	Recorder record.EventRecorder
+}
+
 // BasicReconciler is the basic implementation of BaseReconciler
 // It also provide attributes needed by all reconciler
 type BasicReconciler struct {
-	client.Client
+	BaseReconciler
 	finalizer shared.FinalizerName
-	log       *logrus.Entry
-	recorder  record.EventRecorder
 }
 
 // BasicReconcilerAction provide attribute needed by all reconciler action
 type BasicReconcilerAction struct {
-	client.Client
+	BaseReconciler
 	conditionName shared.ConditionName
-	log           *logrus.Entry
-	recorder      record.EventRecorder
 }
