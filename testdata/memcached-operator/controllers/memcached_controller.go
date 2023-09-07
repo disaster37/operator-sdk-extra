@@ -21,7 +21,6 @@ import (
 
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -43,7 +42,7 @@ type MemcachedReconciler struct {
 	BaseReconciler
 }
 
-func NewMemcachedReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder, scheme *runtime.Scheme) (multiPhaseReconciler *MemcachedReconciler) {
+func NewMemcachedReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseReconciler *MemcachedReconciler) {
 
 	return &MemcachedReconciler{
 		MultiPhaseReconcilerAction: controller.NewBasicMultiPhaseReconcilerAction(
@@ -58,7 +57,6 @@ func NewMemcachedReconciler(client client.Client, logger *logrus.Entry, recorder
 			"memcached.cache.example.com/finalizer",
 			logger,
 			recorder,
-			scheme,
 		),
 		BaseReconciler: BaseReconciler{
 			client:   client,

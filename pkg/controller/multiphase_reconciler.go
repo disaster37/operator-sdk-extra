@@ -13,7 +13,6 @@ import (
 	"github.com/mitchellh/copystructure"
 	"github.com/sirupsen/logrus"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -34,7 +33,7 @@ type BasicMultiPhaseReconciler struct {
 }
 
 // NewBasicMultiPhaseReconciler permit to instanciate new basic multiphase resonciler
-func NewBasicMultiPhaseReconciler(client client.Client, name string, finalizer shared.FinalizerName, logger *logrus.Entry, recorder record.EventRecorder, scheme *runtime.Scheme) (multiPhaseReconciler MultiPhaseReconciler) {
+func NewBasicMultiPhaseReconciler(client client.Client, name string, finalizer shared.FinalizerName, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseReconciler MultiPhaseReconciler) {
 
 	if recorder == nil {
 		panic("recorder can't be nil")
@@ -48,7 +47,6 @@ func NewBasicMultiPhaseReconciler(client client.Client, name string, finalizer s
 			}),
 			recorder: recorder,
 			Client:   client,
-			scheme:   scheme,
 		},
 	}
 

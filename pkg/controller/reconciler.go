@@ -5,7 +5,6 @@ import (
 	"github.com/disaster37/operator-sdk-extra/pkg/apis/shared"
 	"github.com/disaster37/operator-sdk-extra/pkg/object"
 	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -43,7 +42,6 @@ type BasicReconciler struct {
 	finalizer shared.FinalizerName
 	log       *logrus.Entry
 	recorder  record.EventRecorder
-	scheme    *runtime.Scheme
 }
 
 // BasicReconcilerAction provide attribute needed by all reconciler action
