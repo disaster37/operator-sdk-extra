@@ -25,14 +25,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/disaster37/operator-sdk-extra/pkg/apis/shared"
 	"github.com/disaster37/operator-sdk-extra/pkg/controller"
 	cachecrd "github.com/disaster37/operator-sdk-extra/testdata/memcached-operator/api/v1alpha1"
 	"github.com/sirupsen/logrus"
-)
-
-const (
-	MemcachedCondition shared.ConditionName = "MemcachedReady"
 )
 
 // MemcachedReconciler reconciles a Memcached object
@@ -48,7 +43,7 @@ func NewMemcachedReconciler(client client.Client, logger *logrus.Entry, recorder
 	return &MemcachedReconciler{
 		MultiPhaseReconcilerAction: controller.NewBasicMultiPhaseReconcilerAction(
 			client,
-			MemcachedCondition,
+			controller.ReadyCondition,
 			logger,
 			recorder,
 		),

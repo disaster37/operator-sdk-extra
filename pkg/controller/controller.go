@@ -3,8 +3,8 @@ package controller
 import (
 	"context"
 
-	"github.com/disaster37/operator-sdk-extra/pkg/object"
 	"emperror.dev/errors"
+	"github.com/disaster37/operator-sdk-extra/pkg/object"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -22,6 +22,11 @@ type Controller interface {
 
 // BasicController is the default controller implementation
 type BasicController struct{}
+
+// NewBasicController is the default constructor for Controller
+func NewBasicController() Controller {
+	return &BasicController{}
+}
 
 func (h *BasicController) SetupWithManager(mgr ctrl.Manager) error {
 	return errors.New("You need implement 'SetupWithManager'")
