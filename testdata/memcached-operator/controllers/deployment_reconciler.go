@@ -25,7 +25,7 @@ const (
 
 type deploymentReconciler struct {
 	controller.MultiPhaseStepReconcilerAction
-	BaseReconciler
+	controller.BaseReconciler
 }
 
 func newDeploymentReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseStepReconcilerAction *deploymentReconciler) {
@@ -38,10 +38,10 @@ func newDeploymentReconciler(client client.Client, logger *logrus.Entry, recorde
 			logger,
 			recorder,
 		),
-		BaseReconciler: BaseReconciler{
-			client:   client,
-			recorder: recorder,
-			logger:   logger,
+		BaseReconciler: controller.BaseReconciler{
+			Client:   client,
+			Recorder: recorder,
+			Log:      logger,
 		},
 	}
 }
@@ -56,7 +56,7 @@ func (r *deploymentReconciler) Read(ctx context.Context, o object.MultiPhaseObje
 	if err != nil {
 		return read, res, errors.Wrap(err, "Error when generate label selector")
 	}
-	if err = r.client.List(ctx, deploymentList, &client.ListOptions{Namespace: o.GetNamespace(), LabelSelector: labelSelectors}); err != nil {
+	if err = r.Client.List(ctx, deploymentList, &client.ListOptions{Namespace: o.GetNamespace(), LabelSelector: labelSelectors}); err != nil {
 		return read, res, errors.Wrapf(err, "Error when read deployments")
 	}
 

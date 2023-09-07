@@ -152,7 +152,7 @@ func (h *BasicMultiPhaseStepReconcilerAction) OnError(ctx context.Context, o obj
 		Type:    h.conditionName.String(),
 		Status:  metav1.ConditionFalse,
 		Reason:  "Failed",
-		Message: k8sstrings.ShortenString(currentErr.Error(), shared.ShortenError),
+		Message: k8sstrings.ShortenString(currentErr.Error(), ShortenError),
 	})
 
 	var (

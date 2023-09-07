@@ -192,7 +192,7 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r clien
 	}
 
 	// Ignore if needed by annotation
-	if r.GetAnnotations()[fmt.Sprintf("%s/ignoreReconcile", shared.BaseAnnotation)] == "true" {
+	if r.GetAnnotations()[fmt.Sprintf("%s/ignoreReconcile", BaseAnnotation)] == "true" {
 		h.log.Info("Found annotation on ressource to ignore reconcile")
 		return res, nil
 	}

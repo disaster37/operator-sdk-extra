@@ -157,7 +157,7 @@ func (h *BasicMultiPhaseReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	// Ignore if needed by annotation
-	if o.GetAnnotations()[fmt.Sprintf("%s/ignoreReconcile", shared.BaseAnnotation)] == "true" {
+	if o.GetAnnotations()[fmt.Sprintf("%s/ignoreReconcile", BaseAnnotation)] == "true" {
 		h.Log.Info("Found annotation on ressource to ignore reconcile")
 		return res, nil
 	}

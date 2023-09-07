@@ -39,10 +39,11 @@ const (
 type MemcachedReconciler struct {
 	controller.MultiPhaseReconcilerAction
 	controller.MultiPhaseReconciler
-	BaseReconciler
+	controller.BasicController
+	controller.BaseReconciler
 }
 
-func NewMemcachedReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseReconciler *MemcachedReconciler) {
+func NewMemcachedReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseReconciler controller.Controller) {
 
 	return &MemcachedReconciler{
 		MultiPhaseReconcilerAction: controller.NewBasicMultiPhaseReconcilerAction(
@@ -58,10 +59,10 @@ func NewMemcachedReconciler(client client.Client, logger *logrus.Entry, recorder
 			logger,
 			recorder,
 		),
-		BaseReconciler: BaseReconciler{
-			client:   client,
-			recorder: recorder,
-			logger:   logger,
+		BaseReconciler: controller.BaseReconciler{
+			Client:   client,
+			Recorder: recorder,
+			Log:      logger,
 		},
 	}
 }
@@ -94,14 +95,14 @@ func (r *MemcachedReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		data,
 		r,
 		newConfigMapReconciler(
-			r.client,
-			r.logger,
-			r.recorder,
+			r.Client,
+			r.Log,
+			r.Recorder,
 		),
 		newDeploymentReconciler(
-			r.client,
-			r.logger,
-			r.recorder,
+			r.Client,
+			r.Log,
+			r.Recorder,
 		),
 	)
 

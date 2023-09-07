@@ -102,7 +102,6 @@ func main() {
 		mgr.GetClient(),
 		logrus.NewEntry(log),
 		mgr.GetEventRecorderFor("memcached-controller"),
-		scheme,
 	)
 	if err = memcachedReconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Memcached")
