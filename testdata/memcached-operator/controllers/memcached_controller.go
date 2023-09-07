@@ -93,12 +93,12 @@ func (r *MemcachedReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		mc,
 		data,
 		r,
-		NewConfigMapReconciler(
+		newConfigMapReconciler(
 			r.client,
 			r.logger,
 			r.recorder,
 		),
-		NewDeploymentReconciler(
+		newDeploymentReconciler(
 			r.client,
 			r.logger,
 			r.recorder,

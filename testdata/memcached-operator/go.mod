@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	emperror.dev/errors v0.8.1
-	github.com/disaster37/operator-sdk-extra v0.1.3-0.20230906144249-e146d5930e9b
+	github.com/disaster37/operator-sdk-extra v0.1.3-0.20230907074746-1f995a0a4a79
 	github.com/onsi/ginkgo/v2 v2.11.0
 	github.com/onsi/gomega v1.27.10
 	github.com/sirupsen/logrus v1.9.3

@@ -23,14 +23,14 @@ const (
 	DeploymentPhase     shared.PhaseName     = "Deployment"
 )
 
-type DeploymentReconciler struct {
+type deploymentReconciler struct {
 	controller.MultiPhaseStepReconcilerAction
 	BaseReconciler
 }
 
-func NewDeploymentReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseStepReconcilerAction *DeploymentReconciler) {
+func newDeploymentReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseStepReconcilerAction *deploymentReconciler) {
 
-	return &DeploymentReconciler{
+	return &deploymentReconciler{
 		MultiPhaseStepReconcilerAction: controller.NewBasicMultiPhaseStepReconcilerAction(
 			client,
 			DeploymentPhase,
@@ -46,7 +46,7 @@ func NewDeploymentReconciler(client client.Client, logger *logrus.Entry, recorde
 	}
 }
 
-func (r *DeploymentReconciler) Read(ctx context.Context, o object.MultiPhaseObject, data map[string]any) (read controller.MultiPhaseRead, res ctrl.Result, err error) {
+func (r *deploymentReconciler) Read(ctx context.Context, o object.MultiPhaseObject, data map[string]any) (read controller.MultiPhaseRead, res ctrl.Result, err error) {
 	mc := o.(*v1alpha1.Memcached)
 	deploymentList := &appv1.DeploymentList{}
 	read = controller.NewBasicMultiPhaseRead()
@@ -63,7 +63,7 @@ func (r *DeploymentReconciler) Read(ctx context.Context, o object.MultiPhaseObje
 	read.SetCurrentObjects(helper.ToSliceOfObject(deploymentList.Items))
 
 	// Generate expected configmaps
-	expectedDeployments, err := NewDeploymentsBuilder(mc)
+	expectedDeployments, err := newDeploymentsBuilder(mc)
 	if err != nil {
 		return read, res, errors.Wrap(err, "Error when generate expected deployments")
 	}

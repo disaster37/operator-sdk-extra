@@ -19,6 +19,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
+// MultiPhaseController is the interface for controller
+type MultiPhaseController interface {
+	MultiPhaseReconciler
+	MultiPhaseReconcilerAction
+}
+
 // MultiPhaseReconciler the reconciler to implement whe you need to create multiple resources on k8s
 type MultiPhaseReconciler interface {
 	BaseReconciler

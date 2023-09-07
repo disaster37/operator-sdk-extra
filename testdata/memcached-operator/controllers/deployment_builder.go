@@ -10,7 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func NewDeploymentsBuilder(memcached *v1alpha1.Memcached) (deployments []appsv1.Deployment, err error) {
+func newDeploymentsBuilder(memcached *v1alpha1.Memcached) (deployments []appsv1.Deployment, err error) {
 
 	deployments = make([]appsv1.Deployment, 0, 1)
 	ls := labelsForMemcached(memcached.Name)

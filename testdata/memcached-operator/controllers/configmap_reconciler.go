@@ -23,13 +23,13 @@ const (
 	ConfigmapPhase     shared.PhaseName     = "Configmap"
 )
 
-type ConfigMapReconciler struct {
+type configMapReconciler struct {
 	controller.MultiPhaseStepReconcilerAction
 	BaseReconciler
 }
 
-func NewConfigMapReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseStepReconcilerAction controller.MultiPhaseStepReconcilerAction) {
-	return &ConfigMapReconciler{
+func newConfigMapReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseStepReconcilerAction controller.MultiPhaseStepReconcilerAction) {
+	return &configMapReconciler{
 		MultiPhaseStepReconcilerAction: controller.NewBasicMultiPhaseStepReconcilerAction(
 			client,
 			ConfigmapPhase,
@@ -45,7 +45,7 @@ func NewConfigMapReconciler(client client.Client, logger *logrus.Entry, recorder
 	}
 }
 
-func (r *ConfigMapReconciler) Read(ctx context.Context, o object.MultiPhaseObject, data map[string]any) (read controller.MultiPhaseRead, res ctrl.Result, err error) {
+func (r *configMapReconciler) Read(ctx context.Context, o object.MultiPhaseObject, data map[string]any) (read controller.MultiPhaseRead, res ctrl.Result, err error) {
 	mc := o.(*v1alpha1.Memcached)
 	cmList := &corev1.ConfigMapList{}
 	read = controller.NewBasicMultiPhaseRead()
@@ -62,7 +62,7 @@ func (r *ConfigMapReconciler) Read(ctx context.Context, o object.MultiPhaseObjec
 	read.SetCurrentObjects(helper.ToSliceOfObject(cmList.Items))
 
 	// Generate expected configmaps
-	expectedCms, err := NewConfigMapsBuilder(mc)
+	expectedCms, err := newConfigMapsBuilder(mc)
 	if err != nil {
 		return read, res, errors.Wrap(err, "Error when generate expected configMaps")
 	}
