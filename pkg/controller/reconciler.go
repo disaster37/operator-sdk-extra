@@ -3,10 +3,8 @@ package controller
 import (
 	"emperror.dev/errors"
 	"github.com/disaster37/operator-sdk-extra/pkg/apis/shared"
-	"github.com/disaster37/operator-sdk-extra/pkg/object"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/tools/record"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -25,16 +23,6 @@ var (
 	ErrWhenGetObjectStatus                  = errors.Sentinel("Error when get object status")
 )
 
-// BaseReconciler is the base interface for all reconciler
-type BaseReconciler interface {
-
-	// SetupWithManager permit to setup controller with manager
-	SetupWithManager(mgr ctrl.Manager) error
-
-	// SetupIndexerWithManager permit to setup indexer with manager
-	SetupIndexerWithManager(mgr ctrl.Manager, indexer object.Indexer)
-}
-
 // BasicReconciler is the basic implementation of BaseReconciler
 // It also provide attributes needed by all reconciler
 type BasicReconciler struct {
@@ -50,12 +38,4 @@ type BasicReconcilerAction struct {
 	conditionName shared.ConditionName
 	log           *logrus.Entry
 	recorder      record.EventRecorder
-}
-
-func (h *BasicReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return errors.New("You need implement 'SetupWithManager'")
-}
-
-func (h *BasicReconciler) SetupIndexerWithManager(mgr ctrl.Manager, indexer object.Indexer) {
-	indexer.SetupIndexer(mgr)
 }
