@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/disaster37/operator-sdk-extra/pkg/apis/shared"
 	"github.com/mitchellh/copystructure"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"

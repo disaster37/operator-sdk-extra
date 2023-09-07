@@ -120,7 +120,7 @@ func (h *BasicMultiPhaseReconcilerAction) OnSuccess(ctx context.Context, o objec
 	}
 	o.GetStatus().SetConditions(conditions)
 
-	o.GetStatus().SetPhaseName(shared.RunningPhase)
+	o.GetStatus().SetPhaseName(RunningPhase)
 
 	return res, nil
 }

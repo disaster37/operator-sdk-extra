@@ -31,6 +31,8 @@ github.com/disaster37/operator-sdk-extra v0.1.3-0.20230907101847-ba6d6d12fd33 h1
 github.com/disaster37/operator-sdk-extra v0.1.3-0.20230907101847-ba6d6d12fd33/go.mod h1:6eNUWpHu/Tf2M/JDnpaWahshrWSyvUm9QY+6wgy07Sg=
 github.com/disaster37/operator-sdk-extra v0.1.3-0.20230907122446-94cbb868e44b h1:6o4qHaSMqgfATkCE33UAIUwzGVLYcjY9a3PiIbZIspk=
 github.com/disaster37/operator-sdk-extra v0.1.3-0.20230907122446-94cbb868e44b/go.mod h1:6eNUWpHu/Tf2M/JDnpaWahshrWSyvUm9QY+6wgy07Sg=
+github.com/disaster37/operator-sdk-extra v0.1.3-0.20230907123618-014999113a65 h1:w07KF3yxOrEaZ87CYaChFSJ+dmKw98Q+l0pxeYC4gW4=
+github.com/disaster37/operator-sdk-extra v0.1.3-0.20230907123618-014999113a65/go.mod h1:6eNUWpHu/Tf2M/JDnpaWahshrWSyvUm9QY+6wgy07Sg=
 github.com/emicklei/go-restful/v3 v3.9.0 h1:XwGDlfxEnQZzuopoqxwSEllNcCOM9DhhFyhFIIGKwxE=
 github.com/emicklei/go-restful/v3 v3.9.0/go.mod h1:6n3XBCmQQb25CM2LCACGz8ukIrRry+4bhvbpWn3mrbc=
 github.com/evanphx/json-patch v5.6.0+incompatible h1:jBYDEEiFBPxA0v50tFdvOzQQTCvpL6mnFh5mB2/l16U=

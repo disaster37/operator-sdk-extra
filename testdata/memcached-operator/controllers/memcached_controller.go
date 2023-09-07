@@ -32,15 +32,16 @@ import (
 
 // MemcachedReconciler reconciles a Memcached object
 type MemcachedReconciler struct {
+	controller.Controller
 	controller.MultiPhaseReconcilerAction
 	controller.MultiPhaseReconciler
-	controller.BasicController
 	controller.BaseReconciler
 }
 
 func NewMemcachedReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseReconciler controller.Controller) {
 
 	return &MemcachedReconciler{
+		Controller: controller.NewBasicController(),
 		MultiPhaseReconcilerAction: controller.NewBasicMultiPhaseReconcilerAction(
 			client,
 			controller.ReadyCondition,
