@@ -4,10 +4,12 @@ import (
 	"context"
 
 	"emperror.dev/errors"
-	"github.com/disaster37/operator-sdk-extra/pkg/object"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
+
+// Indexer is a function to add indexer on manager
+type Indexer func(mgr ctrl.Manager) error
 
 // Controller is the controller interface
 type Controller interface {
@@ -17,17 +19,17 @@ type Controller interface {
 	SetupWithManager(mgr ctrl.Manager) error
 
 	// SetupIndexerWithManager permit to setup indexer with manager
-	SetupIndexerWithManager(mgr ctrl.Manager)
+	SetupIndexerWithManager(mgr ctrl.Manager) error
 }
 
 // BasicController is the default controller implementation
 type BasicController struct {
-	indexer object.Indexer
+	indexer Indexer
 }
 
 // NewBasicController is the default constructor for Controller
 // index can be nil
-func NewBasicController(indexer object.Indexer) Controller {
+func NewBasicController(indexer Indexer) Controller {
 	return &BasicController{
 		indexer: indexer,
 	}
@@ -37,11 +39,12 @@ func (h *BasicController) SetupWithManager(mgr ctrl.Manager) error {
 	return errors.New("You need implement 'SetupWithManager'")
 }
 
-func (h *BasicController) SetupIndexerWithManager(mgr ctrl.Manager) {
+func (h *BasicController) SetupIndexerWithManager(mgr ctrl.Manager) error {
 	if h.indexer != nil {
-		h.indexer.SetupIndexer(mgr)
+		return h.indexer(mgr)
 	}
-	
+
+	return nil
 }
 
 func (h *BasicController) Reconcile(context.Context, reconcile.Request) (res reconcile.Result, err error) {

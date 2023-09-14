@@ -2,7 +2,6 @@ package object
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
 // ObjectStatus is the interface for object status
@@ -25,9 +24,4 @@ type ObjectStatus interface {
 
 	// SetLastErrorMessage permit to set the current error
 	SetLastErrorMessage(message string)
-}
-
-// Indexer is interface that permit to setup indexer on CRD
-type Indexer interface {
-	SetupIndexer(k8sManager manager.Manager)
 }
