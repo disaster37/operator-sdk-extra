@@ -26,8 +26,10 @@ type BasicController struct {
 }
 
 // NewBasicController is the default constructor for Controller
-func NewBasicController() Controller {
-	return &BasicController{}
+func NewBasicController(indexer object.Indexer) Controller {
+	return &BasicController{
+		indexer: indexer,
+	}
 }
 
 func (h *BasicController) SetupWithManager(mgr ctrl.Manager) error {
