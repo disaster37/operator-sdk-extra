@@ -17,11 +17,13 @@ type Controller interface {
 	SetupWithManager(mgr ctrl.Manager) error
 
 	// SetupIndexerWithManager permit to setup indexer with manager
-	SetupIndexerWithManager(mgr ctrl.Manager, indexer object.Indexer)
+	SetupIndexerWithManager(mgr ctrl.Manager)
 }
 
 // BasicController is the default controller implementation
-type BasicController struct{}
+type BasicController struct {
+	indexer object.Indexer
+}
 
 // NewBasicController is the default constructor for Controller
 func NewBasicController() Controller {
@@ -32,8 +34,8 @@ func (h *BasicController) SetupWithManager(mgr ctrl.Manager) error {
 	return errors.New("You need implement 'SetupWithManager'")
 }
 
-func (h *BasicController) SetupIndexerWithManager(mgr ctrl.Manager, indexer object.Indexer) {
-	indexer.SetupIndexer(mgr)
+func (h *BasicController) SetupIndexerWithManager(mgr ctrl.Manager) {
+	h.indexer.SetupIndexer(mgr)
 }
 
 func (h *BasicController) Reconcile(context.Context, reconcile.Request) (res reconcile.Result, err error) {
