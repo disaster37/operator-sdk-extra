@@ -109,6 +109,18 @@ func (h *BasicMultiPhaseStepReconcilerAction) Read(ctx context.Context, o object
 func (h *BasicMultiPhaseStepReconcilerAction) Create(ctx context.Context, o object.MultiPhaseObject, data map[string]any, objects []client.Object) (res ctrl.Result, err error) {
 
 	for _, oChild := range objects {
+
+		// Set owner
+		err = ctrl.SetControllerReference(o, oChild, h.Client.Scheme())
+		if err != nil {
+			return res, errors.Wrapf(err, "Error when set owner reference on object '%s'", oChild.GetName())
+		}
+
+		// Set diff 3-way annotations
+		if err := patch.DefaultAnnotator.SetLastAppliedAnnotation(oChild); err != nil {
+			return res, errors.Wrapf(err, "Error when set annotation for 3-way diff on  object '%s'", oChild.GetName())
+		}
+
 		if err = h.Client.Create(ctx, oChild); err != nil {
 			return res, errors.Wrapf(err, "Error when create object '%s'", oChild.GetName())
 		}
@@ -252,16 +264,6 @@ func (h *BasicMultiPhaseStepReconcilerAction) Diff(ctx context.Context, o object
 		if !isFound {
 			// Need create object
 			diff.AddDiff(fmt.Sprintf("Need Create object '%s'", expectedObject.GetName()))
-
-			// Set owner
-			err = ctrl.SetControllerReference(o, expectedObject, h.Client.Scheme())
-			if err != nil {
-				return diff, res, errors.Wrapf(err, "Error when set owner reference on object '%s'", expectedObject.GetName())
-			}
-
-			if err := patch.DefaultAnnotator.SetLastAppliedAnnotation(expectedObject); err != nil {
-				return diff, res, errors.Wrapf(err, "Error when set annotation for 3-way diff on  object '%s'", expectedObject.GetName())
-			}
 
 			toCreate = append(toCreate, expectedObject)
 
