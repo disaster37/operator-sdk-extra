@@ -26,6 +26,7 @@ type BasicController struct {
 }
 
 // NewBasicController is the default constructor for Controller
+// index can be nil
 func NewBasicController(indexer object.Indexer) Controller {
 	return &BasicController{
 		indexer: indexer,
@@ -37,7 +38,10 @@ func (h *BasicController) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func (h *BasicController) SetupIndexerWithManager(mgr ctrl.Manager) {
-	h.indexer.SetupIndexer(mgr)
+	if h.indexer != nil {
+		h.indexer.SetupIndexer(mgr)
+	}
+	
 }
 
 func (h *BasicController) Reconcile(context.Context, reconcile.Request) (res reconcile.Result, err error) {
