@@ -67,8 +67,6 @@ func NewBasicMultiPhaseReconcilerAction(client client.Client, conditionName shar
 }
 
 func (h *BasicMultiPhaseReconcilerAction) Configure(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject) (res ctrl.Result, err error) {
-	o.GetStatus().SetIsOnError(false)
-	o.GetStatus().SetLastErrorMessage("")
 
 	conditions := o.GetStatus().GetConditions()
 	if condition.FindStatusCondition(conditions, h.conditionName.String()) == nil {
@@ -121,6 +119,7 @@ func (h *BasicMultiPhaseReconcilerAction) OnSuccess(ctx context.Context, o objec
 	o.GetStatus().SetConditions(conditions)
 
 	o.GetStatus().SetPhaseName(RunningPhase)
+	o.GetStatus().SetIsOnError(false)
 
 	return res, nil
 }

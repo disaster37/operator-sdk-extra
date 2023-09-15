@@ -8,7 +8,11 @@ import (
 type RemoteObject interface {
 	client.Object
 
+	// GetStatus permit to get the status object
 	GetStatus() RemoteObjectStatus
+
+	// GetExternalName permit to get the name of external resource (the remote name)
+	GetExternalName() string
 }
 
 // RemoteObject is use when your CRD is used to call remote API (not create K8s resources)
