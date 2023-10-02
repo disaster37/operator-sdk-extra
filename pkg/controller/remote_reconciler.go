@@ -20,25 +20,25 @@ import (
 )
 
 // RemoteReconciler is the reconciler to reconcile the remote resource
-type RemoteReconciler[T comparable, M any] interface {
+type RemoteReconciler[k8sObject comparable, apiObject comparable] interface {
 
 	// Reconcile permit to reconcile the step (one K8s resource)
-	Reconcile(ctx context.Context, req ctrl.Request, o object.RemoteObject, data map[string]interface{}, reconciler RemoteReconcilerAction[T, M]) (res ctrl.Result, err error)
+	Reconcile(ctx context.Context, req ctrl.Request, o object.RemoteObject, data map[string]interface{}, reconciler RemoteReconcilerAction[k8sObject, apiObject]) (res ctrl.Result, err error)
 }
 
 // BasicRemoteReconciler is the basic implementation of RemoteReconciler interface
-type BasicRemoteReconciler[T comparable, M any] struct {
+type BasicRemoteReconciler[k8sObject comparable, apiObject comparable] struct {
 	BasicReconciler
 }
 
 // NewBasicMultiPhaseReconciler permit to instanciate new basic multiphase resonciler
-func NewBasicRemoteReconciler[T comparable, M any](client client.Client, name string, finalizer shared.FinalizerName, logger *logrus.Entry, recorder record.EventRecorder) (remoteReconciler RemoteReconciler[T, M]) {
+func NewBasicRemoteReconciler[k8sObject comparable, apiObject comparable](client client.Client, name string, finalizer shared.FinalizerName, logger *logrus.Entry, recorder record.EventRecorder) (remoteReconciler RemoteReconciler[k8sObject, apiObject]) {
 
 	if recorder == nil {
 		panic("recorder can't be nil")
 	}
 
-	basicRemoteReconciler := &BasicRemoteReconciler[T, M]{
+	basicRemoteReconciler := &BasicRemoteReconciler[k8sObject, apiObject]{
 		BasicReconciler: BasicReconciler{
 			BaseReconciler: BaseReconciler{
 				Client: client,
@@ -58,12 +58,12 @@ func NewBasicRemoteReconciler[T comparable, M any](client client.Client, name st
 	return basicRemoteReconciler
 }
 
-func (h *BasicRemoteReconciler[T, M]) Reconcile(ctx context.Context, req ctrl.Request, o object.RemoteObject, data map[string]interface{}, reconciler RemoteReconcilerAction[T, M]) (res ctrl.Result, err error) {
+func (h *BasicRemoteReconciler[k8sObject, apiObject]) Reconcile(ctx context.Context, req ctrl.Request, o object.RemoteObject, data map[string]interface{}, reconciler RemoteReconcilerAction[k8sObject, apiObject]) (res ctrl.Result, err error) {
 
 	var (
-		meta M
-		read RemoteRead[T]
-		diff RemoteDiff[T]
+		handler RemoteExternalReconciler[k8sObject, apiObject]
+		read    RemoteRead[apiObject]
+		diff    RemoteDiff[apiObject]
 	)
 
 	// Init logger
@@ -94,7 +94,7 @@ func (h *BasicRemoteReconciler[T, M]) Reconcile(ctx context.Context, req ctrl.Re
 			controllerutil.AddFinalizer(o, h.finalizer.String())
 			if err = h.Update(ctx, o); err != nil {
 				h.Log.Errorf("Error when add finalizer: %s", err.Error())
-				return reconciler.OnError(ctx, o, data, meta, errors.Wrap(err, ErrWhenAddFinalizer.Error()))
+				return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, ErrWhenAddFinalizer.Error()))
 			}
 			h.Log.Debug("Add finalizer successfully, force requeue object")
 			return ctrl.Result{Requeue: true}, nil
@@ -120,10 +120,10 @@ func (h *BasicRemoteReconciler[T, M]) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	// Configure to optional get driver client (call meta)
-	meta, res, err = reconciler.Configure(ctx, req, o)
+	handler, res, err = reconciler.Configure(ctx, req, o)
 	if err != nil {
 		h.Log.Errorf("Error when call 'configure' from reconciler: %s", err.Error())
-		return reconciler.OnError(ctx, o, data, meta, errors.Wrap(err, ErrWhenCallConfigureFromReconciler.Error()))
+		return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, ErrWhenCallConfigureFromReconciler.Error()))
 	}
 	h.Log.Debug("Call 'configure' from reconciler successfully")
 	if res != (ctrl.Result{}) {
@@ -131,10 +131,10 @@ func (h *BasicRemoteReconciler[T, M]) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	// Read resources
-	read, res, err = reconciler.Read(ctx, o, data, meta)
+	read, res, err = reconciler.Read(ctx, o, data, handler)
 	if err != nil {
 		h.Log.Errorf("Error when call 'read' from reconciler: %s", err.Error())
-		return reconciler.OnError(ctx, o, data, meta, errors.Wrap(err, ErrWhenCallReadFromReconciler.Error()))
+		return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, ErrWhenCallReadFromReconciler.Error()))
 	}
 	h.Log.Debug("Call 'read' from reconciler successfully")
 	if res != (ctrl.Result{}) {
@@ -144,16 +144,16 @@ func (h *BasicRemoteReconciler[T, M]) Reconcile(ctx context.Context, req ctrl.Re
 	// Handle delete finalizer
 	if !getObjectMeta(o).DeletionTimestamp.IsZero() {
 		if h.finalizer.String() != "" && controllerutil.ContainsFinalizer(o, h.finalizer.String()) {
-			if err = reconciler.Delete(ctx, o, data, meta); err != nil {
+			if err = reconciler.Delete(ctx, o, data, handler); err != nil {
 				h.Log.Errorf("Error when call 'delete' from reconciler: %s", err.Error())
-				return reconciler.OnError(ctx, o, data, meta, errors.Wrap(err, ErrWhenCallDeleteFromReconciler.Error()))
+				return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, ErrWhenCallDeleteFromReconciler.Error()))
 			}
 			h.Log.Debug("Delete successfully")
 
 			controllerutil.RemoveFinalizer(o, h.finalizer.String())
 			if err = h.Update(ctx, o); err != nil {
 				h.Log.Errorf("Failed to remove finalizer: %s", err.Error())
-				return reconciler.OnError(ctx, o, data, meta, errors.Wrap(err, ErrWhenDeleteFinalizer.Error()))
+				return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, ErrWhenDeleteFinalizer.Error()))
 			}
 			h.Log.Debug("Remove finalizer successfully")
 		}
@@ -167,20 +167,20 @@ func (h *BasicRemoteReconciler[T, M]) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	// Check if diff exist
-	diff, res, err = reconciler.Diff(ctx, o, read, data, meta, reconciler.GetIgnoresDiff()...)
+	diff, res, err = reconciler.Diff(ctx, o, read, data, handler, reconciler.GetIgnoresDiff()...)
 	if err != nil {
 		h.Log.Errorf("Failed to call 'diff' from reconciler: %s", err.Error())
-		return reconciler.OnError(ctx, o, data, meta, errors.Wrap(err, ErrWhenCallDiffFromReconciler.Error()))
+		return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, ErrWhenCallDiffFromReconciler.Error()))
 	}
 	if res != (ctrl.Result{}) {
 		return res, nil
 	}
 
 	if diff.NeedCreate() {
-		res, err = reconciler.Create(ctx, o, data, meta, diff.GetObjectToCreate())
+		res, err = reconciler.Create(ctx, o, data, handler, diff.GetObjectToCreate())
 		if err != nil {
 			h.Log.Errorf("Failed to call 'create' from reconciler: %s", err.Error())
-			return reconciler.OnError(ctx, o, data, meta, errors.Wrap(err, ErrWhenCallCreateFromReconciler.Error()))
+			return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, ErrWhenCallCreateFromReconciler.Error()))
 		}
 		if res != (ctrl.Result{}) {
 			return res, nil
@@ -188,20 +188,20 @@ func (h *BasicRemoteReconciler[T, M]) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	if diff.NeedUpdate() {
-		res, err = reconciler.Update(ctx, o, data, meta, diff.GetObjectToUpdate())
+		res, err = reconciler.Update(ctx, o, data, handler, diff.GetObjectToUpdate())
 		if err != nil {
 			h.Log.Errorf("Failed to call 'update' from reconciler: %s", err.Error())
-			return reconciler.OnError(ctx, o, data, meta, errors.Wrap(err, ErrWhenCallUpdateFromReconciler.Error()))
+			return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, ErrWhenCallUpdateFromReconciler.Error()))
 		}
 		if res != (ctrl.Result{}) {
 			return res, nil
 		}
 	}
 
-	res, err = reconciler.OnSuccess(ctx, o, data, meta, diff)
+	res, err = reconciler.OnSuccess(ctx, o, data, handler, diff)
 	if err != nil {
 		h.Log.Errorf("Error when call 'onSuccess' from reconciler: %s", err.Error())
-		return reconciler.OnError(ctx, o, data, meta, errors.Wrap(err, ErrWhenCallOnSuccessFromReconciler.Error()))
+		return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, ErrWhenCallOnSuccessFromReconciler.Error()))
 	}
 
 	return res, nil
