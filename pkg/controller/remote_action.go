@@ -6,7 +6,6 @@ import (
 
 	"emperror.dev/errors"
 	"github.com/disaster37/generic-objectmatcher/patch"
-	"github.com/disaster37/operator-sdk-extra/pkg/apis/shared"
 	"github.com/disaster37/operator-sdk-extra/pkg/helper"
 	"github.com/disaster37/operator-sdk-extra/pkg/object"
 	"github.com/sirupsen/logrus"
@@ -64,7 +63,7 @@ type BasicRemoteReconcilerAction[k8sObject comparable, apiObject comparable] str
 }
 
 // NewRemoteReconcilerAction is the basic constructor of RemoteReconcilerAction interface
-func NewRemoteReconcilerAction[k8sObject comparable, apiObject comparable](client client.Client, conditionName shared.ConditionName, logger *logrus.Entry, recorder record.EventRecorder) (remoteReconciler RemoteReconcilerAction[k8sObject, apiObject]) {
+func NewRemoteReconcilerAction[k8sObject comparable, apiObject comparable](client client.Client, logger *logrus.Entry, recorder record.EventRecorder) (remoteReconciler RemoteReconcilerAction[k8sObject, apiObject]) {
 	if recorder == nil {
 		panic("recorder can't be nil")
 	}
@@ -76,7 +75,7 @@ func NewRemoteReconcilerAction[k8sObject comparable, apiObject comparable](clien
 				Log:      logger,
 				Recorder: recorder,
 			},
-			conditionName: conditionName,
+			conditionName: ReadyCondition,
 		},
 	}
 }
