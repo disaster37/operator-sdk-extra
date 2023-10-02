@@ -249,7 +249,7 @@ func (h *BasicRemoteReconcilerAction[k8sObject, apiObject]) Diff(ctx context.Con
 
 	if o.GetStatus().GetLastAppliedConfiguration() != "" {
 		originalObject = new(apiObject)
-		if err = helper.UnZipBase64Decode(o.GetStatus().GetLastAppliedConfiguration(), *originalObject); err != nil {
+		if err = helper.UnZipBase64Decode(o.GetStatus().GetLastAppliedConfiguration(), originalObject); err != nil {
 			return diff, res, errors.Wrap(err, "Error when create object from 'lastAppliedConfiguration'")
 		}
 	}
