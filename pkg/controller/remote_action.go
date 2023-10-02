@@ -21,9 +21,13 @@ import (
 
 // RemoteReconcilerAction is the interface that use by reconciler remote to reconcile your remote resource
 type RemoteReconcilerAction[k8sObject comparable, apiObject comparable] interface {
+
+	// GetRemoteHandler permit to get the handler to manage the remote resources
+	GetRemoteHandler(ctx context.Context, req ctrl.Request, o object.RemoteObject) (handler RemoteExternalReconciler[k8sObject, apiObject], res ctrl.Result, err error)
+
 	// Confirgure permit to init external provider driver (API client REST)
 	// It can also permit to init condition on status
-	Configure(ctx context.Context, req ctrl.Request, o object.RemoteObject) (handler RemoteExternalReconciler[k8sObject, apiObject], res ctrl.Result, err error)
+	Configure(ctx context.Context, o object.RemoteObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject]) (res ctrl.Result, err error)
 
 	// Read permit to read the actual resource state from provider and set it on data map
 	Read(ctx context.Context, o object.RemoteObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject]) (read RemoteRead[apiObject], res ctrl.Result, err error)
@@ -77,9 +81,11 @@ func NewRemoteReconcilerAction[k8sObject comparable, apiObject comparable](clien
 	}
 }
 
-// You need to create the RemoteExternalReconciler here.
-// SO need to overwrite this method on your code
-func (h *BasicRemoteReconcilerAction[k8sObject, apiObject]) Configure(ctx context.Context, req ctrl.Request, o object.RemoteObject) (handler RemoteExternalReconciler[k8sObject, apiObject], res ctrl.Result, err error) {
+func (h *BasicRemoteReconcilerAction[k8sObject, apiObject]) GetRemoteHandler(ctx context.Context, req ctrl.Request, o object.RemoteObject) (handler RemoteExternalReconciler[k8sObject, apiObject], res ctrl.Result, err error) {
+	panic("You need to implement GetRemoteHandler")
+}
+
+func (h *BasicRemoteReconcilerAction[k8sObject, apiObject]) Configure(ctx context.Context, o object.RemoteObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject]) (res ctrl.Result, err error) {
 	conditions := o.GetStatus().GetConditions()
 
 	// Init condition
@@ -91,7 +97,7 @@ func (h *BasicRemoteReconcilerAction[k8sObject, apiObject]) Configure(ctx contex
 		})
 	}
 
-	return handler, res, nil
+	return res, nil
 }
 
 func (h *BasicRemoteReconcilerAction[k8sObject, apiObject]) Read(ctx context.Context, o object.RemoteObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject]) (read RemoteRead[apiObject], res ctrl.Result, err error) {

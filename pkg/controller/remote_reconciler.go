@@ -119,11 +119,22 @@ func (h *BasicRemoteReconciler[k8sObject, apiObject]) Reconcile(ctx context.Cont
 		}()
 	}
 
-	// Configure to optional get driver client (call meta)
-	handler, res, err = reconciler.Configure(ctx, req, o)
+	// Get the remote handler
+	handler, res, err = reconciler.GetRemoteHandler(ctx, req, o)
+	if err != nil {
+		h.Log.Errorf("Error when call 'getRemoteHandler' from reconciler: %s", err.Error())
+		return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, ErrWhenCallConfigureFromReconciler.Error()))
+	}
+	h.Log.Debug("Call 'getRemoteHandler' from reconciler successfully")
+	if res != (ctrl.Result{}) {
+		return res, nil
+	}
+
+	// Configure resource
+	res, err = reconciler.Configure(ctx, o, data, handler)
 	if err != nil {
 		h.Log.Errorf("Error when call 'configure' from reconciler: %s", err.Error())
-		return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, ErrWhenCallConfigureFromReconciler.Error()))
+		return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, ErrWhenCallReadFromReconciler.Error()))
 	}
 	h.Log.Debug("Call 'configure' from reconciler successfully")
 	if res != (ctrl.Result{}) {
