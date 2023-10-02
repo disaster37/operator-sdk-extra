@@ -4,9 +4,11 @@ go 1.20
 
 require (
 	emperror.dev/errors v0.8.1
+	github.com/disaster37/generic-objectmatcher v1.0.1
 	github.com/disaster37/go-kibana-rest/v8 v8.5.0
 	github.com/disaster37/k8s-objectmatcher v1.8.2
 	github.com/google/go-cmp v0.5.9
+	github.com/json-iterator/go v1.1.12
 	github.com/mitchellh/copystructure v1.2.0
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.9.3
@@ -39,7 +41,6 @@ require (
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/imdario/mergo v0.3.6 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
-	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect

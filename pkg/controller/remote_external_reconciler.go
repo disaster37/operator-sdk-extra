@@ -1,7 +1,7 @@
 package controller
 
 import (
-	"github.com/disaster37/k8s-objectmatcher/patch"
+	"github.com/disaster37/generic-objectmatcher/patch"
 )
 
 type RemoteExternalReconciler[O comparable, T comparable] interface {

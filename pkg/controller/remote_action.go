@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"emperror.dev/errors"
-	"github.com/disaster37/k8s-objectmatcher/patch"
+	"github.com/disaster37/generic-objectmatcher/patch"
 	"github.com/disaster37/operator-sdk-extra/pkg/apis/shared"
 	"github.com/disaster37/operator-sdk-extra/pkg/helper"
 	"github.com/disaster37/operator-sdk-extra/pkg/object"
