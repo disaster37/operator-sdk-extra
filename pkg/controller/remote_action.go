@@ -55,18 +55,18 @@ type RemoteReconcilerAction[T comparable, M any] interface {
 }
 
 // BasicRemoteReconcilerAction is the basic implementation of RemoteReconcilerAction
-type BasicRemoteReconcilerAction[T comparable, M any] struct {
+type BasicRemoteReconcilerAction[O comparable, T comparable, M any] struct {
 	BasicReconcilerAction
-	externalReconciler RemoteExternalReconciler[T]
+	externalReconciler RemoteExternalReconciler[O, T]
 }
 
 // NewRemoteReconcilerAction is the basic constructor of RemoteReconcilerAction interface
-func NewRemoteReconcilerAction[T comparable, M any](client client.Client, conditionName shared.ConditionName, logger *logrus.Entry, recorder record.EventRecorder, externalReconciler RemoteExternalReconciler[T]) (remoteReconciler RemoteReconcilerAction[T, M]) {
+func NewRemoteReconcilerAction[O comparable, T comparable, M any](client client.Client, conditionName shared.ConditionName, logger *logrus.Entry, recorder record.EventRecorder, externalReconciler RemoteExternalReconciler[O, T]) (remoteReconciler RemoteReconcilerAction[T, M]) {
 	if recorder == nil {
 		panic("recorder can't be nil")
 	}
 
-	return &BasicRemoteReconcilerAction[T, M]{
+	return &BasicRemoteReconcilerAction[O, T, M]{
 		BasicReconcilerAction: BasicReconcilerAction{
 			BaseReconciler: BaseReconciler{
 				Client:   client,
@@ -79,7 +79,7 @@ func NewRemoteReconcilerAction[T comparable, M any](client client.Client, condit
 	}
 }
 
-func (h *BasicRemoteReconcilerAction[T, M]) Configure(ctx context.Context, req ctrl.Request, o object.RemoteObject) (meta M, res ctrl.Result, err error) {
+func (h *BasicRemoteReconcilerAction[O, T, M]) Configure(ctx context.Context, req ctrl.Request, o object.RemoteObject) (meta M, res ctrl.Result, err error) {
 	conditions := o.GetStatus().GetConditions()
 
 	// Init condition
@@ -94,7 +94,7 @@ func (h *BasicRemoteReconcilerAction[T, M]) Configure(ctx context.Context, req c
 	return meta, res, nil
 }
 
-func (h *BasicRemoteReconcilerAction[T, M]) Read(ctx context.Context, o object.RemoteObject, data map[string]any, meta M) (read RemoteRead[T], res ctrl.Result, err error) {
+func (h *BasicRemoteReconcilerAction[O, T, M]) Read(ctx context.Context, o object.RemoteObject, data map[string]any, meta M) (read RemoteRead[T], res ctrl.Result, err error) {
 	read = NewBasicRemoteRead[T]()
 
 	// Read current object
@@ -105,7 +105,7 @@ func (h *BasicRemoteReconcilerAction[T, M]) Read(ctx context.Context, o object.R
 	read.SetCurrentObject(currentObject)
 
 	// Build expected object
-	expectedObject, err := h.externalReconciler.Build(o)
+	expectedObject, err := h.externalReconciler.Build(o.(O))
 	if err != nil {
 		return read, res, errors.Wrapf(err, "Error when build object %s for remote target", o.GetName())
 	}
@@ -114,7 +114,7 @@ func (h *BasicRemoteReconcilerAction[T, M]) Read(ctx context.Context, o object.R
 	return read, res, nil
 }
 
-func (h *BasicRemoteReconcilerAction[T, M]) Create(ctx context.Context, o object.RemoteObject, data map[string]any, meta M, object T) (res ctrl.Result, err error) {
+func (h *BasicRemoteReconcilerAction[O, T, M]) Create(ctx context.Context, o object.RemoteObject, data map[string]any, meta M, object T) (res ctrl.Result, err error) {
 
 	if err = h.externalReconciler.Create(object); err != nil {
 		return res, errors.Wrapf(err, "Error when create %s on remote target", o.GetName())
@@ -134,7 +134,7 @@ func (h *BasicRemoteReconcilerAction[T, M]) Create(ctx context.Context, o object
 
 // Update can be call on your own version
 // It only add some log / events
-func (h *BasicRemoteReconcilerAction[T, M]) Update(ctx context.Context, o object.RemoteObject, data map[string]any, meta M, object T) (res ctrl.Result, err error) {
+func (h *BasicRemoteReconcilerAction[O, T, M]) Update(ctx context.Context, o object.RemoteObject, data map[string]any, meta M, object T) (res ctrl.Result, err error) {
 
 	if err = h.externalReconciler.Update(object); err != nil {
 		return res, errors.Wrapf(err, "Error when update %s on remote target", o.GetName())
@@ -154,7 +154,7 @@ func (h *BasicRemoteReconcilerAction[T, M]) Update(ctx context.Context, o object
 
 // Delete can be call on your own version
 // It only add some log / events
-func (h *BasicRemoteReconcilerAction[T, M]) Delete(ctx context.Context, o object.RemoteObject, data map[string]any, meta M) (err error) {
+func (h *BasicRemoteReconcilerAction[O, T, M]) Delete(ctx context.Context, o object.RemoteObject, data map[string]any, meta M) (err error) {
 
 	if err = h.externalReconciler.Delete(o.GetExternalName()); err != nil {
 		return errors.Wrapf(err, "Error when delete %s on remote target", o.GetName())
@@ -166,7 +166,7 @@ func (h *BasicRemoteReconcilerAction[T, M]) Delete(ctx context.Context, o object
 	return nil
 }
 
-func (h *BasicRemoteReconcilerAction[T, M]) OnError(ctx context.Context, o object.RemoteObject, data map[string]any, meta M, currentErr error) (res ctrl.Result, err error) {
+func (h *BasicRemoteReconcilerAction[O, T, M]) OnError(ctx context.Context, o object.RemoteObject, data map[string]any, meta M, currentErr error) (res ctrl.Result, err error) {
 
 	o.GetStatus().SetIsOnError(true)
 	o.GetStatus().SetLastErrorMessage(k8sstrings.ShortenString(err.Error(), ShortenError))
@@ -216,7 +216,7 @@ func (h *BasicRemoteReconcilerAction[T, M]) OnError(ctx context.Context, o objec
 	return res, errors.Wrap(errors.New(k8sstrings.ShortenString(err.Error(), ShortenError)), errorMessage)
 }
 
-func (h *BasicRemoteReconcilerAction[T, M]) OnSuccess(ctx context.Context, o object.RemoteObject, data map[string]any, meta M, diff RemoteDiff[T]) (res ctrl.Result, err error) {
+func (h *BasicRemoteReconcilerAction[O, T, M]) OnSuccess(ctx context.Context, o object.RemoteObject, data map[string]any, meta M, diff RemoteDiff[T]) (res ctrl.Result, err error) {
 
 	conditions := o.GetStatus().GetConditions()
 	if !condition.IsStatusConditionPresentAndEqual(conditions, h.conditionName.String(), metav1.ConditionTrue) {
@@ -234,7 +234,7 @@ func (h *BasicRemoteReconcilerAction[T, M]) OnSuccess(ctx context.Context, o obj
 	return res, nil
 }
 
-func (h *BasicRemoteReconcilerAction[T, M]) Diff(ctx context.Context, o object.RemoteObject, read RemoteRead[T], data map[string]any, meta M, ignoreDiff ...patch.CalculateOption) (diff RemoteDiff[T], res ctrl.Result, err error) {
+func (h *BasicRemoteReconcilerAction[O, T, M]) Diff(ctx context.Context, o object.RemoteObject, read RemoteRead[T], data map[string]any, meta M, ignoreDiff ...patch.CalculateOption) (diff RemoteDiff[T], res ctrl.Result, err error) {
 
 	// Get the original object from status to use 3-way diff
 	var (
@@ -271,6 +271,6 @@ func (h *BasicRemoteReconcilerAction[T, M]) Diff(ctx context.Context, o object.R
 	return diff, res, nil
 }
 
-func (h *BasicRemoteReconcilerAction[T, M]) GetIgnoresDiff() []patch.CalculateOption {
+func (h *BasicRemoteReconcilerAction[O, T, M]) GetIgnoresDiff() []patch.CalculateOption {
 	return make([]patch.CalculateOption, 0)
 }
