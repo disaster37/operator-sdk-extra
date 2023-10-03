@@ -16,7 +16,7 @@ type RemoteExternalReconciler[k8sObject comparable, apiObject comparable] interf
 	Update(object apiObject) (err error)
 	Delete(name string) (err error)
 	Diff(currentOject apiObject, expectedObject apiObject, originalObject apiObject, ignoresDiff ...patch.CalculateOption) (patchResult *patch.PatchResult, err error)
-	Custom(name string, k8sO k8sObject, apiO apiObject, params ...any) (err error)
+	Custom(f func() error) (err error)
 }
 
 // BasicRemoteExternalReconciler is the basic implementation of RemoteExternalReconciler
@@ -42,6 +42,6 @@ func (h *BasicRemoteExternalReconciler[k8sObject, apiObject]) Diff(currentOject 
 	return patch.DefaultPatchMaker.Calculate(currentOject, expectedObject, originalObject, ignoresDiff...)
 }
 
-func (h *BasicRemoteExternalReconciler[k8sObject, apiObject]) Custom(name string, k8sO k8sObject, apiO apiObject, params ...any) (err error) {
-	return nil
+func (h *BasicRemoteExternalReconciler[k8sObject, apiObject]) Custom(f func() error) (err error) {
+	return f()
 }
