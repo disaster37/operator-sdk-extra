@@ -60,3 +60,7 @@ func (h *MockRemoteReconcilerAction[k8sObject, apiObject]) Diff(ctx context.Cont
 func (h *MockRemoteReconcilerAction[k8sObject, apiObject]) GetIgnoresDiff() []patch.CalculateOption {
 	return h.reconciler.GetIgnoresDiff()
 }
+
+func (h *MockRemoteReconcilerAction[k8sObject, apiObject]) Custom(ctx context.Context, o object.RemoteObject, data map[string]any, handler controller.RemoteExternalReconciler[k8sObject, apiObject], object apiObject, f func(handler any) error) (err error) {
+	return h.reconciler.Custom(ctx, o, data, handler, object, f)
+}
