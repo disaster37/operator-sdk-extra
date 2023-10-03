@@ -54,6 +54,9 @@ type RemoteReconcilerAction[k8sObject comparable, apiObject comparable] interfac
 	// Diff permit to compare the actual state and the expected state
 	Diff(ctx context.Context, o object.RemoteObject, read RemoteRead[apiObject], data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject], ignoreDiff ...patch.CalculateOption) (diff RemoteDiff[apiObject], res ctrl.Result, err error)
 
+	// Custom permit to add function that not include on CRUD from remote reconciler
+	Custom(ctx context.Context, name string, o object.RemoteObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject], object apiObject, params ...any) (err error)
+
 	GetIgnoresDiff() []patch.CalculateOption
 }
 
@@ -279,4 +282,8 @@ func (h *BasicRemoteReconcilerAction[k8sObject, apiObject]) Diff(ctx context.Con
 
 func (h *BasicRemoteReconcilerAction[k8sObject, apiObject]) GetIgnoresDiff() []patch.CalculateOption {
 	return make([]patch.CalculateOption, 0)
+}
+
+func (h *BasicRemoteReconcilerAction[k8sObject, apiObject]) Custom(ctx context.Context, name string, o object.RemoteObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject], object apiObject, params ...any) (err error) {
+	return handler.Custom(name, o.(k8sObject), object, params...)
 }
