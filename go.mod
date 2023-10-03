@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	emperror.dev/errors v0.8.1
-	github.com/disaster37/generic-objectmatcher v1.0.1
+	github.com/disaster37/generic-objectmatcher v1.0.2
 	github.com/disaster37/go-kibana-rest/v8 v8.5.0
 	github.com/disaster37/k8s-objectmatcher v1.8.2
 	github.com/google/go-cmp v0.5.9
