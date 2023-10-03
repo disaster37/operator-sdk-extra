@@ -268,9 +268,7 @@ func (h *BasicRemoteReconcilerAction[k8sObject, apiObject]) Diff(ctx context.Con
 	if err != nil {
 		return diff, res, errors.Wrapf(err, "Error when diffing %s for remote target", o.GetName())
 	}
-	if differ == nil {
-		panic(fmt.Sprintf("Differ is nil and error: %+v", err))
-	}
+
 	if !differ.IsEmpty() {
 		diff.AddDiff(string(differ.Patch))
 		diff.SetObjectToUpdate(read.GetExpectedObject())
