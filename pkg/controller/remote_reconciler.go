@@ -159,7 +159,7 @@ func (h *BasicRemoteReconciler[k8sObject, apiObject]) Reconcile(ctx context.Cont
 				h.Log.Errorf("Error when call 'delete' from reconciler: %s", err.Error())
 				return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, ErrWhenCallDeleteFromReconciler.Error()))
 			}
-			h.Log.Debug("Delete successfully")
+			h.Log.Debug("Call 'delete' from reconciler successfully")
 
 			controllerutil.RemoveFinalizer(o, h.finalizer.String())
 			if err = h.Update(ctx, o); err != nil {
@@ -183,6 +183,7 @@ func (h *BasicRemoteReconciler[k8sObject, apiObject]) Reconcile(ctx context.Cont
 		h.Log.Errorf("Failed to call 'diff' from reconciler: %s", err.Error())
 		return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, ErrWhenCallDiffFromReconciler.Error()))
 	}
+	h.Log.Debugf("Call 'diff' from reconciler successfully with diff:\n%s", diff.Diff())
 	if res != (ctrl.Result{}) {
 		return res, nil
 	}
@@ -193,6 +194,7 @@ func (h *BasicRemoteReconciler[k8sObject, apiObject]) Reconcile(ctx context.Cont
 			h.Log.Errorf("Failed to call 'create' from reconciler: %s", err.Error())
 			return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, ErrWhenCallCreateFromReconciler.Error()))
 		}
+		h.Log.Debug("Call 'create' from reconciler successfully")
 		if res != (ctrl.Result{}) {
 			return res, nil
 		}
@@ -204,6 +206,7 @@ func (h *BasicRemoteReconciler[k8sObject, apiObject]) Reconcile(ctx context.Cont
 			h.Log.Errorf("Failed to call 'update' from reconciler: %s", err.Error())
 			return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, ErrWhenCallUpdateFromReconciler.Error()))
 		}
+		h.Log.Debug("Call 'update' from reconciler successfully")
 		if res != (ctrl.Result{}) {
 			return res, nil
 		}
@@ -214,6 +217,7 @@ func (h *BasicRemoteReconciler[k8sObject, apiObject]) Reconcile(ctx context.Cont
 		h.Log.Errorf("Error when call 'onSuccess' from reconciler: %s", err.Error())
 		return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, ErrWhenCallOnSuccessFromReconciler.Error()))
 	}
+	h.Log.Debug("Call 'onSuccess' from reconciler successfully")
 
 	return res, nil
 }
