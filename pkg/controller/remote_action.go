@@ -106,7 +106,7 @@ func (h *BasicRemoteReconcilerAction[k8sObject, apiObject]) Read(ctx context.Con
 	read = NewBasicRemoteRead[apiObject]()
 
 	// Read current object
-	currentObject, err := handler.Get(o.GetExternalName())
+	currentObject, err := handler.Get(o.(k8sObject))
 	if err != nil {
 		return read, res, errors.Wrapf(err, "Error when read object %s on remote target", o.GetName())
 	}
@@ -124,7 +124,7 @@ func (h *BasicRemoteReconcilerAction[k8sObject, apiObject]) Read(ctx context.Con
 
 func (h *BasicRemoteReconcilerAction[k8sObject, apiObject]) Create(ctx context.Context, o object.RemoteObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject], object apiObject) (res ctrl.Result, err error) {
 
-	if err = handler.Create(object); err != nil {
+	if err = handler.Create(object, o.(k8sObject)); err != nil {
 		return res, errors.Wrapf(err, "Error when create %s on remote target", o.GetName())
 	}
 
@@ -144,7 +144,7 @@ func (h *BasicRemoteReconcilerAction[k8sObject, apiObject]) Create(ctx context.C
 // It only add some log / events
 func (h *BasicRemoteReconcilerAction[k8sObject, apiObject]) Update(ctx context.Context, o object.RemoteObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject], object apiObject) (res ctrl.Result, err error) {
 
-	if err = handler.Update(object); err != nil {
+	if err = handler.Update(object, o.(k8sObject)); err != nil {
 		return res, errors.Wrapf(err, "Error when update %s on remote target", o.GetName())
 	}
 
@@ -164,7 +164,7 @@ func (h *BasicRemoteReconcilerAction[k8sObject, apiObject]) Update(ctx context.C
 // It only add some log / events
 func (h *BasicRemoteReconcilerAction[k8sObject, apiObject]) Delete(ctx context.Context, o object.RemoteObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject]) (err error) {
 
-	if err = handler.Delete(o.GetExternalName()); err != nil {
+	if err = handler.Delete(o.(k8sObject)); err != nil {
 		return errors.Wrapf(err, "Error when delete %s on remote target", o.GetName())
 	}
 

@@ -10,11 +10,11 @@ import (
 
 // RemoteExternalReconciler is the interface to call the remote API to handler resource
 type RemoteExternalReconciler[k8sObject comparable, apiObject comparable] interface {
-	Build(o k8sObject) (object apiObject, err error)
-	Get(name string) (object apiObject, err error)
-	Create(object apiObject) (err error)
-	Update(object apiObject) (err error)
-	Delete(name string) (err error)
+	Build(k8sO k8sObject) (object apiObject, err error)
+	Get(k8sO k8sObject) (object apiObject, err error)
+	Create(apiO apiObject, k8sO k8sObject) (err error)
+	Update(apiO apiObject, k8sO k8sObject) (err error)
+	Delete(k8sO k8sObject) (err error)
 	Diff(currentOject apiObject, expectedObject apiObject, originalObject apiObject, ignoresDiff ...patch.CalculateOption) (patchResult *patch.PatchResult, err error)
 	Custom(f func(handler any) error) (err error)
 }
