@@ -8,6 +8,7 @@ import (
 	"github.com/disaster37/operator-sdk-extra/pkg/helper"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/cli-runtime/pkg/printers"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
@@ -24,6 +25,10 @@ func EqualFromYamlFile[k8sobject comparable](t *testing.T, expectedYamlFile stri
 	if err != nil {
 		panic(err)
 	}
+	currentObject := new(k8sobject)
+	if err = json.Unmarshal(f, currentObject); err != nil {
+		panic(err)
+	}
 
 	y := printers.NewTypeSetter(s).ToPrinter(&printers.JSONPrinter{})
 	buf := new(bytes.Buffer)
@@ -36,7 +41,7 @@ func EqualFromYamlFile[k8sobject comparable](t *testing.T, expectedYamlFile stri
 		panic(err)
 	}
 
-	diff := helper.Diff(*expectedObject, actual)
+	diff := helper.Diff(*expectedObject, *currentObject)
 
 	if diff != "" {
 		assert.Fail(t, diff)
