@@ -25,8 +25,8 @@ func EqualFromYamlFile[k8sobject comparable](t *testing.T, expectedYamlFile stri
 	if err != nil {
 		panic(err)
 	}
-	currentObject := new(k8sobject)
-	if err = json.Unmarshal(f, currentObject); err != nil {
+	expectedObject := new(k8sobject)
+	if err = yaml.Unmarshal(f, expectedObject); err != nil {
 		panic(err)
 	}
 
@@ -35,9 +35,8 @@ func EqualFromYamlFile[k8sobject comparable](t *testing.T, expectedYamlFile stri
 	if err := y.PrintObj(actual, buf); err != nil {
 		panic(err)
 	}
-
-	expectedObject := new(k8sobject)
-	if err = yaml.Unmarshal(f, expectedObject); err != nil {
+	currentObject := new(k8sobject)
+	if err = json.Unmarshal(buf.Bytes(), currentObject); err != nil {
 		panic(err)
 	}
 
