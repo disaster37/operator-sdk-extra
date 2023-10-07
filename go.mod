@@ -3,6 +3,7 @@ module github.com/disaster37/operator-sdk-extra
 go 1.20
 
 require (
+	dario.cat/mergo v1.0.0
 	emperror.dev/errors v0.8.1
 	github.com/disaster37/generic-objectmatcher v1.0.2
 	github.com/disaster37/go-kibana-rest/v8 v8.5.0
@@ -18,7 +19,6 @@ require (
 	k8s.io/apimachinery v0.28.2
 	k8s.io/cli-runtime v0.28.2
 	k8s.io/client-go v0.28.2
-	k8s.io/kubectl v0.28.2
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
 	sigs.k8s.io/controller-runtime v0.16.1
 	sigs.k8s.io/yaml v1.3.0
