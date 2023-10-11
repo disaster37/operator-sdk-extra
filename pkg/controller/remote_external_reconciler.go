@@ -22,12 +22,12 @@ type RemoteExternalReconciler[k8sObject comparable, apiObject comparable] interf
 // BasicRemoteExternalReconciler is the basic implementation of RemoteExternalReconciler
 // It only implement the Diff method, because of is generic with 3-way merge patch
 type BasicRemoteExternalReconciler[k8sObject comparable, apiObject comparable] struct {
-	handler any
+	Client any
 }
 
 func NewBasicRemoteExternalReconciler[k8sObject comparable, apiObject comparable](handler any) *BasicRemoteExternalReconciler[k8sObject, apiObject] {
 	return &BasicRemoteExternalReconciler[k8sObject, apiObject]{
-		handler: handler,
+		Client: handler,
 	}
 }
 
@@ -51,5 +51,5 @@ func (h *BasicRemoteExternalReconciler[k8sObject, apiObject]) Diff(currentOject 
 }
 
 func (h *BasicRemoteExternalReconciler[k8sObject, apiObject]) Custom(f func(handler any) error) (err error) {
-	return f(h.handler)
+	return f(h.Client)
 }
