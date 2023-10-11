@@ -21,17 +21,17 @@ type RemoteExternalReconciler[k8sObject comparable, apiObject comparable] interf
 
 // BasicRemoteExternalReconciler is the basic implementation of RemoteExternalReconciler
 // It only implement the Diff method, because of is generic with 3-way merge patch
-type BasicRemoteExternalReconciler[k8sObject comparable, apiObject comparable, externalHandler any] struct {
-	handler externalHandler
+type BasicRemoteExternalReconciler[k8sObject comparable, apiObject comparable] struct {
+	handler any
 }
 
-func NewBasicRemoteExternalReconciler[k8sObject comparable, apiObject comparable, externalHandler any](handler externalHandler) *BasicRemoteExternalReconciler[k8sObject, apiObject, externalHandler] {
-	return &BasicRemoteExternalReconciler[k8sObject, apiObject, externalHandler]{
+func NewBasicRemoteExternalReconciler[k8sObject comparable, apiObject comparable](handler any) *BasicRemoteExternalReconciler[k8sObject, apiObject] {
+	return &BasicRemoteExternalReconciler[k8sObject, apiObject]{
 		handler: handler,
 	}
 }
 
-func (h *BasicRemoteExternalReconciler[k8sObject, apiObject, externalHandler]) Diff(currentOject apiObject, expectedObject apiObject, originalObject apiObject, ignoresDiff ...patch.CalculateOption) (patchResult *patch.PatchResult, err error) {
+func (h *BasicRemoteExternalReconciler[k8sObject, apiObject]) Diff(currentOject apiObject, expectedObject apiObject, originalObject apiObject, ignoresDiff ...patch.CalculateOption) (patchResult *patch.PatchResult, err error) {
 	if reflect.ValueOf(currentOject).IsNil() {
 		expected, err := jsonIterator.ConfigCompatibleWithStandardLibrary.Marshal(expectedObject)
 		if err != nil {
@@ -50,6 +50,6 @@ func (h *BasicRemoteExternalReconciler[k8sObject, apiObject, externalHandler]) D
 	return patch.DefaultPatchMaker.Calculate(currentOject, expectedObject, originalObject, ignoresDiff...)
 }
 
-func (h *BasicRemoteExternalReconciler[k8sObject, apiObject, externalHandler]) Custom(f func(handler any) error) (err error) {
+func (h *BasicRemoteExternalReconciler[k8sObject, apiObject]) Custom(f func(handler any) error) (err error) {
 	return f(h.handler)
 }
