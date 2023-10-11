@@ -9,29 +9,29 @@ import (
 )
 
 // RemoteExternalReconciler is the interface to call the remote API to handler resource
-type RemoteExternalReconciler[k8sObject comparable, apiObject comparable] interface {
+type RemoteExternalReconciler[k8sObject comparable, apiObject comparable, apiClient any] interface {
 	Build(k8sO k8sObject) (object apiObject, err error)
 	Get(k8sO k8sObject) (object apiObject, err error)
 	Create(apiO apiObject, k8sO k8sObject) (err error)
 	Update(apiO apiObject, k8sO k8sObject) (err error)
 	Delete(k8sO k8sObject) (err error)
 	Diff(currentOject apiObject, expectedObject apiObject, originalObject apiObject, ignoresDiff ...patch.CalculateOption) (patchResult *patch.PatchResult, err error)
-	Custom(f func(handler any) error) (err error)
+	Custom(f func(handler apiClient) error) (err error)
 }
 
 // BasicRemoteExternalReconciler is the basic implementation of RemoteExternalReconciler
 // It only implement the Diff method, because of is generic with 3-way merge patch
-type BasicRemoteExternalReconciler[k8sObject comparable, apiObject comparable] struct {
-	Client any
+type BasicRemoteExternalReconciler[k8sObject comparable, apiObject comparable, apiClient any] struct {
+	Client apiClient
 }
 
-func NewBasicRemoteExternalReconciler[k8sObject comparable, apiObject comparable](handler any) *BasicRemoteExternalReconciler[k8sObject, apiObject] {
-	return &BasicRemoteExternalReconciler[k8sObject, apiObject]{
+func NewBasicRemoteExternalReconciler[k8sObject comparable, apiObject comparable, apiClient any](handler apiClient) *BasicRemoteExternalReconciler[k8sObject, apiObject, apiClient] {
+	return &BasicRemoteExternalReconciler[k8sObject, apiObject, apiClient]{
 		Client: handler,
 	}
 }
 
-func (h *BasicRemoteExternalReconciler[k8sObject, apiObject]) Diff(currentOject apiObject, expectedObject apiObject, originalObject apiObject, ignoresDiff ...patch.CalculateOption) (patchResult *patch.PatchResult, err error) {
+func (h *BasicRemoteExternalReconciler[k8sObject, apiObject, apiClient]) Diff(currentOject apiObject, expectedObject apiObject, originalObject apiObject, ignoresDiff ...patch.CalculateOption) (patchResult *patch.PatchResult, err error) {
 	if reflect.ValueOf(currentOject).IsNil() {
 		expected, err := jsonIterator.ConfigCompatibleWithStandardLibrary.Marshal(expectedObject)
 		if err != nil {
@@ -50,6 +50,6 @@ func (h *BasicRemoteExternalReconciler[k8sObject, apiObject]) Diff(currentOject 
 	return patch.DefaultPatchMaker.Calculate(currentOject, expectedObject, originalObject, ignoresDiff...)
 }
 
-func (h *BasicRemoteExternalReconciler[k8sObject, apiObject]) Custom(f func(handler any) error) (err error) {
+func (h *BasicRemoteExternalReconciler[k8sObject, apiObject, apiClient]) Custom(f func(handler apiClient) error) (err error) {
 	return f(h.Client)
 }

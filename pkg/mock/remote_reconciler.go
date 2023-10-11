@@ -9,58 +9,58 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-type MockRemoteReconcilerAction[k8sObject comparable, apiObject comparable] struct {
-	reconciler        controller.RemoteReconcilerAction[k8sObject, apiObject]
-	mockRemoteHandler func(ctx context.Context, req ctrl.Request, o object.RemoteObject) (handler controller.RemoteExternalReconciler[k8sObject, apiObject], res ctrl.Result, err error)
+type MockRemoteReconcilerAction[k8sObject comparable, apiObject comparable, apiClient any] struct {
+	reconciler        controller.RemoteReconcilerAction[k8sObject, apiObject, apiClient]
+	mockRemoteHandler func(ctx context.Context, req ctrl.Request, o object.RemoteObject) (handler controller.RemoteExternalReconciler[k8sObject, apiObject, apiClient], res ctrl.Result, err error)
 }
 
-func NewMockRemoteReconcilerAction[k8sObject comparable, apiObject comparable](reconciler controller.RemoteReconcilerAction[k8sObject, apiObject], mockRemoteHandler func(ctx context.Context, req ctrl.Request, o object.RemoteObject) (handler controller.RemoteExternalReconciler[k8sObject, apiObject], res ctrl.Result, err error)) controller.RemoteReconcilerAction[k8sObject, apiObject] {
-	return &MockRemoteReconcilerAction[k8sObject, apiObject]{
+func NewMockRemoteReconcilerAction[k8sObject comparable, apiObject comparable, apiClient any](reconciler controller.RemoteReconcilerAction[k8sObject, apiObject, apiClient], mockRemoteHandler func(ctx context.Context, req ctrl.Request, o object.RemoteObject) (handler controller.RemoteExternalReconciler[k8sObject, apiObject, apiClient], res ctrl.Result, err error)) controller.RemoteReconcilerAction[k8sObject, apiObject, apiClient] {
+	return &MockRemoteReconcilerAction[k8sObject, apiObject, apiClient]{
 		reconciler:        reconciler,
 		mockRemoteHandler: mockRemoteHandler,
 	}
 }
 
-func (h *MockRemoteReconcilerAction[k8sObject, apiObject]) GetRemoteHandler(ctx context.Context, req ctrl.Request, o object.RemoteObject) (handler controller.RemoteExternalReconciler[k8sObject, apiObject], res ctrl.Result, err error) {
+func (h *MockRemoteReconcilerAction[k8sObject, apiObject, apiClient]) GetRemoteHandler(ctx context.Context, req ctrl.Request, o object.RemoteObject) (handler controller.RemoteExternalReconciler[k8sObject, apiObject, apiClient], res ctrl.Result, err error) {
 	return h.mockRemoteHandler(ctx, req, o)
 }
 
-func (h *MockRemoteReconcilerAction[k8sObject, apiObject]) Configure(ctx context.Context, o object.RemoteObject, data map[string]any, handler controller.RemoteExternalReconciler[k8sObject, apiObject]) (res ctrl.Result, err error) {
+func (h *MockRemoteReconcilerAction[k8sObject, apiObject, apiClient]) Configure(ctx context.Context, o object.RemoteObject, data map[string]any, handler controller.RemoteExternalReconciler[k8sObject, apiObject, apiClient]) (res ctrl.Result, err error) {
 	return h.reconciler.Configure(ctx, o, data, handler)
 }
 
-func (h *MockRemoteReconcilerAction[k8sObject, apiObject]) Read(ctx context.Context, o object.RemoteObject, data map[string]any, handler controller.RemoteExternalReconciler[k8sObject, apiObject]) (read controller.RemoteRead[apiObject], res ctrl.Result, err error) {
+func (h *MockRemoteReconcilerAction[k8sObject, apiObject, apiClient]) Read(ctx context.Context, o object.RemoteObject, data map[string]any, handler controller.RemoteExternalReconciler[k8sObject, apiObject, apiClient]) (read controller.RemoteRead[apiObject], res ctrl.Result, err error) {
 	return h.reconciler.Read(ctx, o, data, handler)
 }
 
-func (h *MockRemoteReconcilerAction[k8sObject, apiObject]) Create(ctx context.Context, o object.RemoteObject, data map[string]any, handler controller.RemoteExternalReconciler[k8sObject, apiObject], object apiObject) (res ctrl.Result, err error) {
+func (h *MockRemoteReconcilerAction[k8sObject, apiObject, apiClient]) Create(ctx context.Context, o object.RemoteObject, data map[string]any, handler controller.RemoteExternalReconciler[k8sObject, apiObject, apiClient], object apiObject) (res ctrl.Result, err error) {
 	return h.reconciler.Create(ctx, o, data, handler, object)
 }
 
-func (h *MockRemoteReconcilerAction[k8sObject, apiObject]) Update(ctx context.Context, o object.RemoteObject, data map[string]any, handler controller.RemoteExternalReconciler[k8sObject, apiObject], object apiObject) (res ctrl.Result, err error) {
+func (h *MockRemoteReconcilerAction[k8sObject, apiObject, apiClient]) Update(ctx context.Context, o object.RemoteObject, data map[string]any, handler controller.RemoteExternalReconciler[k8sObject, apiObject, apiClient], object apiObject) (res ctrl.Result, err error) {
 	return h.reconciler.Update(ctx, o, data, handler, object)
 }
 
-func (h *MockRemoteReconcilerAction[k8sObject, apiObject]) Delete(ctx context.Context, o object.RemoteObject, data map[string]any, handler controller.RemoteExternalReconciler[k8sObject, apiObject]) (err error) {
+func (h *MockRemoteReconcilerAction[k8sObject, apiObject, apiClient]) Delete(ctx context.Context, o object.RemoteObject, data map[string]any, handler controller.RemoteExternalReconciler[k8sObject, apiObject, apiClient]) (err error) {
 	return h.reconciler.Delete(ctx, o, data, handler)
 }
 
-func (h *MockRemoteReconcilerAction[k8sObject, apiObject]) OnError(ctx context.Context, o object.RemoteObject, data map[string]any, handler controller.RemoteExternalReconciler[k8sObject, apiObject], currentErr error) (res ctrl.Result, err error) {
+func (h *MockRemoteReconcilerAction[k8sObject, apiObject, apiClient]) OnError(ctx context.Context, o object.RemoteObject, data map[string]any, handler controller.RemoteExternalReconciler[k8sObject, apiObject, apiClient], currentErr error) (res ctrl.Result, err error) {
 	return h.reconciler.OnError(ctx, o, data, handler, currentErr)
 }
 
-func (h *MockRemoteReconcilerAction[k8sObject, apiObject]) OnSuccess(ctx context.Context, o object.RemoteObject, data map[string]any, handler controller.RemoteExternalReconciler[k8sObject, apiObject], diff controller.RemoteDiff[apiObject]) (res ctrl.Result, err error) {
+func (h *MockRemoteReconcilerAction[k8sObject, apiObject, apiClient]) OnSuccess(ctx context.Context, o object.RemoteObject, data map[string]any, handler controller.RemoteExternalReconciler[k8sObject, apiObject, apiClient], diff controller.RemoteDiff[apiObject]) (res ctrl.Result, err error) {
 	return h.reconciler.OnSuccess(ctx, o, data, handler, diff)
 }
 
-func (h *MockRemoteReconcilerAction[k8sObject, apiObject]) Diff(ctx context.Context, o object.RemoteObject, read controller.RemoteRead[apiObject], data map[string]any, handler controller.RemoteExternalReconciler[k8sObject, apiObject], ignoreDiff ...patch.CalculateOption) (diff controller.RemoteDiff[apiObject], res ctrl.Result, err error) {
+func (h *MockRemoteReconcilerAction[k8sObject, apiObject, apiClient]) Diff(ctx context.Context, o object.RemoteObject, read controller.RemoteRead[apiObject], data map[string]any, handler controller.RemoteExternalReconciler[k8sObject, apiObject, apiClient], ignoreDiff ...patch.CalculateOption) (diff controller.RemoteDiff[apiObject], res ctrl.Result, err error) {
 	return h.reconciler.Diff(ctx, o, read, data, handler, ignoreDiff...)
 }
 
-func (h *MockRemoteReconcilerAction[k8sObject, apiObject]) GetIgnoresDiff() []patch.CalculateOption {
+func (h *MockRemoteReconcilerAction[k8sObject, apiObject, apiClient]) GetIgnoresDiff() []patch.CalculateOption {
 	return h.reconciler.GetIgnoresDiff()
 }
 
-func (h *MockRemoteReconcilerAction[k8sObject, apiObject]) Custom(ctx context.Context, o object.RemoteObject, data map[string]any, handler controller.RemoteExternalReconciler[k8sObject, apiObject], object apiObject, f func(handler any) error) (err error) {
+func (h *MockRemoteReconcilerAction[k8sObject, apiObject, apiClient]) Custom(ctx context.Context, o object.RemoteObject, data map[string]any, handler controller.RemoteExternalReconciler[k8sObject, apiObject, apiClient], object apiObject, f func(handler apiClient) error) (err error) {
 	return h.reconciler.Custom(ctx, o, data, handler, object, f)
 }

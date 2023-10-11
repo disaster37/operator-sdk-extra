@@ -20,25 +20,25 @@ import (
 )
 
 // RemoteReconciler is the reconciler to reconcile the remote resource
-type RemoteReconciler[k8sObject comparable, apiObject comparable] interface {
+type RemoteReconciler[k8sObject comparable, apiObject comparable, apiClient any] interface {
 
 	// Reconcile permit to reconcile the step (one K8s resource)
-	Reconcile(ctx context.Context, req ctrl.Request, o object.RemoteObject, data map[string]interface{}, reconciler RemoteReconcilerAction[k8sObject, apiObject]) (res ctrl.Result, err error)
+	Reconcile(ctx context.Context, req ctrl.Request, o object.RemoteObject, data map[string]interface{}, reconciler RemoteReconcilerAction[k8sObject, apiObject, apiClient]) (res ctrl.Result, err error)
 }
 
 // BasicRemoteReconciler is the basic implementation of RemoteReconciler interface
-type BasicRemoteReconciler[k8sObject comparable, apiObject comparable] struct {
+type BasicRemoteReconciler[k8sObject comparable, apiObject comparable, apiClient any] struct {
 	BasicReconciler
 }
 
 // NewBasicMultiPhaseReconciler permit to instanciate new basic multiphase resonciler
-func NewBasicRemoteReconciler[k8sObject comparable, apiObject comparable](client client.Client, name string, finalizer shared.FinalizerName, logger *logrus.Entry, recorder record.EventRecorder) (remoteReconciler RemoteReconciler[k8sObject, apiObject]) {
+func NewBasicRemoteReconciler[k8sObject comparable, apiObject comparable, apiClient any](client client.Client, name string, finalizer shared.FinalizerName, logger *logrus.Entry, recorder record.EventRecorder) (remoteReconciler RemoteReconciler[k8sObject, apiObject, apiClient]) {
 
 	if recorder == nil {
 		panic("recorder can't be nil")
 	}
 
-	basicRemoteReconciler := &BasicRemoteReconciler[k8sObject, apiObject]{
+	basicRemoteReconciler := &BasicRemoteReconciler[k8sObject, apiObject, apiClient]{
 		BasicReconciler: BasicReconciler{
 			BaseReconciler: BaseReconciler{
 				Client: client,
@@ -58,10 +58,10 @@ func NewBasicRemoteReconciler[k8sObject comparable, apiObject comparable](client
 	return basicRemoteReconciler
 }
 
-func (h *BasicRemoteReconciler[k8sObject, apiObject]) Reconcile(ctx context.Context, req ctrl.Request, o object.RemoteObject, data map[string]interface{}, reconciler RemoteReconcilerAction[k8sObject, apiObject]) (res ctrl.Result, err error) {
+func (h *BasicRemoteReconciler[k8sObject, apiObject, apiClient]) Reconcile(ctx context.Context, req ctrl.Request, o object.RemoteObject, data map[string]interface{}, reconciler RemoteReconcilerAction[k8sObject, apiObject, apiClient]) (res ctrl.Result, err error) {
 
 	var (
-		handler RemoteExternalReconciler[k8sObject, apiObject]
+		handler RemoteExternalReconciler[k8sObject, apiObject, apiClient]
 		read    RemoteRead[apiObject]
 		diff    RemoteDiff[apiObject]
 	)
