@@ -16,18 +16,18 @@ type RemoteExternalReconciler[k8sObject comparable, apiObject comparable, apiCli
 	Update(apiO apiObject, k8sO k8sObject) (err error)
 	Delete(k8sO k8sObject) (err error)
 	Diff(currentOject apiObject, expectedObject apiObject, originalObject apiObject, ignoresDiff ...patch.CalculateOption) (patchResult *patch.PatchResult, err error)
-	Custom(f func(handler apiClient) error) (err error)
+	Client() apiClient
 }
 
 // BasicRemoteExternalReconciler is the basic implementation of RemoteExternalReconciler
 // It only implement the Diff method, because of is generic with 3-way merge patch
 type BasicRemoteExternalReconciler[k8sObject comparable, apiObject comparable, apiClient any] struct {
-	Client apiClient
+	client apiClient
 }
 
 func NewBasicRemoteExternalReconciler[k8sObject comparable, apiObject comparable, apiClient any](handler apiClient) *BasicRemoteExternalReconciler[k8sObject, apiObject, apiClient] {
 	return &BasicRemoteExternalReconciler[k8sObject, apiObject, apiClient]{
-		Client: handler,
+		client: handler,
 	}
 }
 
@@ -50,6 +50,6 @@ func (h *BasicRemoteExternalReconciler[k8sObject, apiObject, apiClient]) Diff(cu
 	return patch.DefaultPatchMaker.Calculate(currentOject, expectedObject, originalObject, ignoresDiff...)
 }
 
-func (h *BasicRemoteExternalReconciler[k8sObject, apiObject, apiClient]) Custom(f func(handler apiClient) error) (err error) {
-	return f(h.Client)
+func (h *BasicRemoteExternalReconciler[k8sObject, apiObject, apiClient]) Client() apiClient {
+	return h.client
 }
