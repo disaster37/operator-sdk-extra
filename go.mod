@@ -5,6 +5,7 @@ go 1.20
 require (
 	dario.cat/mergo v1.0.0
 	emperror.dev/errors v0.8.1
+	github.com/davecgh/go-spew v1.1.1
 	github.com/disaster37/generic-objectmatcher v1.0.2
 	github.com/disaster37/go-kibana-rest/v8 v8.5.0
 	github.com/disaster37/k8s-objectmatcher v1.8.2
@@ -29,7 +30,6 @@ require (
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
-	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/emicklei/go-restful/v3 v3.9.0 // indirect
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect

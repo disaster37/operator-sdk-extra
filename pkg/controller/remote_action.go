@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"emperror.dev/errors"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/disaster37/generic-objectmatcher/patch"
 	"github.com/disaster37/operator-sdk-extra/pkg/helper"
 	"github.com/disaster37/operator-sdk-extra/pkg/object"
@@ -215,7 +216,7 @@ func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) OnError(c
 	default:
 		errorMessage = "Framework error"
 		reason = "FrameworkFailed"
-		panic(errors.Cause(currentErr))
+		h.Log.Debug(spew.Sdump(errors.Cause(currentErr)))
 	}
 	h.Recorder.Event(o, corev1.EventTypeWarning, reason, errorMessage)
 
