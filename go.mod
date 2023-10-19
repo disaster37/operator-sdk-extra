@@ -8,6 +8,7 @@ require (
 	github.com/disaster37/generic-objectmatcher v1.0.2
 	github.com/disaster37/go-kibana-rest/v8 v8.5.0
 	github.com/disaster37/k8s-objectmatcher v1.8.2
+	github.com/go-logr/logr v1.2.4
 	github.com/google/go-cmp v0.5.9
 	github.com/json-iterator/go v1.1.12
 	github.com/kr/pretty v0.3.1
@@ -33,7 +34,6 @@ require (
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
-	github.com/go-logr/logr v1.2.4 // indirect
 	github.com/go-openapi/jsonpointer v0.19.6 // indirect
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
 	github.com/go-openapi/swag v0.22.3 // indirect

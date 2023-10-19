@@ -215,6 +215,7 @@ func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) OnError(c
 	default:
 		errorMessage = "Framework error"
 		reason = "FrameworkFailed"
+		panic(errors.Cause(currentErr))
 	}
 	h.Recorder.Event(o, corev1.EventTypeWarning, reason, errorMessage)
 
