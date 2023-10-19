@@ -216,7 +216,7 @@ func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) OnError(c
 	default:
 		errorMessage = "Framework error"
 		reason = "FrameworkFailed"
-		h.Log.Debug(spew.Sdump((currentErr))
+		h.Log.Debug(spew.Sdump(currentErr))
 		h.Log.Debug(spew.Sdump(errors.Unwrap(currentErr)))
 		h.Log.Debug(spew.Sdump(errors.Cause(currentErr)))
 	}
