@@ -174,7 +174,7 @@ func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) Delete(ct
 func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) OnError(ctx context.Context, o object.RemoteObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject, apiClient], currentErr error) (res ctrl.Result, err error) {
 
 	o.GetStatus().SetIsOnError(true)
-	o.GetStatus().SetLastErrorMessage(k8sstrings.ShortenString(err.Error(), ShortenError))
+	o.GetStatus().SetLastErrorMessage(k8sstrings.ShortenString(currentErr.Error(), ShortenError))
 	o.GetStatus().SetIsSync(false)
 
 	conditions := o.GetStatus().GetConditions()
@@ -218,7 +218,7 @@ func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) OnError(c
 	}
 	h.Recorder.Event(o, corev1.EventTypeWarning, reason, errorMessage)
 
-	return res, errors.Wrap(errors.New(k8sstrings.ShortenString(err.Error(), ShortenError)), errorMessage)
+	return res, errors.Wrap(errors.New(k8sstrings.ShortenString(currentErr.Error(), ShortenError)), errorMessage)
 }
 
 func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) OnSuccess(ctx context.Context, o object.RemoteObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject, apiClient], diff RemoteDiff[apiObject]) (res ctrl.Result, err error) {
