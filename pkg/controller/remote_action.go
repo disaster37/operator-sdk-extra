@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"emperror.dev/errors"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/disaster37/generic-objectmatcher/patch"
 	"github.com/disaster37/operator-sdk-extra/pkg/helper"
 	"github.com/disaster37/operator-sdk-extra/pkg/object"
@@ -187,42 +186,9 @@ func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) OnError(c
 		Message: k8sstrings.ShortenString(currentErr.Error(), ShortenError),
 	})
 
-	var (
-		errorMessage string
-		reason       string
-	)
-	switch errors.Unwrap(err) {
-	case ErrWhenCallConfigureFromReconciler:
-		errorMessage = "Error when call 'configure'"
-		reason = "ConfigureFailed"
-	case ErrWhenCallReadFromReconciler:
-		errorMessage = "Error when call 'read'"
-		reason = "ReadFailed"
-	case ErrWhenCallDiffFromReconciler:
-		errorMessage = "Error when call 'diff'"
-		reason = "DiffFailed"
-	case ErrWhenCallCreateFromReconciler:
-		errorMessage = "Error when call 'create'"
-		reason = "CreateFailed"
-	case ErrWhenCallUpdateFromReconciler:
-		errorMessage = "Error when call 'update'"
-		reason = "UpdateFailed"
-	case ErrWhenCallDeleteFromReconciler:
-		errorMessage = "Error when call 'delete'"
-		reason = "DeleteFailed"
-	case ErrWhenCallOnSuccessFromReconciler:
-		errorMessage = "Error when call 'onSuccess'"
-		reason = "OnSuccessFailed"
-	default:
-		errorMessage = "Framework error"
-		reason = "FrameworkFailed"
-		h.Log.Debug(spew.Sdump(currentErr))
-		h.Log.Debug(spew.Sdump(errors.Unwrap(currentErr)))
-		h.Log.Debug(spew.Sdump(errors.Cause(currentErr)))
-	}
-	h.Recorder.Event(o, corev1.EventTypeWarning, reason, errorMessage)
+	h.Recorder.Event(o, corev1.EventTypeWarning, "ReconcilerActionError", k8sstrings.ShortenString(currentErr.Error(), ShortenError))
 
-	return res, errors.Wrap(errors.New(k8sstrings.ShortenString(currentErr.Error(), ShortenError)), errorMessage)
+	return res, currentErr
 }
 
 func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) OnSuccess(ctx context.Context, o object.RemoteObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject, apiClient], diff RemoteDiff[apiObject]) (res ctrl.Result, err error) {

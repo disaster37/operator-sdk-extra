@@ -167,38 +167,8 @@ func (h *BasicMultiPhaseStepReconcilerAction) OnError(ctx context.Context, o obj
 		Message: k8sstrings.ShortenString(currentErr.Error(), ShortenError),
 	})
 
-	var (
-		errorMessage string
-		reason       string
-	)
-	switch errors.Cause(currentErr) {
-	case ErrWhenCallConfigureFromReconciler:
-		errorMessage = fmt.Sprintf("Error when call 'configure' on step %s", h.GetPhaseName().String())
-		reason = "ConfigureFailed"
-	case ErrWhenCallReadFromReconciler:
-		errorMessage = fmt.Sprintf("Error when call 'read' on step %s", h.GetPhaseName().String())
-		reason = "ReadFailed"
-	case ErrWhenCallDiffFromReconciler:
-		errorMessage = fmt.Sprintf("Error when call 'diff' on step %s", h.GetPhaseName().String())
-		reason = "DiffFailed"
-	case ErrWhenCallCreateFromReconciler:
-		errorMessage = fmt.Sprintf("Error when call 'create' on step %s", h.GetPhaseName().String())
-		reason = "CreateFailed"
-	case ErrWhenCallUpdateFromReconciler:
-		errorMessage = fmt.Sprintf("Error when call 'update' on step %s", h.GetPhaseName().String())
-		reason = "UpdateFailed"
-	case ErrWhenCallDeleteFromReconciler:
-		errorMessage = fmt.Sprintf("Error when call 'delete' on step %s", h.GetPhaseName().String())
-		reason = "DeleteFailed"
-	case ErrWhenCallOnSuccessFromReconciler:
-		errorMessage = fmt.Sprintf("Error when call 'onSuccess' on step %s", h.GetPhaseName().String())
-		reason = "OnSuccessFailed"
-	default:
-		errorMessage = fmt.Sprintf("Framework error on step %s", h.GetPhaseName().String())
-		reason = "FrameworkFailed"
-	}
-	h.Recorder.Event(o, corev1.EventTypeWarning, reason, errorMessage)
-	return res, errors.New(errorMessage)
+	h.Recorder.Event(o, corev1.EventTypeWarning, "ReconcilerStepActionError", k8sstrings.ShortenString(currentErr.Error(), ShortenError))
+	return res, currentErr
 
 }
 
