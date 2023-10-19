@@ -191,7 +191,7 @@ func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) OnError(c
 		errorMessage string
 		reason       string
 	)
-	switch errors.Cause(currentErr) {
+	switch errors.Unwrap(err) {
 	case ErrWhenCallConfigureFromReconciler:
 		errorMessage = "Error when call 'configure'"
 		reason = "ConfigureFailed"
@@ -216,6 +216,8 @@ func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) OnError(c
 	default:
 		errorMessage = "Framework error"
 		reason = "FrameworkFailed"
+		h.Log.Debug(spew.Sdump((currentErr))
+		h.Log.Debug(spew.Sdump(errors.Unwrap(currentErr)))
 		h.Log.Debug(spew.Sdump(errors.Cause(currentErr)))
 	}
 	h.Recorder.Event(o, corev1.EventTypeWarning, reason, errorMessage)
