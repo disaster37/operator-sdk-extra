@@ -10,10 +10,16 @@ import (
 )
 
 func PrintVersion(logger logr.Logger, metricsAddr, probeAddr string) {
+
+	logLevel, _ := os.LookupEnv("LOG_LEVEL")
+	logFormatter, _ := os.LookupEnv("LOG_FORMATTER")
+
 	logger.Info("Binary info ", "Go version", osruntime.Version())
 	logger.Info("Binary info ", "OS", osruntime.GOOS, "Arch", osruntime.GOARCH)
 	logger.Info("Address ", "Metrics", metricsAddr)
 	logger.Info("Address ", "Probe", probeAddr)
+	logger.Info("Log level ", logLevel)
+	logger.Info("Log formatter ", logFormatter)
 }
 
 func GetWatchNamespaceFromEnv() (ns string, err error) {

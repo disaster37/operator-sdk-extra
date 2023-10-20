@@ -27,6 +27,7 @@ func GetZapLogLevelFromEnv() zapcore.Level {
 
 func GetZapFormatterFromDev() zapcore.Encoder {
 	logFormatter, _ := os.LookupEnv("LOG_FORMATTER")
+	logFormatter = strings.ToLower(logFormatter)
 	if logFormatter == "json" {
 		return zapcore.NewJSONEncoder(zapcore.EncoderConfig{})
 	}
@@ -53,6 +54,7 @@ func GetLogrusLogLevelFromEnv() logrus.Level {
 
 func GetLogrusFormatterFromEnv() logrus.Formatter {
 	logFormatter, _ := os.LookupEnv("LOG_FORMATTER")
+	logFormatter = strings.ToLower(logFormatter)
 	if logFormatter == "json" {
 		return &logrus.JSONFormatter{}
 	}
