@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/disaster37/operator-sdk-extra/testdata/memcached-operator/api/v1alpha1"
+	"github.com/thoas/go-funk"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,7 +27,11 @@ func newDeploymentsBuilder(memcached *v1alpha1.Memcached) (deployments []appsv1.
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      memcached.Name,
 			Namespace: memcached.Namespace,
-			Labels:    ls,
+			Labels: funk.UnionStringMap(
+				ls,
+				memcached.Labels,
+			),
+			Annotations: memcached.GetAnnotations(),
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
