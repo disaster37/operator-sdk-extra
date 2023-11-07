@@ -18,6 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
+// Deprecated: use MultiPhaseReconcilerAction instead
 type K8sReconciler interface {
 	// Configure permit to init condition on status
 	Configure(ctx context.Context, req ctrl.Request, resource client.Object) (res ctrl.Result, err error)
@@ -37,6 +38,7 @@ type K8sReconciler interface {
 	OnSuccess(ctx context.Context, r client.Object, data map[string]any) (res ctrl.Result, err error)
 }
 
+// Deprecated: use MultiPhaseStepReconcilerAction instead
 type K8sPhaseReconciler interface {
 	// Configure permit to init condition on status
 	Configure(ctx context.Context, req ctrl.Request, resource client.Object) (res ctrl.Result, err error)
@@ -115,6 +117,7 @@ func NewStdK8sReconciler(client client.Client, finalizer string, reconciler K8sR
 // 3.3 Update / create resources if needed
 // 3.4 Delete resources if needed
 // 4. Delete finalizer if on delete action
+// Deprecated: Use MultiPhaseReconciler instead
 func (h *StdK8sReconciler) Reconcile(ctx context.Context, req ctrl.Request, r client.Object, data map[string]interface{}, reconcilers ...K8sPhaseReconciler) (res ctrl.Result, err error) {
 
 	// Init logger
@@ -122,8 +125,8 @@ func (h *StdK8sReconciler) Reconcile(ctx context.Context, req ctrl.Request, r cl
 		"name":      req.Name,
 		"namespace": req.Namespace,
 	})
-	h.log.Infof("---> Starting reconcile loop")
-	defer h.log.Info("---> Finish reconcile loop for")
+	h.log.Infof("Starting reconcile loop")
+	defer h.log.Info("Finish reconcile loop")
 
 	// Wait few second to be sure status is propaged througout ETCD
 	time.Sleep(time.Second * 1)
@@ -212,7 +215,7 @@ func (h *StdK8sReconciler) Reconcile(ctx context.Context, req ctrl.Request, r cl
 	}
 
 	// Ignore if needed by annotation
-	if r.GetAnnotations()[fmt.Sprintf("%s/ignoreReconcile", Base_annotation)] == "true" {
+	if r.GetAnnotations()[fmt.Sprintf("%s/ignoreReconcile", BaseAnnotation)] == "true" {
 		h.log.Info("Found annotation on ressource to ignore reconcile")
 		return res, nil
 	}

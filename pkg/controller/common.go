@@ -3,12 +3,17 @@ package controller
 import (
 	"reflect"
 
+	"github.com/disaster37/operator-sdk-extra/pkg/apis/shared"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
-	Base_annotation = "operator-sdk-extra.webcenter.fr"
+	RunningPhase   shared.PhaseName     = "running"
+	StartingPhase  shared.PhaseName     = "starting"
+	ReadyCondition shared.ConditionName = "Ready"
+	BaseAnnotation string               = "operator-sdk-extra.webcenter.fr"
+	ShortenError   int                  = 100
 )
 
 func getObjectMeta(r client.Object) metav1.ObjectMeta {

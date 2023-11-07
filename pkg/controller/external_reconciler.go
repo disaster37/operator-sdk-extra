@@ -16,6 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
+// Deprecated: Use RemoteReconcilerAction instead
 type Reconciler interface {
 	// Confirgure permit to init external provider driver (API client REST)
 	// It can also permit to init condition on status
@@ -91,6 +92,7 @@ func NewStdReconciler(client client.Client, finalizer string, reconciler Reconci
 // 4. Check if on delete phase, delete external resources if on it
 // 5. Diff external resources with the expected resources
 // 6. Create or update external resources if needed
+// Deprecated: Use RemoteReconciler instead
 func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r client.Object, data map[string]interface{}) (res ctrl.Result, err error) {
 	var (
 		meta any
@@ -101,8 +103,8 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r clien
 		"name":      req.Name,
 		"namespace": req.Namespace,
 	})
-	h.log.Infof("---> Starting reconcile loop")
-	defer h.log.Info("---> Finish reconcile loop for")
+	h.log.Infof("Starting reconcile loop")
+	defer h.log.Info("Finish reconcile loop")
 
 	// Get current resource
 	if err = h.Get(ctx, req.NamespacedName, r); err != nil {
@@ -189,7 +191,7 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r clien
 	}
 
 	// Ignore if needed by annotation
-	if r.GetAnnotations()[fmt.Sprintf("%s/ignoreReconcile", Base_annotation)] == "true" {
+	if r.GetAnnotations()[fmt.Sprintf("%s/ignoreReconcile", BaseAnnotation)] == "true" {
 		h.log.Info("Found annotation on ressource to ignore reconcile")
 		return res, nil
 	}
