@@ -66,8 +66,8 @@ func (h *BasicMultiPhaseReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		"namespace": req.Namespace,
 	})
 
-	h.Log.Infof("---> Starting reconcile loop")
-	defer h.Log.Info("---> Finish reconcile loop")
+	h.Log.Infof("Starting reconcile loop")
+	defer h.Log.Info("Finish reconcile loop")
 
 	stepReconciler := NewBasicMultiPhaseStepReconciler(h.Client, h.Log, h.Recorder)
 

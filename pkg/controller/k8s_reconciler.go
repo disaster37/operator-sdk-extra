@@ -125,8 +125,8 @@ func (h *StdK8sReconciler) Reconcile(ctx context.Context, req ctrl.Request, r cl
 		"name":      req.Name,
 		"namespace": req.Namespace,
 	})
-	h.log.Infof("---> Starting reconcile loop")
-	defer h.log.Info("---> Finish reconcile loop for")
+	h.log.Infof("Starting reconcile loop")
+	defer h.log.Info("Finish reconcile loop")
 
 	// Wait few second to be sure status is propaged througout ETCD
 	time.Sleep(time.Second * 1)

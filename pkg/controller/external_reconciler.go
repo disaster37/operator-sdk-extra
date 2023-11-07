@@ -103,8 +103,8 @@ func (h *StdReconciler) Reconcile(ctx context.Context, req ctrl.Request, r clien
 		"name":      req.Name,
 		"namespace": req.Namespace,
 	})
-	h.log.Infof("---> Starting reconcile loop")
-	defer h.log.Info("---> Finish reconcile loop for")
+	h.log.Infof("Starting reconcile loop")
+	defer h.log.Info("Finish reconcile loop")
 
 	// Get current resource
 	if err = h.Get(ctx, req.NamespacedName, r); err != nil {

@@ -72,8 +72,8 @@ func (h *BasicRemoteReconciler[k8sObject, apiObject, apiClient]) Reconcile(ctx c
 		"namespace": req.Namespace,
 	})
 
-	h.Log.Infof("---> Starting reconcile loop")
-	defer h.Log.Info("---> Finish reconcile loop")
+	h.Log.Infof("Starting reconcile loop")
+	defer h.Log.Info("Finish reconcile loop")
 
 	// Wait few second to be sure status is propaged througout ETCD
 	time.Sleep(time.Second * 1)
