@@ -6,7 +6,7 @@
  Our CRD permit to set the number of replica and the port or memcached.
  The controller will create and handle one `configmap` and one `deployement` to illustrate the multi phase of reconcilation.
 
- The source code of sample is one `testdata/memcached-operator`
+ The source code of the following sample is on `testdata/memcached-operator`. The sample is fully implemented compared to this documentation.
 
  ## How to do
 
@@ -81,7 +81,7 @@ func init() {
 
 Some explains:
 - We expose for user 2 fields: size and containerPort
-- We use regular status defined by framwork and needed by the standard reconciler `apis.BasicMultiPhaseObjectStatus`
+- We use regular status defined by framework and needed by the standard reconciler `apis.BasicMultiPhaseObjectStatus`
 - We display some fields when you get memcached resource from kubectl with annotation `+kubebuilder:printcolumn:name`
 
 **api/v1alpha1/memcached_func.go**
@@ -102,7 +102,7 @@ Some explains:
 
 ### Implement step reconcilers
 
-Like we say, our controller will handle one configmap and one depployment resources. So wee need to create 2 step reconcilers. One for each resouirce type.
+Like we say, our controller will handle one configmap and one deployment resources. So we need to create 2 steps reconcilers. One for each resource type.
 
 The step reconciler is a standard reconciler. So there are already standard struct that implement the interface `controller.MultiPhaseStepReconcilerAction`. In major of situation, you just need to overwrite the `Read` method.
 It consist to read the existing K8s resource and to compute the expected K8s resources.
@@ -123,7 +123,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func NewConfigMapsBuilder(o *v1alpha1.Memcached) (configMaps []corev1.ConfigMap, err error) {
+func newConfigMapsBuilder(o *v1alpha1.Memcached) (configMaps []corev1.ConfigMap, err error) {
 	configMaps = make([]corev1.ConfigMap, 0, 1)
 
 	cm := &corev1.ConfigMap{
@@ -148,7 +148,9 @@ func NewConfigMapsBuilder(o *v1alpha1.Memcached) (configMaps []corev1.ConfigMap,
 
 > There are no specificity with the framework
 
-Then, we  create the configMap reconciler that implement the `Read` method:
+Then, we  create the configMap reconciler that implement the `Read` method.
+
+**controllers/configmap_reconciler.go**
 ```golang
 package controllers
 
@@ -175,13 +177,13 @@ const (
 	ConfigmapPhase     shared.PhaseName     = "Configmap"
 )
 
-type ConfigMapReconciler struct {
+type configMapReconciler struct {
 	controller.MultiPhaseStepReconcilerAction
-	BaseReconciler
+	controller.BaseReconciler
 }
 
-func NewConfigMapReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseStepReconcilerAction controller.MultiPhaseStepReconcilerAction) {
-	return &ConfigMapReconciler{
+func newConfigMapReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseStepReconcilerAction controller.MultiPhaseStepReconcilerAction) {
+	return &configMapReconciler{
 		MultiPhaseStepReconcilerAction: controller.NewBasicMultiPhaseStepReconcilerAction(
 			client,
 			ConfigmapPhase,
@@ -189,15 +191,15 @@ func NewConfigMapReconciler(client client.Client, logger *logrus.Entry, recorder
 			logger,
 			recorder,
 		),
-		BaseReconciler: BaseReconciler{
-			client:   client,
-			recorder: recorder,
-			logger:   logger,
+		BaseReconciler: controller.BaseReconciler{
+			Client:   client,
+			Recorder: recorder,
+			Log:      logger,
 		},
 	}
 }
 
-func (r *ConfigMapReconciler) Read(ctx context.Context, o object.MultiPhaseObject, data map[string]any) (read controller.MultiPhaseRead, res ctrl.Result, err error) {
+func (r *configMapReconciler) Read(ctx context.Context, o object.MultiPhaseObject, data map[string]any) (read controller.MultiPhaseRead, res ctrl.Result, err error) {
 	mc := o.(*v1alpha1.Memcached)
 	cmList := &corev1.ConfigMapList{}
 	read = controller.NewBasicMultiPhaseRead()
@@ -207,14 +209,14 @@ func (r *ConfigMapReconciler) Read(ctx context.Context, o object.MultiPhaseObjec
 	if err != nil {
 		return read, res, errors.Wrap(err, "Error when generate label selector")
 	}
-	if err = r.client.List(ctx, cmList, &client.ListOptions{Namespace: o.GetNamespace(), LabelSelector: labelSelectors}); err != nil {
+	if err = r.Client.List(ctx, cmList, &client.ListOptions{Namespace: o.GetNamespace(), LabelSelector: labelSelectors}); err != nil {
 		return read, res, errors.Wrapf(err, "Error when read configmaps")
 	}
 
 	read.SetCurrentObjects(helper.ToSliceOfObject(cmList.Items))
 
 	// Generate expected configmaps
-	expectedCms, err := NewConfigMapsBuilder(mc)
+	expectedCms, err := newConfigMapsBuilder(mc)
 	if err != nil {
 		return read, res, errors.Wrap(err, "Error when generate expected configMaps")
 	}
@@ -226,8 +228,8 @@ func (r *ConfigMapReconciler) Read(ctx context.Context, o object.MultiPhaseObjec
 ```
 
 Some explains:
-- The struct `ConfigMapReconciler` need to implement the interface  `controller.MultiPhaseStepReconcilerAction`
-- We create constructor to construct this step reconciler `NewConfigMapReconciler`. It will call from the main reconciler.
+- The struct `configMapReconciler` need to implement the interface  `controller.MultiPhaseStepReconcilerAction`
+- We create constructor to construct this step reconciler `newConfigMapReconciler`. It will call from the main reconciler.
 - We use the standard step reconciler `controller.NewBasicMultiPhaseStepReconcilerAction()`.
 - We implement the methode `Read(ctx context.Context, o object.MultiPhaseObject, data map[string]any) (read controller.MultiPhaseRead, res ctrl.Result, err error)`. First, we read existing configMaps on K8s, then we generate expected configMaps.
 
@@ -244,12 +246,13 @@ import (
 	"strings"
 
 	"github.com/disaster37/operator-sdk-extra/testdata/memcached-operator/api/v1alpha1"
+	"github.com/thoas/go-funk"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func NewDeploymentsBuilder(memcached *v1alpha1.Memcached) (deployments []appsv1.Deployment, err error) {
+func newDeploymentsBuilder(memcached *v1alpha1.Memcached) (deployments []appsv1.Deployment, err error) {
 
 	deployments = make([]appsv1.Deployment, 0, 1)
 	ls := labelsForMemcached(memcached.Name)
@@ -265,7 +268,11 @@ func NewDeploymentsBuilder(memcached *v1alpha1.Memcached) (deployments []appsv1.
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      memcached.Name,
 			Namespace: memcached.Namespace,
-			Labels:    ls,
+			Labels: funk.UnionStringMap(
+				ls,
+				memcached.Labels,
+			),
+			Annotations: memcached.GetAnnotations(),
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
@@ -397,7 +404,9 @@ func imageForMemcached() (string, error) {
 
 > There are no specificity with the framework
 
-Then, we  create the deployment reconciler that implement the `Read` method:
+Then, we  create the deployment reconciler that implement the `Read` method.
+
+**controllers/deployment_reconciler.go**
 ```golang
 package controllers
 
@@ -424,14 +433,14 @@ const (
 	DeploymentPhase     shared.PhaseName     = "Deployment"
 )
 
-type DeploymentReconciler struct {
+type deploymentReconciler struct {
 	controller.MultiPhaseStepReconcilerAction
-	BaseReconciler
+	controller.BaseReconciler
 }
 
-func NewDeploymentReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseStepReconcilerAction *DeploymentReconciler) {
+func newDeploymentReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseStepReconcilerAction *deploymentReconciler) {
 
-	return &DeploymentReconciler{
+	return &deploymentReconciler{
 		MultiPhaseStepReconcilerAction: controller.NewBasicMultiPhaseStepReconcilerAction(
 			client,
 			DeploymentPhase,
@@ -439,15 +448,15 @@ func NewDeploymentReconciler(client client.Client, logger *logrus.Entry, recorde
 			logger,
 			recorder,
 		),
-		BaseReconciler: BaseReconciler{
-			client:   client,
-			recorder: recorder,
-			logger:   logger,
+		BaseReconciler: controller.BaseReconciler{
+			Client:   client,
+			Recorder: recorder,
+			Log:      logger,
 		},
 	}
 }
 
-func (r *DeploymentReconciler) Read(ctx context.Context, o object.MultiPhaseObject, data map[string]any) (read controller.MultiPhaseRead, res ctrl.Result, err error) {
+func (r *deploymentReconciler) Read(ctx context.Context, o object.MultiPhaseObject, data map[string]any) (read controller.MultiPhaseRead, res ctrl.Result, err error) {
 	mc := o.(*v1alpha1.Memcached)
 	deploymentList := &appv1.DeploymentList{}
 	read = controller.NewBasicMultiPhaseRead()
@@ -457,14 +466,14 @@ func (r *DeploymentReconciler) Read(ctx context.Context, o object.MultiPhaseObje
 	if err != nil {
 		return read, res, errors.Wrap(err, "Error when generate label selector")
 	}
-	if err = r.client.List(ctx, deploymentList, &client.ListOptions{Namespace: o.GetNamespace(), LabelSelector: labelSelectors}); err != nil {
+	if err = r.Client.List(ctx, deploymentList, &client.ListOptions{Namespace: o.GetNamespace(), LabelSelector: labelSelectors}); err != nil {
 		return read, res, errors.Wrapf(err, "Error when read deployments")
 	}
 
 	read.SetCurrentObjects(helper.ToSliceOfObject(deploymentList.Items))
 
 	// Generate expected configmaps
-	expectedDeployments, err := NewDeploymentsBuilder(mc)
+	expectedDeployments, err := newDeploymentsBuilder(mc)
 	if err != nil {
 		return read, res, errors.Wrap(err, "Error when generate expected deployments")
 	}
@@ -477,13 +486,13 @@ func (r *DeploymentReconciler) Read(ctx context.Context, o object.MultiPhaseObje
 
 Some explains:
 - The struct `DeploymentReconciler` need to implement the interface  `controller.MultiPhaseStepReconcilerAction`
-- We create constructor to construct this step reconciler `NewDeploymentReconciler`. It will call from the main reconciler.
+- We create constructor to construct this step reconciler `newDeploymentReconciler`. It will call from the main reconciler.
 - We use the standard step reconciler `controller.NewBasicMultiPhaseStepReconcilerAction()`.
 - We implement the methode `Read(ctx context.Context, o object.MultiPhaseObject, data map[string]any) (read controller.MultiPhaseRead, res ctrl.Result, err error)`. First, we read existing deployments on K8s, then we generate expected deployments.
 
 ### Implement the main reconciler
 
-The goal of this reconciler is to get the object that wake up operator, maintain some standard status and call each step reconciler.
+The goal of this reconciler is to get the object that wake up operator, maintain some standard status and call each step to reconcile resources.
 
 It need to implement the `controller.MultiPhaseReconcilerAction` and `controller.MultiPhaseReconciler` interface. You can use standard MultiPhaseReconciler constructor.
 
@@ -512,34 +521,30 @@ import (
 
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/disaster37/operator-sdk-extra/pkg/apis/shared"
 	"github.com/disaster37/operator-sdk-extra/pkg/controller"
 	cachecrd "github.com/disaster37/operator-sdk-extra/testdata/memcached-operator/api/v1alpha1"
 	"github.com/sirupsen/logrus"
 )
 
-const (
-	MemcachedCondition shared.ConditionName = "MemcachedReady"
-)
-
 // MemcachedReconciler reconciles a Memcached object
 type MemcachedReconciler struct {
+	controller.Controller
 	controller.MultiPhaseReconcilerAction
 	controller.MultiPhaseReconciler
-	BaseReconciler
+	controller.BaseReconciler
 }
 
-func NewMemcachedReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder, scheme *runtime.Scheme) (multiPhaseReconciler *MemcachedReconciler) {
+func NewMemcachedReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseReconciler controller.Controller) {
 
 	return &MemcachedReconciler{
+		Controller: controller.NewBasicController(),
 		MultiPhaseReconcilerAction: controller.NewBasicMultiPhaseReconcilerAction(
 			client,
-			MemcachedCondition,
+			controller.ReadyCondition,
 			logger,
 			recorder,
 		),
@@ -549,12 +554,11 @@ func NewMemcachedReconciler(client client.Client, logger *logrus.Entry, recorder
 			"memcached.cache.example.com/finalizer",
 			logger,
 			recorder,
-			scheme,
 		),
-		BaseReconciler: BaseReconciler{
-			client:   client,
-			recorder: recorder,
-			logger:   logger,
+		BaseReconciler: controller.BaseReconciler{
+			Client:   client,
+			Recorder: recorder,
+			Log:      logger,
 		},
 	}
 }
@@ -586,15 +590,15 @@ func (r *MemcachedReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		mc,
 		data,
 		r,
-		NewConfigMapReconciler(
-			r.client,
-			r.logger,
-			r.recorder,
+		newConfigMapReconciler(
+			r.Client,
+			r.Log,
+			r.Recorder,
 		),
-		NewDeploymentReconciler(
-			r.client,
-			r.logger,
-			r.recorder,
+		newDeploymentReconciler(
+			r.Client,
+			r.Log,
+			r.Recorder,
 		),
 	)
 
@@ -608,6 +612,7 @@ func (r *MemcachedReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.ConfigMap{}).
 		Complete(r)
 }
+
 
 ```
 
@@ -725,7 +730,6 @@ func main() {
 		mgr.GetClient(),
 		logrus.NewEntry(log),
 		mgr.GetEventRecorderFor("memcached-controller"),
-		scheme,
 	)
 	if err = memcachedReconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Memcached")

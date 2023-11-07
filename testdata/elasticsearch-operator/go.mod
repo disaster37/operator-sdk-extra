@@ -1,14 +1,17 @@
-module github.com/disaster37/operator-sdk-extra/testdata/memcached-operator
+module github.com/disaster37/operator-sdk-extra/testdata/elasticsearch-operator
 
 go 1.19
 
 require (
 	emperror.dev/errors v0.8.1
-	github.com/disaster37/k8s-objectmatcher v1.8.2
-	github.com/disaster37/operator-sdk-extra v0.1.3-0.20231107132719-b3884284ad9d
+	github.com/disaster37/es-handler/v8 v8.1.4
+	github.com/disaster37/generic-objectmatcher v1.0.2
+	github.com/disaster37/operator-sdk-extra v0.1.3-0.20231020093826-828ae11bdbc6
+	github.com/elastic/elastic-transport-go/v8 v8.3.0
+	github.com/elastic/go-elasticsearch/v8 v8.9.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.8.4
-	github.com/thoas/go-funk v0.9.3
+	go.uber.org/mock v0.3.0
 	k8s.io/api v0.28.2
 	k8s.io/apimachinery v0.28.2
 	k8s.io/client-go v0.28.2
@@ -20,7 +23,8 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/disaster37/generic-objectmatcher v1.0.2 // indirect
+	github.com/disaster37/k8s-objectmatcher v1.8.2 // indirect
+	github.com/elastic/go-ucfg v0.8.6 // indirect
 	github.com/emicklei/go-restful/v3 v3.9.0 // indirect
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
@@ -50,6 +54,7 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
+	github.com/olivere/elastic/v7 v7.0.32 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.16.0 // indirect
