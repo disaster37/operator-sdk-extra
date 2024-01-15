@@ -9,20 +9,20 @@ import (
 )
 
 type MockMultiPhaseReconcilerAction struct {
-	reconciler          controller.MultiPhaseReconcilerAction
-	isFinishedReconcile bool
+	reconciler controller.MultiPhaseReconcilerAction
+	MockBase
 }
 
 func NewMockMultiPhaseReconcilerAction(reconciler controller.MultiPhaseReconcilerAction) controller.MultiPhaseReconcilerAction {
 	return &MockMultiPhaseReconcilerAction{
-		reconciler:          reconciler,
-		isFinishedReconcile: false,
+		reconciler: reconciler,
+		MockBase:   NewMockDefault(),
 	}
 }
 
 // Configure permit to init condition on status
 func (h *MockMultiPhaseReconcilerAction) Configure(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject) (res ctrl.Result, err error) {
-	h.isFinishedReconcile = false
+	h.MockBase.StartReconcile()
 	return h.reconciler.Configure(ctx, req, o)
 }
 
@@ -40,7 +40,7 @@ func (h *MockMultiPhaseReconcilerAction) Delete(ctx context.Context, o object.Mu
 // It the right way to set status condition when error
 func (h *MockMultiPhaseReconcilerAction) OnError(ctx context.Context, o object.MultiPhaseObject, data map[string]any, currentErr error) (res ctrl.Result, err error) {
 	res, err = h.reconciler.OnError(ctx, o, data, currentErr)
-	h.isFinishedReconcile = true
+	h.MockBase.FinishReconcile()
 	return res, err
 }
 
@@ -48,10 +48,6 @@ func (h *MockMultiPhaseReconcilerAction) OnError(ctx context.Context, o object.M
 // It's the right way to set status condition when everithink is good
 func (h *MockMultiPhaseReconcilerAction) OnSuccess(ctx context.Context, o object.MultiPhaseObject, data map[string]any) (res ctrl.Result, err error) {
 	res, err = h.reconciler.OnSuccess(ctx, o, data)
-	h.isFinishedReconcile = true
+	h.MockBase.FinishReconcile()
 	return res, err
-}
-
-func (h *MockMultiPhaseReconcilerAction) IsFinishedReconcile() bool {
-	return h.isFinishedReconcile
 }
