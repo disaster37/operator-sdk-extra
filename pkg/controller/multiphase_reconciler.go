@@ -177,6 +177,8 @@ func (h *BasicMultiPhaseReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		if res != (ctrl.Result{}) {
 			return res, nil
 		}
+
+		time.Sleep(time.Millisecond * 1)
 	}
 
 	res, err = reconcilerAction.OnSuccess(ctx, o, data)
@@ -184,6 +186,7 @@ func (h *BasicMultiPhaseReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		h.Log.Errorf("Error when call 'onSuccess' from reconciler: %s", err.Error())
 		return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, ErrWhenCallOnSuccessFromReconciler.Error()))
 	}
+	h.Log.Debug("Call 'onSuccess' from reconciler")
 
 	return res, nil
 }
