@@ -1,5 +1,7 @@
 package mock
 
+import "github.com/sirupsen/logrus"
+
 type MockBase interface {
 	IsFinishedReconcile() bool
 	StartReconcile()
@@ -21,9 +23,11 @@ func (h *MockBaseDefault) IsFinishedReconcile() bool {
 }
 
 func (h *MockBaseDefault) StartReconcile() {
+	logrus.Debug("call StartReconcile")
 	h.isFinishedReconcile = false
 }
 
 func (h *MockBaseDefault) FinishReconcile() {
+	logrus.Debug("call FinishReconcile")
 	h.isFinishedReconcile = true
 }
