@@ -34,6 +34,7 @@ type TestStep struct {
 func NewTestCase(m mock.MockBase, t *testing.T, c client.Client, key types.NamespacedName, o client.Object, wait time.Duration, data map[string]any) *TestCase {
 	return &TestCase{
 		t:       t,
+		m:       m,
 		client:  c,
 		object:  o,
 		wait:    wait,
