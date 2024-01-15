@@ -19,6 +19,10 @@ type BasicObjectStatus struct {
 	// LastErrorMessage is the current error message
 	// +operator-sdk:csv:customresourcedefinitions:type=status
 	LastErrorMessage string `json:"lastErrorMessage,omitempty"`
+
+	// observedGeneration is the current generation applied
+	// +operator-sdk:csv:customresourcedefinitions:type=status
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
 func (h *BasicObjectStatus) GetConditions() []metav1.Condition {
@@ -47,4 +51,12 @@ func (h *BasicObjectStatus) GetLastErrorMessage() string {
 
 func (h *BasicObjectStatus) SetLastErrorMessage(message string) {
 	h.LastErrorMessage = message
+}
+
+func (h *BasicObjectStatus) GetObservedGeneration() int64 {
+	return h.ObservedGeneration
+}
+
+func (h *BasicObjectStatus) SetObservedGeneration(version int64) {
+	h.ObservedGeneration = version
 }

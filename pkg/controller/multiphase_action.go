@@ -93,6 +93,7 @@ func (h *BasicMultiPhaseReconcilerAction) OnError(ctx context.Context, o object.
 
 	o.GetStatus().SetIsOnError(true)
 	o.GetStatus().SetLastErrorMessage(strings.ShortenString(err.Error(), ShortenError))
+	
 
 	conditions := o.GetStatus().GetConditions()
 	condition.SetStatusCondition(&conditions, metav1.Condition{
@@ -120,6 +121,7 @@ func (h *BasicMultiPhaseReconcilerAction) OnSuccess(ctx context.Context, o objec
 
 	o.GetStatus().SetPhaseName(RunningPhase)
 	o.GetStatus().SetIsOnError(false)
+	o.GetStatus().SetObservedGeneration(o.GetGeneration())
 
 	return res, nil
 }

@@ -24,4 +24,10 @@ type ObjectStatus interface {
 
 	// SetLastErrorMessage permit to set the current error
 	SetLastErrorMessage(message string)
+
+	// GetObservedGeneration permit to know the current generation applied
+	GetObservedGeneration() int64
+
+	// SetObservedGeneration permit to set the current generation applied
+	SetObservedGeneration(version int64)
 }
