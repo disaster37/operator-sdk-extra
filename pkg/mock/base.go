@@ -1,6 +1,8 @@
 package mock
 
-import "github.com/sirupsen/logrus"
+import (
+	"github.com/sirupsen/logrus"
+)
 
 type MockBase interface {
 	IsFinishedReconcile() bool

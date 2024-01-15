@@ -24,4 +24,10 @@ type ObjectStatus interface {
 
 	// SetLastErrorMessage permit to set the current error
 	SetLastErrorMessage(message string)
+
+	// GetCurrentVersion permit to know the current version applied
+	GetCurrentVersion() string
+
+	// SetCurrentVersion permit to set the current version applied
+	SetCurrentVersion(version string)
 }
