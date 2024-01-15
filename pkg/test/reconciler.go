@@ -73,6 +73,7 @@ func (h *TestCase) Run() {
 		if err = h.client.Get(context.Background(), h.key, o); err != nil {
 			o = nil
 		}
+		h.m.StartReconcile()
 		if err = step.Do(h.client, h.key, o, h.data); err != nil {
 			h.t.Fatal(err)
 		}

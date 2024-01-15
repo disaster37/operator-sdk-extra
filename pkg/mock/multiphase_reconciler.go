@@ -22,7 +22,6 @@ func NewMockMultiPhaseReconcilerAction(reconciler controller.MultiPhaseReconcile
 
 // Configure permit to init condition on status
 func (h *MockMultiPhaseReconcilerAction) Configure(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject) (res ctrl.Result, err error) {
-	h.MockBase.StartReconcile()
 	return h.reconciler.Configure(ctx, req, o)
 }
 
