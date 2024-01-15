@@ -120,7 +120,6 @@ func (h *BasicMultiPhaseReconcilerAction) OnSuccess(ctx context.Context, o objec
 
 	o.GetStatus().SetPhaseName(RunningPhase)
 	o.GetStatus().SetIsOnError(false)
-	o.GetStatus().SetCurrentVersion(o.GetResourceVersion())
 
 	return res, nil
 }
