@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/disaster37/operator-sdk-extra/pkg/mock"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -20,7 +19,6 @@ type TestCase struct {
 	object client.Object
 	data   map[string]any
 	t      *testing.T
-	m      mock.MockBase
 	client client.Client
 }
 
@@ -31,10 +29,9 @@ type TestStep struct {
 	Check func(t *testing.T, c client.Client, key types.NamespacedName, o client.Object, data map[string]any) error
 }
 
-func NewTestCase(m mock.MockBase, t *testing.T, c client.Client, key types.NamespacedName, o client.Object, wait time.Duration, data map[string]any) *TestCase {
+func NewTestCase(t *testing.T, c client.Client, key types.NamespacedName, o client.Object, wait time.Duration, data map[string]any) *TestCase {
 	return &TestCase{
 		t:       t,
-		m:       m,
 		client:  c,
 		object:  o,
 		wait:    wait,

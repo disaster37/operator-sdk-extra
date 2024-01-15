@@ -10,13 +10,11 @@ import (
 
 type MockMultiPhaseReconcilerAction struct {
 	reconciler controller.MultiPhaseReconcilerAction
-	MockBase
 }
 
 func NewMockMultiPhaseReconcilerAction(reconciler controller.MultiPhaseReconcilerAction) controller.MultiPhaseReconcilerAction {
 	return &MockMultiPhaseReconcilerAction{
 		reconciler: reconciler,
-		MockBase:   NewMockDefault(),
 	}
 }
 
@@ -38,13 +36,11 @@ func (h *MockMultiPhaseReconcilerAction) Delete(ctx context.Context, o object.Mu
 // OnError is call when error is throwing on current phase
 // It the right way to set status condition when error
 func (h *MockMultiPhaseReconcilerAction) OnError(ctx context.Context, o object.MultiPhaseObject, data map[string]any, currentErr error) (res ctrl.Result, err error) {
-	defer h.MockBase.FinishReconcile()
 	return h.reconciler.OnError(ctx, o, data, currentErr)
 }
 
 // OnSuccess is call at the end of current phase, if not error
 // It's the right way to set status condition when everithink is good
 func (h *MockMultiPhaseReconcilerAction) OnSuccess(ctx context.Context, o object.MultiPhaseObject, data map[string]any) (res ctrl.Result, err error) {
-	defer h.MockBase.FinishReconcile()
 	return h.reconciler.OnSuccess(ctx, o, data)
 }
