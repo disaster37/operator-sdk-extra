@@ -28,7 +28,7 @@ type TestStep struct {
 	Name  string
 	Pre   func(c client.Client, data map[string]any) error
 	Do    func(c client.Client, key types.NamespacedName, o client.Object, data map[string]any) error
-	Check func(m mock.MockBase, t *testing.T, c client.Client, key types.NamespacedName, o client.Object, data map[string]any) error
+	Check func(t *testing.T, c client.Client, key types.NamespacedName, o client.Object, data map[string]any) error
 }
 
 func NewTestCase(m mock.MockBase, t *testing.T, c client.Client, key types.NamespacedName, o client.Object, wait time.Duration, data map[string]any) *TestCase {
@@ -73,7 +73,7 @@ func (h *TestCase) Run() {
 		if err = h.client.Get(context.Background(), h.key, o); err != nil {
 			o = nil
 		}
-		h.m.StartReconcile()
+
 		if err = step.Do(h.client, h.key, o, h.data); err != nil {
 			h.t.Fatal(err)
 		}
@@ -82,7 +82,7 @@ func (h *TestCase) Run() {
 		if err = h.client.Get(context.Background(), h.key, o); err != nil {
 			o = nil
 		}
-		if err = step.Check(h.m, h.t, h.client, h.key, o, h.data); err != nil {
+		if err = step.Check(h.t, h.client, h.key, o, h.data); err != nil {
 			h.t.Fatal(err)
 		}
 		time.Sleep(h.wait)

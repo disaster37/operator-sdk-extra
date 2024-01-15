@@ -38,15 +38,13 @@ func (h *MockMultiPhaseReconcilerAction) Delete(ctx context.Context, o object.Mu
 // OnError is call when error is throwing on current phase
 // It the right way to set status condition when error
 func (h *MockMultiPhaseReconcilerAction) OnError(ctx context.Context, o object.MultiPhaseObject, data map[string]any, currentErr error) (res ctrl.Result, err error) {
-	res, err = h.reconciler.OnError(ctx, o, data, currentErr)
-	h.MockBase.FinishReconcile()
-	return res, err
+	defer h.MockBase.FinishReconcile()
+	return h.reconciler.OnError(ctx, o, data, currentErr)
 }
 
 // OnSuccess is call at the end of current phase, if not error
 // It's the right way to set status condition when everithink is good
 func (h *MockMultiPhaseReconcilerAction) OnSuccess(ctx context.Context, o object.MultiPhaseObject, data map[string]any) (res ctrl.Result, err error) {
-	res, err = h.reconciler.OnSuccess(ctx, o, data)
-	h.MockBase.FinishReconcile()
-	return res, err
+	defer h.MockBase.FinishReconcile()
+	return h.reconciler.OnSuccess(ctx, o, data)
 }
