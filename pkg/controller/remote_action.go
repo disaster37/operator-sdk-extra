@@ -205,6 +205,7 @@ func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) OnSuccess
 
 	o.GetStatus().SetIsOnError(false)
 	o.GetStatus().SetIsSync(true)
+	o.GetStatus().SetObservedGeneration(o.GetGeneration())
 
 	return res, nil
 }
