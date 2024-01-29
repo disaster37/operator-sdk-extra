@@ -10,6 +10,8 @@ import (
 
 func GetZapLogLevelFromEnv() zapcore.Level {
 	switch logLevel, _ := os.LookupEnv("LOG_LEVEL"); strings.ToLower(logLevel) {
+	case "trace":
+		return zapcore.DebugLevel
 	case zapcore.DebugLevel.String():
 		return zapcore.DebugLevel
 	case zapcore.InfoLevel.String():
@@ -37,6 +39,8 @@ func GetZapFormatterFromDev() zapcore.Encoder {
 
 func GetLogrusLogLevelFromEnv() logrus.Level {
 	switch logLevel, _ := os.LookupEnv("LOG_LEVEL"); strings.ToLower(logLevel) {
+	case logrus.TraceLevel.String():
+		return logrus.TraceLevel
 	case logrus.DebugLevel.String():
 		return logrus.DebugLevel
 	case logrus.InfoLevel.String():
