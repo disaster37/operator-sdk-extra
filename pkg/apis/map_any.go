@@ -18,7 +18,7 @@ func (ma MapAny) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements the Unmarshaler interface.
 func (ma *MapAny) UnmarshalJSON(data []byte) error {
-	d := map[string]interface{}
+	d := map[string]any{}
 	err := json.Unmarshal(data, &d)
 	if err != nil {
 		return err
@@ -28,15 +28,15 @@ func (ma *MapAny) UnmarshalJSON(data []byte) error {
 }
 
 // DeepCopyInto is needed by controller
-func (ma *MapAny) DeepCopyInto(mapCopy *MapAny) {
+func (ma *MapAny) DeepCopyInto(maCopy *MapAny) {
 	bytes, err := json.Marshal(ma.Data)
 	if err != nil {
 		panic(err)
 	}
-	clone := &map[string]interface{}
+	clone := &map[string]any{}
 	err = json.Unmarshal(bytes, clone)
 	if err != nil {
 		panic(err)
 	}
-	maCopy.Data = clone
+	maCopy.Data = *clone
 }
