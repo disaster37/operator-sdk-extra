@@ -92,7 +92,7 @@ func (h *BasicMultiPhaseReconcilerAction) Delete(ctx context.Context, o object.M
 func (h *BasicMultiPhaseReconcilerAction) OnError(ctx context.Context, o object.MultiPhaseObject, data map[string]any, currentErr error) (res ctrl.Result, err error) {
 
 	o.GetStatus().SetIsOnError(true)
-	o.GetStatus().SetLastErrorMessage(strings.ShortenString(err.Error(), ShortenError))
+	o.GetStatus().SetLastErrorMessage(strings.ShortenString(currentErr.Error(), ShortenError))
 	
 
 	conditions := o.GetStatus().GetConditions()
