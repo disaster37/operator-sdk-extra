@@ -119,6 +119,12 @@ func (h *BasicRemoteReconciler[k8sObject, apiObject, apiClient]) Reconcile(ctx c
 		}()
 	}
 
+	// Ignore if needed by annotation
+	if o.GetAnnotations()[fmt.Sprintf("%s/ignoreReconcile", BaseAnnotation)] == "true" {
+		h.Log.Info("Found annotation on ressource to ignore reconcile")
+		return res, nil
+	}
+
 	// Get the remote handler
 	handler, res, err = reconciler.GetRemoteHandler(ctx, req, o)
 	if err != nil {
@@ -127,6 +133,17 @@ func (h *BasicRemoteReconciler[k8sObject, apiObject, apiClient]) Reconcile(ctx c
 	}
 	h.Log.Debug("Call 'getRemoteHandler' from reconciler successfully")
 	if res != (ctrl.Result{}) {
+		return res, nil
+	}
+	if handler == nil && !o.GetDeletionTimestamp().IsZero() {
+		// Delete finalizer to finish to destroy current resource
+		controllerutil.RemoveFinalizer(o, h.finalizer.String())
+		if err = h.Update(ctx, o); err != nil {
+			h.Log.Errorf("Failed to remove finalizer: %s", err.Error())
+			return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, ErrWhenDeleteFinalizer.Error()))
+		}
+		h.Log.Debug("Remove finalizer successfully")
+		
 		return res, nil
 	}
 
@@ -169,12 +186,6 @@ func (h *BasicRemoteReconciler[k8sObject, apiObject, apiClient]) Reconcile(ctx c
 			h.Log.Debug("Remove finalizer successfully")
 		}
 		return ctrl.Result{}, nil
-	}
-
-	// Ignore if needed by annotation
-	if o.GetAnnotations()[fmt.Sprintf("%s/ignoreReconcile", BaseAnnotation)] == "true" {
-		h.Log.Info("Found annotation on ressource to ignore reconcile")
-		return res, nil
 	}
 
 	// Check if diff exist
