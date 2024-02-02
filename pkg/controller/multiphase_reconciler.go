@@ -115,6 +115,12 @@ func (h *BasicMultiPhaseReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}()
 	}
 
+	// Ignore if needed by annotation
+	if o.GetAnnotations()[fmt.Sprintf("%s/ignoreReconcile", BaseAnnotation)] == "true" {
+		h.Log.Info("Found annotation on ressource to ignore reconcile")
+		return res, nil
+	}
+
 	// Configure to optional get driver client (call meta)
 	res, err = reconcilerAction.Configure(ctx, req, o)
 	if err != nil {
@@ -156,11 +162,6 @@ func (h *BasicMultiPhaseReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, nil
 	}
 
-	// Ignore if needed by annotation
-	if o.GetAnnotations()[fmt.Sprintf("%s/ignoreReconcile", BaseAnnotation)] == "true" {
-		h.Log.Info("Found annotation on ressource to ignore reconcile")
-		return res, nil
-	}
 
 	// Call step resonsilers
 	for _, reconciler := range reconcilersStepAction {
