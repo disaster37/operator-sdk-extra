@@ -93,18 +93,17 @@ func (h *BasicMultiPhaseReconcilerAction) OnError(ctx context.Context, o object.
 
 	o.GetStatus().SetIsOnError(true)
 	o.GetStatus().SetLastErrorMessage(strings.ShortenString(currentErr.Error(), ShortenError))
-	
 
 	conditions := o.GetStatus().GetConditions()
 	condition.SetStatusCondition(&conditions, metav1.Condition{
 		Type:    h.conditionName.String(),
 		Status:  metav1.ConditionFalse,
 		Reason:  "Failed",
-		Message: strings.ShortenString(err.Error(), ShortenError),
+		Message: strings.ShortenString(currentErr.Error(), ShortenError),
 	})
 	o.GetStatus().SetConditions(conditions)
 
-	return res, errors.Wrap(err, "Error on reconciler")
+	return res, errors.Wrap(currentErr, "Error on reconciler")
 }
 
 func (h *BasicMultiPhaseReconcilerAction) OnSuccess(ctx context.Context, o object.MultiPhaseObject, data map[string]any) (res ctrl.Result, err error) {
