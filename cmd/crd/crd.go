@@ -60,7 +60,7 @@ func CleanCrd(c *cli.Context) error {
 
 func recursiveCleanCrd(item apiv1.JSONSchemaProps) apiv1.JSONSchemaProps {
 	if strings.Contains(item.Description, "@clean") {
-		item.Description = strings.Replace(item.Description, "@clean", "", 0)
+		item.Description = strings.Replace(item.Description, "@clean", "", -1)
 		item.Properties = nil
 		item.XPreserveUnknownFields = ptr.To[bool](true)
 
