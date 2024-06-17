@@ -20,8 +20,6 @@ func CleanCrd(c *cli.Context) error {
 		log.Fatal(err)
 	}
 
-	log.Infof("Found %d CRD files", len(fileMatches))
-
 	for _, file := range fileMatches {
 
 		logrus.Infof("Start to process file %s", file)
