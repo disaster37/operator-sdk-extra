@@ -35,16 +35,14 @@ type BasicRemoteReconciler[k8sObject comparable, apiObject comparable, apiClient
 func NewBasicRemoteReconciler[k8sObject comparable, apiObject comparable, apiClient any](client client.Client, name string, finalizer shared.FinalizerName, logger *logrus.Entry, recorder record.EventRecorder) (remoteReconciler RemoteReconciler[k8sObject, apiObject, apiClient]) {
 
 	return &BasicRemoteReconciler[k8sObject, apiObject, apiClient]{
-		BasicReconciler: BasicReconciler{
-			BaseReconciler: NewDefaultBaseReconciler(
-				client,
-				recorder,
-				logger.WithFields(logrus.Fields{
-					"reconciler": name,
-				}),
-			),
-			finalizer: finalizer,
-		},
+		BasicReconciler: NewBasicReconciler(
+			client,
+			recorder,
+			finalizer,
+			logger.WithFields(logrus.Fields{
+				"reconciler": name,
+			}),
+		),
 	}
 }
 
@@ -57,12 +55,10 @@ func (h *BasicRemoteReconciler[k8sObject, apiObject, apiClient]) Reconcile(ctx c
 	)
 
 	// Init logger
-	loggerFields := logrus.Fields{
+	logger := h.BasicReconciler.logger.WithFields(logrus.Fields{
 		"name":      req.Name,
 		"namespace": req.Namespace,
-	}
-	logger := h.Logger().WithFields(loggerFields)
-	reconciler.WithLoggerFields(loggerFields)
+	})
 
 	logger.Infof("Starting reconcile loop")
 	defer logger.Info("Finish reconcile loop")
@@ -86,7 +82,7 @@ func (h *BasicRemoteReconciler[k8sObject, apiObject, apiClient]) Reconcile(ctx c
 			controllerutil.AddFinalizer(o, h.finalizer.String())
 			if err = h.Client().Update(ctx, o); err != nil {
 				logger.Errorf("Error when add finalizer: %s", err.Error())
-				return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, ErrWhenAddFinalizer.Error()))
+				return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, ErrWhenAddFinalizer.Error()), logger)
 			}
 			logger.Debug("Add finalizer successfully, force requeue object")
 			return ctrl.Result{Requeue: true}, nil
@@ -118,10 +114,10 @@ func (h *BasicRemoteReconciler[k8sObject, apiObject, apiClient]) Reconcile(ctx c
 	}
 
 	// Get the remote handler
-	handler, res, err = reconciler.GetRemoteHandler(ctx, req, o)
+	handler, res, err = reconciler.GetRemoteHandler(ctx, req, o, logger)
 	if err != nil {
 		logger.Errorf("Error when call 'getRemoteHandler' from reconciler: %s", err.Error())
-		return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, ErrWhenCallConfigureFromReconciler.Error()))
+		return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, ErrWhenCallConfigureFromReconciler.Error()), logger)
 	}
 	logger.Debug("Call 'getRemoteHandler' from reconciler successfully")
 	if res != (ctrl.Result{}) {
@@ -132,7 +128,7 @@ func (h *BasicRemoteReconciler[k8sObject, apiObject, apiClient]) Reconcile(ctx c
 		controllerutil.RemoveFinalizer(o, h.finalizer.String())
 		if err = h.Client().Update(ctx, o); err != nil {
 			logger.Errorf("Failed to remove finalizer: %s", err.Error())
-			return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, ErrWhenDeleteFinalizer.Error()))
+			return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, ErrWhenDeleteFinalizer.Error()), logger)
 		}
 		logger.Debug("Remove finalizer successfully")
 
@@ -140,10 +136,10 @@ func (h *BasicRemoteReconciler[k8sObject, apiObject, apiClient]) Reconcile(ctx c
 	}
 
 	// Configure resource
-	res, err = reconciler.Configure(ctx, o, data, handler)
+	res, err = reconciler.Configure(ctx, o, data, handler, logger)
 	if err != nil {
 		logger.Errorf("Error when call 'configure' from reconciler: %s", err.Error())
-		return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, ErrWhenCallReadFromReconciler.Error()))
+		return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, ErrWhenCallReadFromReconciler.Error()), logger)
 	}
 	logger.Debug("Call 'configure' from reconciler successfully")
 	if res != (ctrl.Result{}) {
@@ -151,10 +147,10 @@ func (h *BasicRemoteReconciler[k8sObject, apiObject, apiClient]) Reconcile(ctx c
 	}
 
 	// Read resources
-	read, res, err = reconciler.Read(ctx, o, data, handler)
+	read, res, err = reconciler.Read(ctx, o, data, handler, logger)
 	if err != nil {
 		logger.Errorf("Error when call 'read' from reconciler: %s", err.Error())
-		return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, ErrWhenCallReadFromReconciler.Error()))
+		return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, ErrWhenCallReadFromReconciler.Error()), logger)
 	}
 	logger.Debug("Call 'read' from reconciler successfully")
 	if res != (ctrl.Result{}) {
@@ -164,16 +160,16 @@ func (h *BasicRemoteReconciler[k8sObject, apiObject, apiClient]) Reconcile(ctx c
 	// Handle delete finalizer
 	if !getObjectMeta(o).DeletionTimestamp.IsZero() {
 		if h.finalizer.String() != "" && controllerutil.ContainsFinalizer(o, h.finalizer.String()) {
-			if err = reconciler.Delete(ctx, o, data, handler); err != nil {
+			if err = reconciler.Delete(ctx, o, data, handler, logger); err != nil {
 				logger.Errorf("Error when call 'delete' from reconciler: %s", err.Error())
-				return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, ErrWhenCallDeleteFromReconciler.Error()))
+				return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, ErrWhenCallDeleteFromReconciler.Error()), logger)
 			}
 			logger.Debug("Call 'delete' from reconciler successfully")
 
 			controllerutil.RemoveFinalizer(o, h.finalizer.String())
 			if err = h.Client().Update(ctx, o); err != nil {
 				logger.Errorf("Failed to remove finalizer: %s", err.Error())
-				return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, ErrWhenDeleteFinalizer.Error()))
+				return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, ErrWhenDeleteFinalizer.Error()), logger)
 			}
 			logger.Debug("Remove finalizer successfully")
 		}
@@ -181,10 +177,10 @@ func (h *BasicRemoteReconciler[k8sObject, apiObject, apiClient]) Reconcile(ctx c
 	}
 
 	// Check if diff exist
-	diff, res, err = reconciler.Diff(ctx, o, read, data, handler, reconciler.GetIgnoresDiff()...)
+	diff, res, err = reconciler.Diff(ctx, o, read, data, handler, logger, reconciler.GetIgnoresDiff()...)
 	if err != nil {
 		logger.Errorf("Failed to call 'diff' from reconciler: %s", err.Error())
-		return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, ErrWhenCallDiffFromReconciler.Error()))
+		return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, ErrWhenCallDiffFromReconciler.Error()), logger)
 	}
 	logger.Debugf("Call 'diff' from reconciler successfully with diff:\n%s", diff.Diff())
 	if res != (ctrl.Result{}) {
@@ -192,10 +188,10 @@ func (h *BasicRemoteReconciler[k8sObject, apiObject, apiClient]) Reconcile(ctx c
 	}
 
 	if diff.NeedCreate() {
-		res, err = reconciler.Create(ctx, o, data, handler, diff.GetObjectToCreate())
+		res, err = reconciler.Create(ctx, o, data, handler, diff.GetObjectToCreate(), logger)
 		if err != nil {
 			logger.Errorf("Failed to call 'create' from reconciler: %s", err.Error())
-			return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, ErrWhenCallCreateFromReconciler.Error()))
+			return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, ErrWhenCallCreateFromReconciler.Error()), logger)
 		}
 		logger.Debug("Call 'create' from reconciler successfully")
 		if res != (ctrl.Result{}) {
@@ -204,10 +200,10 @@ func (h *BasicRemoteReconciler[k8sObject, apiObject, apiClient]) Reconcile(ctx c
 	}
 
 	if diff.NeedUpdate() {
-		res, err = reconciler.Update(ctx, o, data, handler, diff.GetObjectToUpdate())
+		res, err = reconciler.Update(ctx, o, data, handler, diff.GetObjectToUpdate(), logger)
 		if err != nil {
 			logger.Errorf("Failed to call 'update' from reconciler: %s", err.Error())
-			return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, ErrWhenCallUpdateFromReconciler.Error()))
+			return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, ErrWhenCallUpdateFromReconciler.Error()), logger)
 		}
 		logger.Debug("Call 'update' from reconciler successfully")
 		if res != (ctrl.Result{}) {
@@ -215,10 +211,10 @@ func (h *BasicRemoteReconciler[k8sObject, apiObject, apiClient]) Reconcile(ctx c
 		}
 	}
 
-	res, err = reconciler.OnSuccess(ctx, o, data, handler, diff)
+	res, err = reconciler.OnSuccess(ctx, o, data, handler, diff, logger)
 	if err != nil {
 		logger.Errorf("Error when call 'onSuccess' from reconciler: %s", err.Error())
-		return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, ErrWhenCallOnSuccessFromReconciler.Error()))
+		return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, ErrWhenCallOnSuccessFromReconciler.Error()), logger)
 	}
 	logger.Debug("Call 'onSuccess' from reconciler successfully")
 

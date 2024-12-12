@@ -19,41 +19,42 @@ import (
 )
 
 // RemoteReconcilerAction is the interface that use by reconciler remote to reconcile your remote resource
+// Put logger param on each function, permit to set contextual fields like namespace and object name, object type
 type RemoteReconcilerAction[k8sObject comparable, apiObject comparable, apiClient any] interface {
 	BaseReconciler
 
 	// GetRemoteHandler permit to get the handler to manage the remote resources
-	GetRemoteHandler(ctx context.Context, req ctrl.Request, o object.RemoteObject) (handler RemoteExternalReconciler[k8sObject, apiObject, apiClient], res ctrl.Result, err error)
+	GetRemoteHandler(ctx context.Context, req ctrl.Request, o object.RemoteObject, logger *logrus.Entry) (handler RemoteExternalReconciler[k8sObject, apiObject, apiClient], res ctrl.Result, err error)
 
 	// Confirgure permit to init external provider driver (API client REST)
 	// It can also permit to init condition on status
-	Configure(ctx context.Context, o object.RemoteObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject, apiClient]) (res ctrl.Result, err error)
+	Configure(ctx context.Context, o object.RemoteObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject, apiClient], logger *logrus.Entry) (res ctrl.Result, err error)
 
 	// Read permit to read the actual resource state from provider and set it on data map
-	Read(ctx context.Context, o object.RemoteObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject, apiClient]) (read RemoteRead[apiObject], res ctrl.Result, err error)
+	Read(ctx context.Context, o object.RemoteObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject, apiClient], logger *logrus.Entry) (read RemoteRead[apiObject], res ctrl.Result, err error)
 
 	// Create permit to create resource on provider
 	// It only call if diff.NeeCreated is true
-	Create(ctx context.Context, o object.RemoteObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject, apiClient], object apiObject) (res ctrl.Result, err error)
+	Create(ctx context.Context, o object.RemoteObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject, apiClient], object apiObject, logger *logrus.Entry) (res ctrl.Result, err error)
 
 	// Update permit to update resource on provider
 	// It only call if diff.NeedUpdated is true
-	Update(ctx context.Context, o object.RemoteObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject, apiClient], object apiObject) (res ctrl.Result, err error)
+	Update(ctx context.Context, o object.RemoteObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject, apiClient], object apiObject, logger *logrus.Entry) (res ctrl.Result, err error)
 
 	// Delete permit to delete resource on provider
 	// It only call if you have specified finalizer name when you create reconciler and if resource as marked to be deleted
-	Delete(ctx context.Context, o object.RemoteObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject, apiClient]) (err error)
+	Delete(ctx context.Context, o object.RemoteObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject, apiClient], logger *logrus.Entry) (err error)
 
 	// OnError is call when error is throwing
 	// It the right way to set status condition when error
-	OnError(ctx context.Context, o object.RemoteObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject, apiClient], currentErr error) (res ctrl.Result, err error)
+	OnError(ctx context.Context, o object.RemoteObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject, apiClient], currentErr error, logger *logrus.Entry) (res ctrl.Result, err error)
 
 	// OnSuccess is call at the end if no error
 	// It's the right way to set status condition when everithink is good
-	OnSuccess(ctx context.Context, o object.RemoteObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject, apiClient], diff RemoteDiff[apiObject]) (res ctrl.Result, err error)
+	OnSuccess(ctx context.Context, o object.RemoteObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject, apiClient], diff RemoteDiff[apiObject], logger *logrus.Entry) (res ctrl.Result, err error)
 
 	// Diff permit to compare the actual state and the expected state
-	Diff(ctx context.Context, o object.RemoteObject, read RemoteRead[apiObject], data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject, apiClient], ignoreDiff ...patch.CalculateOption) (diff RemoteDiff[apiObject], res ctrl.Result, err error)
+	Diff(ctx context.Context, o object.RemoteObject, read RemoteRead[apiObject], data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject, apiClient], logger *logrus.Entry, ignoreDiff ...patch.CalculateOption) (diff RemoteDiff[apiObject], res ctrl.Result, err error)
 
 	GetIgnoresDiff() []patch.CalculateOption
 }
@@ -64,20 +65,17 @@ type BasicRemoteReconcilerAction[k8sObject comparable, apiObject comparable, api
 }
 
 // NewRemoteReconcilerAction is the basic constructor of RemoteReconcilerAction interface
-func NewRemoteReconcilerAction[k8sObject comparable, apiObject comparable, apiClient any](client client.Client, logger *logrus.Entry, recorder record.EventRecorder) (remoteReconciler RemoteReconcilerAction[k8sObject, apiObject, apiClient]) {
+func NewRemoteReconcilerAction[k8sObject comparable, apiObject comparable, apiClient any](client client.Client, recorder record.EventRecorder) (remoteReconciler RemoteReconcilerAction[k8sObject, apiObject, apiClient]) {
 	return &BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]{
-		BasicReconcilerAction: BasicReconcilerAction{
-			BaseReconciler: NewDefaultBaseReconciler(client, recorder, logger),
-			conditionName:  ReadyCondition,
-		},
+		BasicReconcilerAction: NewBasicReconcilerAction(client, recorder, ReadyCondition),
 	}
 }
 
-func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) GetRemoteHandler(ctx context.Context, req ctrl.Request, o object.RemoteObject) (handler RemoteExternalReconciler[k8sObject, apiObject, apiClient], res ctrl.Result, err error) {
+func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) GetRemoteHandler(ctx context.Context, req ctrl.Request, o object.RemoteObject, logger *logrus.Entry) (handler RemoteExternalReconciler[k8sObject, apiObject, apiClient], res ctrl.Result, err error) {
 	panic("You need to implement GetRemoteHandler")
 }
 
-func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) Configure(ctx context.Context, o object.RemoteObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject, apiClient]) (res ctrl.Result, err error) {
+func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) Configure(ctx context.Context, o object.RemoteObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject, apiClient], logger *logrus.Entry) (res ctrl.Result, err error) {
 	conditions := o.GetStatus().GetConditions()
 
 	// Init condition
@@ -92,7 +90,7 @@ func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) Configure
 	return res, nil
 }
 
-func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) Read(ctx context.Context, o object.RemoteObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject, apiClient]) (read RemoteRead[apiObject], res ctrl.Result, err error) {
+func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) Read(ctx context.Context, o object.RemoteObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject, apiClient], logger *logrus.Entry) (read RemoteRead[apiObject], res ctrl.Result, err error) {
 	read = NewBasicRemoteRead[apiObject]()
 
 	// Read current object
@@ -112,7 +110,7 @@ func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) Read(ctx 
 	return read, res, nil
 }
 
-func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) Create(ctx context.Context, o object.RemoteObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject, apiClient], object apiObject) (res ctrl.Result, err error) {
+func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) Create(ctx context.Context, o object.RemoteObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject, apiClient], object apiObject, logger *logrus.Entry) (res ctrl.Result, err error) {
 
 	if err = handler.Create(object, o.(k8sObject)); err != nil {
 		return res, errors.Wrapf(err, "Error when create %s on remote target", o.GetName())
@@ -124,7 +122,7 @@ func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) Create(ct
 	}
 	o.GetStatus().SetLastAppliedConfiguration(zip)
 
-	h.Logger().Debugf("Create object '%s' successfully on remote target", o.GetName())
+	logger.Debugf("Create object '%s' successfully on remote target", o.GetName())
 	h.Recorder().Eventf(o, corev1.EventTypeNormal, "CreateCompleted", "Object '%s' successfully created on remote target", o.GetName())
 
 	return res, nil
@@ -132,7 +130,7 @@ func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) Create(ct
 
 // Update can be call on your own version
 // It only add some log / events
-func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) Update(ctx context.Context, o object.RemoteObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject, apiClient], object apiObject) (res ctrl.Result, err error) {
+func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) Update(ctx context.Context, o object.RemoteObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject, apiClient], object apiObject, logger *logrus.Entry) (res ctrl.Result, err error) {
 
 	if err = handler.Update(object, o.(k8sObject)); err != nil {
 		return res, errors.Wrapf(err, "Error when update %s on remote target", o.GetName())
@@ -144,7 +142,7 @@ func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) Update(ct
 	}
 	o.GetStatus().SetLastAppliedConfiguration(zip)
 
-	h.Logger().Debugf("Update object '%s' successfully on remote target", o.GetName())
+	logger.Debugf("Update object '%s' successfully on remote target", o.GetName())
 	h.Recorder().Eventf(o, corev1.EventTypeNormal, "UpdateCompleted", "Object '%s' successfully updated on remote target", o.GetName())
 
 	return res, nil
@@ -152,19 +150,19 @@ func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) Update(ct
 
 // Delete can be call on your own version
 // It only add some log / events
-func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) Delete(ctx context.Context, o object.RemoteObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject, apiClient]) (err error) {
+func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) Delete(ctx context.Context, o object.RemoteObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject, apiClient], logger *logrus.Entry) (err error) {
 
 	if err = handler.Delete(o.(k8sObject)); err != nil {
 		return errors.Wrapf(err, "Error when delete %s on remote target", o.GetName())
 	}
 
-	h.Logger().Debugf("Delete object '%s' successfully on remote target", o.GetName())
+	logger.Debugf("Delete object '%s' successfully on remote target", o.GetName())
 	h.Recorder().Eventf(o, corev1.EventTypeNormal, "DeleteCompleted", "Object '%s' successfully deleted on remote target", o.GetName())
 
 	return nil
 }
 
-func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) OnError(ctx context.Context, o object.RemoteObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject, apiClient], currentErr error) (res ctrl.Result, err error) {
+func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) OnError(ctx context.Context, o object.RemoteObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject, apiClient], currentErr error, logger *logrus.Entry) (res ctrl.Result, err error) {
 
 	o.GetStatus().SetIsOnError(true)
 	o.GetStatus().SetLastErrorMessage(k8sstrings.ShortenString(currentErr.Error(), ShortenError))
@@ -184,7 +182,7 @@ func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) OnError(c
 	return res, currentErr
 }
 
-func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) OnSuccess(ctx context.Context, o object.RemoteObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject, apiClient], diff RemoteDiff[apiObject]) (res ctrl.Result, err error) {
+func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) OnSuccess(ctx context.Context, o object.RemoteObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject, apiClient], diff RemoteDiff[apiObject], logger *logrus.Entry) (res ctrl.Result, err error) {
 
 	conditions := o.GetStatus().GetConditions()
 	if !condition.IsStatusConditionPresentAndEqual(conditions, h.conditionName.String(), metav1.ConditionTrue) {
@@ -203,7 +201,7 @@ func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) OnSuccess
 	return res, nil
 }
 
-func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) Diff(ctx context.Context, o object.RemoteObject, read RemoteRead[apiObject], data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject, apiClient], ignoreDiff ...patch.CalculateOption) (diff RemoteDiff[apiObject], res ctrl.Result, err error) {
+func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) Diff(ctx context.Context, o object.RemoteObject, read RemoteRead[apiObject], data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject, apiClient], logger *logrus.Entry, ignoreDiff ...patch.CalculateOption) (diff RemoteDiff[apiObject], res ctrl.Result, err error) {
 
 	// Get the original object from status to use 3-way diff
 	var (

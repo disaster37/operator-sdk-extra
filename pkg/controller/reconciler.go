@@ -25,11 +25,6 @@ var (
 
 // BaseReconciler is the interface for all reconciler
 type BaseReconciler interface {
-	// GetLogger permit to get logger
-	Logger() *logrus.Entry
-
-	// SetLogger permit to set new logger
-	WithLoggerFields(fields logrus.Fields)
 
 	// Client get the client
 	Client() client.Client
@@ -39,12 +34,11 @@ type BaseReconciler interface {
 }
 
 type DefaultBaseReconciler struct {
-	logger   *logrus.Entry
 	client   client.Client
 	recorder record.EventRecorder
 }
 
-func NewDefaultBaseReconciler(client client.Client, recorder record.EventRecorder, logger *logrus.Entry) BaseReconciler {
+func NewBaseReconciler(client client.Client, recorder record.EventRecorder) BaseReconciler {
 
 	if recorder == nil {
 		panic("recorder can't be nil")
@@ -54,23 +48,10 @@ func NewDefaultBaseReconciler(client client.Client, recorder record.EventRecorde
 		panic("client can't be nil")
 	}
 
-	if logger == nil {
-		logger = logrus.NewEntry(logrus.New())
-	}
-
 	return &DefaultBaseReconciler{
-		logger:   logger,
 		client:   client,
 		recorder: recorder,
 	}
-}
-
-func (h *DefaultBaseReconciler) Logger() *logrus.Entry {
-	return h.logger
-}
-
-func (h *DefaultBaseReconciler) WithLoggerFields(fields logrus.Fields) {
-	h.logger = h.logger.WithFields(fields)
 }
 
 func (h *DefaultBaseReconciler) Client() client.Client {
@@ -86,10 +67,35 @@ func (h *DefaultBaseReconciler) Recorder() record.EventRecorder {
 type BasicReconciler struct {
 	BaseReconciler
 	finalizer shared.FinalizerName
+	logger    *logrus.Entry
+}
+
+func NewBasicReconciler(client client.Client, recorder record.EventRecorder, finalizer shared.FinalizerName, logger *logrus.Entry) BasicReconciler {
+	if logger == nil {
+		panic("logger can't be nil")
+	}
+
+	return BasicReconciler{
+		BaseReconciler: NewBaseReconciler(client, recorder),
+		finalizer:      finalizer,
+		logger:         logger,
+	}
 }
 
 // BasicReconcilerAction provide attribute needed by all reconciler action
 type BasicReconcilerAction struct {
 	BaseReconciler
 	conditionName shared.ConditionName
+}
+
+func NewBasicReconcilerAction(client client.Client, recorder record.EventRecorder, conditionName shared.ConditionName) BasicReconcilerAction {
+
+	if conditionName == "" {
+		panic("Contion name must be provided")
+	}
+
+	return BasicReconcilerAction{
+		BaseReconciler: NewBaseReconciler(client, recorder),
+		conditionName:  conditionName,
+	}
 }
