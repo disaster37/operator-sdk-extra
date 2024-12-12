@@ -6,7 +6,10 @@ import (
 	"github.com/disaster37/generic-objectmatcher/patch"
 	"github.com/disaster37/operator-sdk-extra/pkg/controller"
 	"github.com/disaster37/operator-sdk-extra/pkg/object"
+	"github.com/sirupsen/logrus"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type MockRemoteReconcilerAction[k8sObject comparable, apiObject comparable, apiClient any] struct {
@@ -59,4 +62,20 @@ func (h *MockRemoteReconcilerAction[k8sObject, apiObject, apiClient]) Diff(ctx c
 
 func (h *MockRemoteReconcilerAction[k8sObject, apiObject, apiClient]) GetIgnoresDiff() []patch.CalculateOption {
 	return h.reconciler.GetIgnoresDiff()
+}
+
+func (h *MockRemoteReconcilerAction[k8sObject, apiObject, apiClient]) GetLogger() *logrus.Entry {
+	return h.reconciler.GetLogger()
+}
+
+func (h *MockRemoteReconcilerAction[k8sObject, apiObject, apiClient]) WithLoggerFields(fields logrus.Fields) {
+	h.reconciler.WithLoggerFields(fields)
+}
+
+func (h *MockRemoteReconcilerAction[k8sObject, apiObject, apiClient]) Client() client.Client {
+	return h.reconciler.Client()
+}
+
+func (h *MockRemoteReconcilerAction[k8sObject, apiObject, apiClient]) Recorder() record.EventRecorder {
+	return h.reconciler.Recorder()
 }

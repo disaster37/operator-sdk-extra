@@ -20,6 +20,7 @@ import (
 
 // RemoteReconcilerAction is the interface that use by reconciler remote to reconcile your remote resource
 type RemoteReconcilerAction[k8sObject comparable, apiObject comparable, apiClient any] interface {
+	BaseReconciler
 
 	// GetRemoteHandler permit to get the handler to manage the remote resources
 	GetRemoteHandler(ctx context.Context, req ctrl.Request, o object.RemoteObject) (handler RemoteExternalReconciler[k8sObject, apiObject, apiClient], res ctrl.Result, err error)
@@ -64,18 +65,10 @@ type BasicRemoteReconcilerAction[k8sObject comparable, apiObject comparable, api
 
 // NewRemoteReconcilerAction is the basic constructor of RemoteReconcilerAction interface
 func NewRemoteReconcilerAction[k8sObject comparable, apiObject comparable, apiClient any](client client.Client, logger *logrus.Entry, recorder record.EventRecorder) (remoteReconciler RemoteReconcilerAction[k8sObject, apiObject, apiClient]) {
-	if recorder == nil {
-		panic("recorder can't be nil")
-	}
-
 	return &BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]{
 		BasicReconcilerAction: BasicReconcilerAction{
-			BaseReconciler: BaseReconciler{
-				Client:   client,
-				Log:      logger,
-				Recorder: recorder,
-			},
-			conditionName: ReadyCondition,
+			BaseReconciler: NewDefaultBaseReconciler(client, recorder, logger),
+			conditionName:  ReadyCondition,
 		},
 	}
 }
@@ -131,8 +124,8 @@ func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) Create(ct
 	}
 	o.GetStatus().SetLastAppliedConfiguration(zip)
 
-	h.Log.Debugf("Create object '%s' successfully on remote target", o.GetName())
-	h.Recorder.Eventf(o, corev1.EventTypeNormal, "CreateCompleted", "Object '%s' successfully created on remote target", o.GetName())
+	h.GetLogger().Debugf("Create object '%s' successfully on remote target", o.GetName())
+	h.Recorder().Eventf(o, corev1.EventTypeNormal, "CreateCompleted", "Object '%s' successfully created on remote target", o.GetName())
 
 	return res, nil
 }
@@ -151,8 +144,8 @@ func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) Update(ct
 	}
 	o.GetStatus().SetLastAppliedConfiguration(zip)
 
-	h.Log.Debugf("Update object '%s' successfully on remote target", o.GetName())
-	h.Recorder.Eventf(o, corev1.EventTypeNormal, "UpdateCompleted", "Object '%s' successfully updated on remote target", o.GetName())
+	h.GetLogger().Debugf("Update object '%s' successfully on remote target", o.GetName())
+	h.Recorder().Eventf(o, corev1.EventTypeNormal, "UpdateCompleted", "Object '%s' successfully updated on remote target", o.GetName())
 
 	return res, nil
 }
@@ -165,8 +158,8 @@ func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) Delete(ct
 		return errors.Wrapf(err, "Error when delete %s on remote target", o.GetName())
 	}
 
-	h.Log.Debugf("Delete object '%s' successfully on remote target", o.GetName())
-	h.Recorder.Eventf(o, corev1.EventTypeNormal, "DeleteCompleted", "Object '%s' successfully deleted on remote target", o.GetName())
+	h.GetLogger().Debugf("Delete object '%s' successfully on remote target", o.GetName())
+	h.Recorder().Eventf(o, corev1.EventTypeNormal, "DeleteCompleted", "Object '%s' successfully deleted on remote target", o.GetName())
 
 	return nil
 }
@@ -186,7 +179,7 @@ func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) OnError(c
 		Message: k8sstrings.ShortenString(currentErr.Error(), ShortenError),
 	})
 
-	h.Recorder.Event(o, corev1.EventTypeWarning, "ReconcilerActionError", k8sstrings.ShortenString(currentErr.Error(), ShortenError))
+	h.Recorder().Event(o, corev1.EventTypeWarning, "ReconcilerActionError", k8sstrings.ShortenString(currentErr.Error(), ShortenError))
 
 	return res, currentErr
 }

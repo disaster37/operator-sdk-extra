@@ -15,6 +15,7 @@ import (
 
 // MultiPhaseStepReconciler is the reconciler to implement to create one step for MultiPhaseReconciler
 type MultiPhaseStepReconciler interface {
+	BaseReconciler
 
 	// Reconcile permit to reconcile the step (one K8s resource)
 	Reconcile(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject, data map[string]interface{}, reconciler MultiPhaseStepReconcilerAction, ignoresDiff ...patch.CalculateOption) (res ctrl.Result, err error)
@@ -27,16 +28,8 @@ type BasicMultiPhaseStepReconciler struct {
 
 // NewBasicMultiPhaseStepReconciler is the basic constructor of MultiPhaseStepReconciler interface
 func NewBasicMultiPhaseStepReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseStepReconciler MultiPhaseStepReconciler) {
-	if recorder == nil {
-		panic("recorder can't be nil")
-	}
-
 	return &BasicMultiPhaseStepReconciler{
-		BaseReconciler: BaseReconciler{
-			Client:   client,
-			Log:      logger,
-			Recorder: recorder,
-		},
+		BaseReconciler: NewDefaultBaseReconciler(client, recorder, logger),
 	}
 }
 
@@ -49,17 +42,17 @@ func (h *BasicMultiPhaseStepReconciler) Reconcile(ctx context.Context, req ctrl.
 	)
 
 	// Init logger
-	h.Log = h.Log.WithFields(logrus.Fields{
+	logger := h.GetLogger().WithFields(logrus.Fields{
 		"step": reconcilerAction.GetPhaseName().String(),
 	})
 
 	// Configure
 	res, err = reconcilerAction.Configure(ctx, req, o)
 	if err != nil {
-		h.Log.Errorf("Error when call 'configure' from step reconciler: %s", err.Error())
+		logger.Errorf("Error when call 'configure' from step reconciler: %s", err.Error())
 		return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, ErrWhenCallConfigureFromReconciler.Error()))
 	}
-	h.Log.Debug("Call 'configure' from step reconciler successfully")
+	logger.Debug("Call 'configure' from step reconciler successfully")
 	if res != (ctrl.Result{}) {
 		return res, nil
 	}
@@ -67,10 +60,10 @@ func (h *BasicMultiPhaseStepReconciler) Reconcile(ctx context.Context, req ctrl.
 	// Read resources
 	read, res, err = reconcilerAction.Read(ctx, o, data)
 	if err != nil {
-		h.Log.Errorf("Error when call 'read' from step reconciler: %s", err.Error())
+		logger.Errorf("Error when call 'read' from step reconciler: %s", err.Error())
 		return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, ErrWhenCallReadFromReconciler.Error()))
 	}
-	h.Log.Debug("Call 'read' from step reconciler successfully")
+	logger.Debug("Call 'read' from step reconciler successfully")
 	if res != (ctrl.Result{}) {
 		return res, nil
 	}
@@ -78,12 +71,12 @@ func (h *BasicMultiPhaseStepReconciler) Reconcile(ctx context.Context, req ctrl.
 	//Check if diff exist
 	diff, res, err = reconcilerAction.Diff(ctx, o, read, data, ignoresDiff...)
 	if err != nil {
-		h.Log.Errorf("Error when call 'diff' from step reconciler: %s", err.Error())
+		logger.Errorf("Error when call 'diff' from step reconciler: %s", err.Error())
 		return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, ErrWhenCallDiffFromReconciler.Error()))
 	}
-	h.Log.Debug("Call 'diff' from step reconciler successfully")
+	logger.Debug("Call 'diff' from step reconciler successfully")
 	if diff.IsDiff() {
-		h.Log.Debugf("Found diff: %s", diff.Diff())
+		logger.Debugf("Found diff: %s", diff.Diff())
 	}
 	if res != (ctrl.Result{}) {
 		return res, nil
@@ -91,13 +84,13 @@ func (h *BasicMultiPhaseStepReconciler) Reconcile(ctx context.Context, req ctrl.
 
 	// Need create resources
 	if diff.NeedCreate() {
-		h.Log.Debug("Call 'create' from step reconciler")
+		logger.Debug("Call 'create' from step reconciler")
 		res, err = reconcilerAction.Create(ctx, o, data, diff.GetObjectsToCreate())
 		if err != nil {
-			h.Log.Errorf("Error when call 'create' from step reconciler: %s", err.Error())
+			logger.Errorf("Error when call 'create' from step reconciler: %s", err.Error())
 			return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, ErrWhenCallCreateFromReconciler.Error()))
 		}
-		h.Log.Debug("Call 'create' from step reconciler successfully")
+		logger.Debug("Call 'create' from step reconciler successfully")
 		if res != (ctrl.Result{}) {
 			return res, nil
 		}
@@ -105,13 +98,13 @@ func (h *BasicMultiPhaseStepReconciler) Reconcile(ctx context.Context, req ctrl.
 
 	// Need update resources
 	if diff.NeedUpdate() {
-		h.Log.Debug("Call 'update' from step reconciler")
+		logger.Debug("Call 'update' from step reconciler")
 		res, err = reconcilerAction.Update(ctx, o, data, diff.GetObjectsToUpdate())
 		if err != nil {
-			h.Log.Errorf("Error when call 'update' from step reconciler: %s", err.Error())
+			logger.Errorf("Error when call 'update' from step reconciler: %s", err.Error())
 			return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, ErrWhenCallUpdateFromReconciler.Error()))
 		}
-		h.Log.Debug("Call 'update' from step reconciler successfully")
+		logger.Debug("Call 'update' from step reconciler successfully")
 		if res != (ctrl.Result{}) {
 			return res, nil
 		}
@@ -119,13 +112,13 @@ func (h *BasicMultiPhaseStepReconciler) Reconcile(ctx context.Context, req ctrl.
 
 	// Need Delete
 	if diff.NeedDelete() {
-		h.Log.Debug("Call 'delete' from step reconciler")
+		logger.Debug("Call 'delete' from step reconciler")
 		res, err = reconcilerAction.Delete(ctx, o, data, diff.GetObjectsToDelete())
 		if err != nil {
-			h.Log.Errorf("Error when call 'delete' from step reconciler: %s", err.Error())
+			logger.Errorf("Error when call 'delete' from step reconciler: %s", err.Error())
 			return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, ErrWhenCallDeleteFromReconciler.Error()))
 		}
-		h.Log.Debug("Call 'delete' from step reconciler successfully")
+		logger.Debug("Call 'delete' from step reconciler successfully")
 		if res != (ctrl.Result{}) {
 			return res, nil
 		}
@@ -133,10 +126,10 @@ func (h *BasicMultiPhaseStepReconciler) Reconcile(ctx context.Context, req ctrl.
 
 	res, err = reconcilerAction.OnSuccess(ctx, o, data, diff)
 	if err != nil {
-		h.Log.Errorf("Error when call 'onSuccess' from step reconciler: %s", err.Error())
+		logger.Errorf("Error when call 'onSuccess' from step reconciler: %s", err.Error())
 		return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, ErrWhenCallOnSuccessFromReconciler.Error()))
 	}
-	h.Log.Debug("Call 'onSuccess' from step reconciler successfully")
+	logger.Debug("Call 'onSuccess' from step reconciler successfully")
 
 	return res, nil
 }

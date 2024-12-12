@@ -23,11 +23,62 @@ var (
 	ErrWhenGetObjectStatus                  = errors.Sentinel("Error when get object status")
 )
 
-// BaseReconciler is the base attributes for all reconciler
-type BaseReconciler struct {
-	client.Client
-	Log      *logrus.Entry
-	Recorder record.EventRecorder
+// BaseReconciler is the interface for all reconciler
+type BaseReconciler interface {
+	// GetLogger permit to get logger
+	GetLogger() *logrus.Entry
+
+	// SetLogger permit to set new logger
+	WithLoggerFields(fields logrus.Fields)
+
+	// Client get the client
+	Client() client.Client
+
+	// Recorder get the recorder
+	Recorder() record.EventRecorder
+}
+
+type DefaultBaseReconciler struct {
+	logger   *logrus.Entry
+	client   client.Client
+	recorder record.EventRecorder
+}
+
+func NewDefaultBaseReconciler(client client.Client, recorder record.EventRecorder, logger *logrus.Entry) BaseReconciler {
+
+	if recorder == nil {
+		panic("recorder can't be nil")
+	}
+
+	if client == nil {
+		panic("client can't be nil")
+	}
+
+	if logger == nil {
+		logger = logrus.NewEntry(logrus.New())
+	}
+
+	return &DefaultBaseReconciler{
+		logger:   logger,
+		client:   client,
+		recorder: recorder,
+	}
+}
+
+func (h *DefaultBaseReconciler) GetLogger() *logrus.Entry {
+	return h.logger
+}
+
+func (h *DefaultBaseReconciler) WithLoggerFields(fields logrus.Fields) {
+	h.logger = h.logger.WithFields(fields)
+}
+
+func (h *DefaultBaseReconciler) Client() client.Client {
+	return h.client
+}
+
+func (h *DefaultBaseReconciler) Recorder() record.EventRecorder {
+	return h.recorder
 }
 
 // BasicReconciler is the basic implementation of BaseReconciler

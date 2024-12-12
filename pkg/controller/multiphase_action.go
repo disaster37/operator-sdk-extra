@@ -17,6 +17,7 @@ import (
 
 // MultiPhaseReconcilerAction is the methode needed by step reconciler to reconcile your custom resource
 type MultiPhaseReconcilerAction interface {
+	BaseReconciler
 
 	// Configure permit to init condition on status
 	Configure(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject) (res ctrl.Result, err error)
@@ -43,27 +44,12 @@ type BasicMultiPhaseReconcilerAction struct {
 
 // NewBasicMultiPhaseReconcilerAction is the basic contructor of MultiPhaseReconcilerAction interface
 func NewBasicMultiPhaseReconcilerAction(client client.Client, conditionName shared.ConditionName, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseReconciler MultiPhaseReconcilerAction) {
-
-	if recorder == nil {
-		panic("recorder can't be nil")
-	}
-
-	basicMultiPhaseReconciler := &BasicMultiPhaseReconcilerAction{
+	return &BasicMultiPhaseReconcilerAction{
 		BasicReconcilerAction: BasicReconcilerAction{
-			BaseReconciler: BaseReconciler{
-				Client:   client,
-				Log:      logger,
-				Recorder: recorder,
-			},
-			conditionName: conditionName,
+			BaseReconciler: NewDefaultBaseReconciler(client, recorder, logger),
+			conditionName:  conditionName,
 		},
 	}
-
-	if basicMultiPhaseReconciler.Log == nil {
-		basicMultiPhaseReconciler.Log = logrus.NewEntry(logrus.New())
-	}
-
-	return basicMultiPhaseReconciler
 }
 
 func (h *BasicMultiPhaseReconcilerAction) Configure(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject) (res ctrl.Result, err error) {
