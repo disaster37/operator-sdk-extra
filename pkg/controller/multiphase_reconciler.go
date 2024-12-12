@@ -55,7 +55,7 @@ func (h *BasicMultiPhaseReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		"name":      req.Name,
 		"namespace": req.Namespace,
 	}
-	logger := h.GetLogger().WithFields(loggerFields)
+	logger := h.Logger().WithFields(loggerFields)
 	logger.Infof("Starting reconcile loop")
 	defer logger.Info("Finish reconcile loop")
 	reconcilerAction.WithLoggerFields(loggerFields)

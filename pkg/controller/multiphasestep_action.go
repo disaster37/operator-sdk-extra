@@ -122,7 +122,7 @@ func (h *BasicMultiPhaseStepReconcilerAction) Create(ctx context.Context, o obje
 		if err = h.Client().Create(ctx, oChild); err != nil {
 			return res, errors.Wrapf(err, "Error when create object '%s'", oChild.GetName())
 		}
-		h.GetLogger().Debugf("Create object '%s' successfully", oChild.GetName())
+		h.Logger().Debugf("Create object '%s' successfully", oChild.GetName())
 		h.Recorder().Eventf(o, corev1.EventTypeNormal, "CreateCompleted", "Object '%s' successfully created", oChild.GetName())
 	}
 
@@ -135,7 +135,7 @@ func (h *BasicMultiPhaseStepReconcilerAction) Update(ctx context.Context, o obje
 		if err = h.Client().Update(ctx, oChild); err != nil {
 			return res, errors.Wrapf(err, "Error when update object '%s'", oChild.GetName())
 		}
-		h.GetLogger().Debugf("Update object '%s' successfully", oChild.GetName())
+		h.Logger().Debugf("Update object '%s' successfully", oChild.GetName())
 		h.Recorder().Eventf(o, corev1.EventTypeNormal, "UpdateCompleted", "Object '%s' successfully updated", oChild.GetName())
 	}
 
@@ -148,7 +148,7 @@ func (h *BasicMultiPhaseStepReconcilerAction) Delete(ctx context.Context, o obje
 		if err = h.Client().Delete(ctx, oChild); err != nil {
 			return res, errors.Wrapf(err, "Error when delete object '%s'", oChild.GetName())
 		}
-		h.GetLogger().Debugf("Delete object '%s' successfully", oChild.GetName())
+		h.Logger().Debugf("Delete object '%s' successfully", oChild.GetName())
 		h.Recorder().Eventf(o, corev1.EventTypeNormal, "DeleteCompleted", "Object '%s' successfully deleted", oChild.GetName())
 	}
 
@@ -219,7 +219,7 @@ func (h *BasicMultiPhaseStepReconcilerAction) Diff(ctx context.Context, o object
 					updatedObject := patchResult.Patched.(client.Object)
 					diff.AddDiff(fmt.Sprintf("diff %s: %s", updatedObject.GetName(), string(patchResult.Patch)))
 					toUpdate = append(toUpdate, updatedObject)
-					h.GetLogger().Debugf("Need update object '%s'", updatedObject.GetName())
+					h.Logger().Debugf("Need update object '%s'", updatedObject.GetName())
 				}
 
 				// Remove items found
@@ -235,7 +235,7 @@ func (h *BasicMultiPhaseStepReconcilerAction) Diff(ctx context.Context, o object
 
 			toCreate = append(toCreate, expectedObject)
 
-			h.GetLogger().Debugf("Need create object '%s'", expectedObject.GetName())
+			h.Logger().Debugf("Need create object '%s'", expectedObject.GetName())
 		}
 	}
 

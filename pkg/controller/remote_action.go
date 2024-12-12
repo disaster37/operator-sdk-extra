@@ -124,7 +124,7 @@ func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) Create(ct
 	}
 	o.GetStatus().SetLastAppliedConfiguration(zip)
 
-	h.GetLogger().Debugf("Create object '%s' successfully on remote target", o.GetName())
+	h.Logger().Debugf("Create object '%s' successfully on remote target", o.GetName())
 	h.Recorder().Eventf(o, corev1.EventTypeNormal, "CreateCompleted", "Object '%s' successfully created on remote target", o.GetName())
 
 	return res, nil
@@ -144,7 +144,7 @@ func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) Update(ct
 	}
 	o.GetStatus().SetLastAppliedConfiguration(zip)
 
-	h.GetLogger().Debugf("Update object '%s' successfully on remote target", o.GetName())
+	h.Logger().Debugf("Update object '%s' successfully on remote target", o.GetName())
 	h.Recorder().Eventf(o, corev1.EventTypeNormal, "UpdateCompleted", "Object '%s' successfully updated on remote target", o.GetName())
 
 	return res, nil
@@ -158,7 +158,7 @@ func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) Delete(ct
 		return errors.Wrapf(err, "Error when delete %s on remote target", o.GetName())
 	}
 
-	h.GetLogger().Debugf("Delete object '%s' successfully on remote target", o.GetName())
+	h.Logger().Debugf("Delete object '%s' successfully on remote target", o.GetName())
 	h.Recorder().Eventf(o, corev1.EventTypeNormal, "DeleteCompleted", "Object '%s' successfully deleted on remote target", o.GetName())
 
 	return nil

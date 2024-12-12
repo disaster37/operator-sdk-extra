@@ -26,7 +26,7 @@ var (
 // BaseReconciler is the interface for all reconciler
 type BaseReconciler interface {
 	// GetLogger permit to get logger
-	GetLogger() *logrus.Entry
+	Logger() *logrus.Entry
 
 	// SetLogger permit to set new logger
 	WithLoggerFields(fields logrus.Fields)
@@ -65,7 +65,7 @@ func NewDefaultBaseReconciler(client client.Client, recorder record.EventRecorde
 	}
 }
 
-func (h *DefaultBaseReconciler) GetLogger() *logrus.Entry {
+func (h *DefaultBaseReconciler) Logger() *logrus.Entry {
 	return h.logger
 }
 

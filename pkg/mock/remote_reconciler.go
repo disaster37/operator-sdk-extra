@@ -64,8 +64,8 @@ func (h *MockRemoteReconcilerAction[k8sObject, apiObject, apiClient]) GetIgnores
 	return h.reconciler.GetIgnoresDiff()
 }
 
-func (h *MockRemoteReconcilerAction[k8sObject, apiObject, apiClient]) GetLogger() *logrus.Entry {
-	return h.reconciler.GetLogger()
+func (h *MockRemoteReconcilerAction[k8sObject, apiObject, apiClient]) Logger() *logrus.Entry {
+	return h.reconciler.Logger()
 }
 
 func (h *MockRemoteReconcilerAction[k8sObject, apiObject, apiClient]) WithLoggerFields(fields logrus.Fields) {

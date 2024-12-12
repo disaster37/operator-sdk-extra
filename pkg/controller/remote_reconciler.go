@@ -61,7 +61,7 @@ func (h *BasicRemoteReconciler[k8sObject, apiObject, apiClient]) Reconcile(ctx c
 		"name":      req.Name,
 		"namespace": req.Namespace,
 	}
-	logger := h.GetLogger().WithFields(loggerFields)
+	logger := h.Logger().WithFields(loggerFields)
 	reconciler.WithLoggerFields(loggerFields)
 
 	logger.Infof("Starting reconcile loop")
