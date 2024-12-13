@@ -43,7 +43,7 @@ func (h *BasicMultiPhaseStepReconciler) Reconcile(ctx context.Context, req ctrl.
 
 	// Init logger
 	logger = logger.WithFields(logrus.Fields{
-		"phase": reconcilerAction.GetPhaseName().String(),
+		"step": reconcilerAction.GetPhaseName().String(),
 	})
 
 	// Configure
