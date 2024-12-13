@@ -109,7 +109,7 @@ func (h *BasicMultiPhaseReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	// Configure to optional get driver client (call meta)
-	res, err = reconcilerAction.Configure(ctx, req, o, logger)
+	res, err = reconcilerAction.Configure(ctx, req, o, data, logger)
 	if err != nil {
 		logger.Errorf("Error when call 'configure' from reconciler: %s", err.Error())
 		return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, ErrWhenCallConfigureFromReconciler.Error()), logger)
@@ -152,8 +152,6 @@ func (h *BasicMultiPhaseReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// Call step resonsilers
 	for _, reconciler := range reconcilersStepAction {
 		logger.Infof("Run phase %s", reconciler.GetPhaseName().String())
-
-		data := map[string]any{}
 
 		res, err = h.reconcilerStep.Reconcile(ctx, req, o, data, reconciler, logger, reconciler.GetIgnoresDiff()...)
 		if err != nil {

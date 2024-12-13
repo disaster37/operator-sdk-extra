@@ -20,7 +20,7 @@ type MultiPhaseReconcilerAction interface {
 	BaseReconciler
 
 	// Configure permit to init condition on status
-	Configure(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject, logger *logrus.Entry) (res ctrl.Result, err error)
+	Configure(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject, data map[string]any, logger *logrus.Entry) (res ctrl.Result, err error)
 
 	// Read permit to read kubernetes resources
 	Read(ctx context.Context, o object.MultiPhaseObject, data map[string]any, logger *logrus.Entry) (res ctrl.Result, err error)
@@ -52,7 +52,7 @@ func NewBasicMultiPhaseReconcilerAction(client client.Client, conditionName shar
 	}
 }
 
-func (h *BasicMultiPhaseReconcilerAction) Configure(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject, logger *logrus.Entry) (res ctrl.Result, err error) {
+func (h *BasicMultiPhaseReconcilerAction) Configure(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject, data map[string]any, logger *logrus.Entry) (res ctrl.Result, err error) {
 
 	conditions := o.GetStatus().GetConditions()
 	if condition.FindStatusCondition(conditions, h.conditionName.String()) == nil {
