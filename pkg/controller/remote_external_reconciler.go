@@ -15,7 +15,7 @@ type RemoteExternalReconciler[k8sObject comparable, apiObject comparable, apiCli
 	Create(apiO apiObject, k8sO k8sObject) (err error)
 	Update(apiO apiObject, k8sO k8sObject) (err error)
 	Delete(k8sO k8sObject) (err error)
-	Diff(currentOject apiObject, expectedObject apiObject, originalObject apiObject, ignoresDiff ...patch.CalculateOption) (patchResult *patch.PatchResult, err error)
+	Diff(currentOject apiObject, expectedObject apiObject, originalObject apiObject, k8sO k8sObject, ignoresDiff ...patch.CalculateOption) (patchResult *patch.PatchResult, err error)
 	Client() apiClient
 }
 
@@ -31,7 +31,7 @@ func NewBasicRemoteExternalReconciler[k8sObject comparable, apiObject comparable
 	}
 }
 
-func (h *BasicRemoteExternalReconciler[k8sObject, apiObject, apiClient]) Diff(currentOject apiObject, expectedObject apiObject, originalObject apiObject, ignoresDiff ...patch.CalculateOption) (patchResult *patch.PatchResult, err error) {
+func (h *BasicRemoteExternalReconciler[k8sObject, apiObject, apiClient]) Diff(currentOject apiObject, expectedObject apiObject, originalObject apiObject, o k8sObject, ignoresDiff ...patch.CalculateOption) (patchResult *patch.PatchResult, err error) {
 	if reflect.ValueOf(currentOject).IsNil() {
 		expected, err := jsonIterator.ConfigCompatibleWithStandardLibrary.Marshal(expectedObject)
 		if err != nil {

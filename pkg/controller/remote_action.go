@@ -226,7 +226,7 @@ func (h *BasicRemoteReconcilerAction[k8sObject, apiObject, apiClient]) Diff(ctx 
 		return diff, res, nil
 	}
 
-	differ, err := handler.Diff(read.GetCurrentObject(), read.GetExpectedObject(), *originalObject, ignoreDiff...)
+	differ, err := handler.Diff(read.GetCurrentObject(), read.GetExpectedObject(), *originalObject, o.(k8sObject), ignoreDiff...)
 	if err != nil {
 		return diff, res, errors.Wrapf(err, "Error when diffing %s for remote target", o.GetName())
 	}
