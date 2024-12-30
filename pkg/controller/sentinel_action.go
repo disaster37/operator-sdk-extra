@@ -62,7 +62,7 @@ type BasicSentinelAction struct {
 // NewRemoteReconcilerAction is the basic constructor of RemoteReconcilerAction interface
 func NewBasicSentinelAction(client client.Client, recorder record.EventRecorder) (sentinelReconciler SentinelReconcilerAction) {
 	return &BasicSentinelAction{
-		BasicReconcilerAction: NewBasicReconcilerAction(client, recorder, ReadyCondition),
+		BasicReconcilerAction: NewBasicReconcilerAction(client, recorder, ""),
 	}
 }
 

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"emperror.dev/errors"
-	"github.com/disaster37/operator-sdk-extra/pkg/apis/shared"
 	"github.com/google/go-cmp/cmp"
 	"github.com/mitchellh/copystructure"
 	"github.com/sirupsen/logrus"
@@ -32,13 +31,13 @@ type BasicSentinelReconciler struct {
 }
 
 // NewBasicSentinelReconciler permit to instanciate new basic sentinel resonciler
-func NewBasicSentinelReconciler(client client.Client, name string, finalizer shared.FinalizerName, logger *logrus.Entry, recorder record.EventRecorder) (sentinelReconciler SentinelReconciler) {
+func NewBasicSentinelReconciler(client client.Client, name string, logger *logrus.Entry, recorder record.EventRecorder) (sentinelReconciler SentinelReconciler) {
 
 	return &BasicSentinelReconciler{
 		BasicReconciler: NewBasicReconciler(
 			client,
 			recorder,
-			finalizer,
+			"",
 			logger.WithFields(logrus.Fields{
 				"reconciler": name,
 			}),
