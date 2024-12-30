@@ -20,7 +20,6 @@ import (
 // Some time you should to generate somme resource from labels or annotations ...
 // It the use case of this controller
 type SentinelReconciler interface {
-	BaseReconciler
 
 	// Reconcile permit to orchestrate all phase needed to successfully reconcile the object
 	Reconcile(ctx context.Context, req ctrl.Request, o client.Object, data map[string]interface{}, reconciler SentinelReconcilerAction) (res ctrl.Result, err error)
