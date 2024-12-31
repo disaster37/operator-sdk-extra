@@ -14,10 +14,10 @@ import (
 
 type MockRemoteReconcilerAction[k8sObject comparable, apiObject comparable, apiClient any] struct {
 	reconciler        controller.RemoteReconcilerAction[k8sObject, apiObject, apiClient]
-	mockRemoteHandler func(ctx context.Context, req ctrl.Request, o object.RemoteObject) (handler controller.RemoteExternalReconciler[k8sObject, apiObject, apiClient], res ctrl.Result, err error)
+	mockRemoteHandler func(ctx context.Context, req ctrl.Request, o object.RemoteObject, logger *logrus.Entry) (handler controller.RemoteExternalReconciler[k8sObject, apiObject, apiClient], res ctrl.Result, err error)
 }
 
-func NewMockRemoteReconcilerAction[k8sObject comparable, apiObject comparable, apiClient any](reconciler controller.RemoteReconcilerAction[k8sObject, apiObject, apiClient], mockRemoteHandler func(ctx context.Context, req ctrl.Request, o object.RemoteObject) (handler controller.RemoteExternalReconciler[k8sObject, apiObject, apiClient], res ctrl.Result, err error)) controller.RemoteReconcilerAction[k8sObject, apiObject, apiClient] {
+func NewMockRemoteReconcilerAction[k8sObject comparable, apiObject comparable, apiClient any](reconciler controller.RemoteReconcilerAction[k8sObject, apiObject, apiClient], mockRemoteHandler func(ctx context.Context, req ctrl.Request, o object.RemoteObject, logger *logrus.Entry) (handler controller.RemoteExternalReconciler[k8sObject, apiObject, apiClient], res ctrl.Result, err error)) controller.RemoteReconcilerAction[k8sObject, apiObject, apiClient] {
 	return &MockRemoteReconcilerAction[k8sObject, apiObject, apiClient]{
 		reconciler:        reconciler,
 		mockRemoteHandler: mockRemoteHandler,
@@ -25,7 +25,7 @@ func NewMockRemoteReconcilerAction[k8sObject comparable, apiObject comparable, a
 }
 
 func (h *MockRemoteReconcilerAction[k8sObject, apiObject, apiClient]) GetRemoteHandler(ctx context.Context, req ctrl.Request, o object.RemoteObject, logger *logrus.Entry) (handler controller.RemoteExternalReconciler[k8sObject, apiObject, apiClient], res ctrl.Result, err error) {
-	return h.mockRemoteHandler(ctx, req, o)
+	return h.mockRemoteHandler(ctx, req, o, logger)
 }
 
 func (h *MockRemoteReconcilerAction[k8sObject, apiObject, apiClient]) Configure(ctx context.Context, o object.RemoteObject, data map[string]any, handler controller.RemoteExternalReconciler[k8sObject, apiObject, apiClient], logger *logrus.Entry) (res ctrl.Result, err error) {
