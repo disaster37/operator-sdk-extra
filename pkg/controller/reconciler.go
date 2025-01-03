@@ -91,7 +91,7 @@ type BasicReconcilerAction struct {
 func NewBasicReconcilerAction(client client.Client, recorder record.EventRecorder, conditionName shared.ConditionName) BasicReconcilerAction {
 
 	if conditionName == "" {
-		panic("Contion name must be provided")
+		panic("Condition name must be provided")
 	}
 
 	return BasicReconcilerAction{
