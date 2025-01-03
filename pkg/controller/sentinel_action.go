@@ -152,8 +152,9 @@ func (h *BasicSentinelAction) Diff(ctx context.Context, o client.Object, read Se
 	toDelete := make([]client.Object, 0)
 
 	// Compare the expected and current objects type
-	objectTypes := funk.Union(funk.Keys(read.GetAllCurrentObjects()), funk.Keys(read.GetAllExpectedObjects())).([]string)
+	objectTypes := funk.Uniq(funk.Union(funk.Keys(read.GetAllCurrentObjects()), funk.Keys(read.GetAllExpectedObjects())).([]string)).([]string)
 	for _, objectType := range objectTypes {
+		logger.Debugf("Start process object type '%s'", objectType)
 		tmpCurrentObjects := make([]client.Object, len(read.GetCurrentObjects(objectType)))
 		copy(tmpCurrentObjects, read.GetCurrentObjects(objectType))
 
