@@ -205,7 +205,7 @@ func (h *BasicMultiPhaseStepReconcilerAction) Diff(ctx context.Context, o object
 				isFound = true
 
 				// Copy TypeMeta to work with some ignore rules like IgnorePDBSelector()
-				mustInjectTypeMeta(currentObject, expectedObject)
+				MustInjectTypeMeta(currentObject, expectedObject)
 				patchResult, err := patch.DefaultPatchMaker.Calculate(currentObject, expectedObject, patchOptions...)
 				if err != nil {
 					return diff, res, errors.Wrapf(err, "Error when diffing object '%s'", currentObject.GetName())

@@ -134,7 +134,7 @@ func (h *BasicMultiPhaseStepReconciler) Reconcile(ctx context.Context, req ctrl.
 	return res, nil
 }
 
-func mustInjectTypeMeta(src, dst client.Object) {
+func MustInjectTypeMeta(src, dst client.Object) {
 	var (
 		rt reflect.Type
 	)
