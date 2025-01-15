@@ -3,7 +3,6 @@ package controller
 import (
 	"context"
 
-	"emperror.dev/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -33,11 +32,11 @@ func NewController() Controller {
 }
 
 func (h *DefaultController) SetupWithManager(mgr ctrl.Manager) error {
-	return errors.New("You need implement 'SetupWithManager'")
+	panic("You need implement it")
 }
 
 func (h *DefaultController) Reconcile(context.Context, reconcile.Request) (res reconcile.Result, err error) {
-	return res, errors.New("You need implement 'Reconcil'")
+	panic("You need implement it")
 }
 
 // SetupIndexerWithManager permit to registers indexers on manager

@@ -6,13 +6,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func TestBasicMultiPhaseDiffDiff(t *testing.T) {
 
 	// With default object
-	o := &DefaultMultiPhaseDiff{}
+	o := &DefaultMultiPhaseDiff[*corev1.ConfigMap]{}
 
 	assert.False(t, o.IsDiff())
 	assert.Empty(t, o.Diff())
@@ -27,12 +26,12 @@ func TestBasicMultiPhaseDiffDiff(t *testing.T) {
 func TestBasicMultiPhaseDiffCreate(t *testing.T) {
 
 	// With default object
-	o := &DefaultMultiPhaseDiff{}
+	o := &DefaultMultiPhaseDiff[*corev1.ConfigMap]{}
 
 	assert.False(t, o.NeedCreate())
 	assert.Empty(t, o.GetObjectsToCreate())
 
-	objects := []client.Object{
+	objects := []*corev1.ConfigMap{
 		&corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test",
@@ -50,13 +49,13 @@ func TestBasicMultiPhaseDiffCreate(t *testing.T) {
 func TestBasicMultiPhaseDiffUpdate(t *testing.T) {
 
 	// With default object
-	o := &DefaultMultiPhaseDiff{}
+	o := &DefaultMultiPhaseDiff[*corev1.ConfigMap]{}
 
 	assert.False(t, o.NeedUpdate())
 	assert.Empty(t, o.GetObjectsToUpdate())
 
-	objects := []client.Object{
-		&corev1.ConfigMap{
+	objects := []*corev1.ConfigMap{
+		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test",
 			},
@@ -73,13 +72,13 @@ func TestBasicMultiPhaseDiffUpdate(t *testing.T) {
 func TestBasicMultiPhaseDiffDelete(t *testing.T) {
 
 	// With default object
-	o := &DefaultMultiPhaseDiff{}
+	o := &DefaultMultiPhaseDiff[*corev1.ConfigMap]{}
 
 	assert.False(t, o.NeedDelete())
 	assert.Empty(t, o.GetObjectsToDelete())
 
-	objects := []client.Object{
-		&corev1.ConfigMap{
+	objects := []*corev1.ConfigMap{
+		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test",
 			},

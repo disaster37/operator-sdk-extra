@@ -14,31 +14,31 @@ import (
 )
 
 // MultiPhaseStepReconciler is the reconciler to implement to create one step for MultiPhaseReconciler
-type MultiPhaseStepReconciler interface {
+type MultiPhaseStepReconciler[k8sObject object.MultiPhaseObject, k8sStepObject client.Object] interface {
 	controller.BaseReconciler
 
 	// Reconcile permit to reconcile the step (one K8s resource)
-	Reconcile(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject, data map[string]interface{}, reconciler MultiPhaseStepReconcilerAction, logger *logrus.Entry, ignoresDiff ...patch.CalculateOption) (res ctrl.Result, err error)
+	Reconcile(ctx context.Context, req ctrl.Request, o k8sObject, data map[string]interface{}, reconciler MultiPhaseStepReconcilerAction[k8sObject, k8sStepObject], logger *logrus.Entry, ignoresDiff ...patch.CalculateOption) (res ctrl.Result, err error)
 }
 
 // DefaultMultiPhaseStepReconciler is the default implementation of MultiPhaseStepReconciler interface
-type DefaultMultiPhaseStepReconciler struct {
+type DefaultMultiPhaseStepReconciler[k8sObject object.MultiPhaseObject, k8sStepObject client.Object] struct {
 	controller.BaseReconciler
 }
 
 // NewMultiPhaseStepReconciler is the default implementation of MultiPhaseStepReconciler interface
-func NewMultiPhaseStepReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseStepReconciler MultiPhaseStepReconciler) {
-	return &DefaultMultiPhaseStepReconciler{
+func NewMultiPhaseStepReconciler[k8sObject object.MultiPhaseObject, k8sStepObject client.Object](client client.Client, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseStepReconciler MultiPhaseStepReconciler[k8sObject, k8sStepObject]) {
+	return &DefaultMultiPhaseStepReconciler[k8sObject, k8sStepObject]{
 		BaseReconciler: controller.NewBaseReconciler(client, recorder),
 	}
 }
 
 // Reconcile permit to reconcile the step (one K8s resource)
-func (h *DefaultMultiPhaseStepReconciler) Reconcile(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject, data map[string]interface{}, reconcilerAction MultiPhaseStepReconcilerAction, logger *logrus.Entry, ignoresDiff ...patch.CalculateOption) (res ctrl.Result, err error) {
+func (h *DefaultMultiPhaseStepReconciler[k8sObject, k8sStepObject]) Reconcile(ctx context.Context, req ctrl.Request, o k8sObject, data map[string]interface{}, reconcilerAction MultiPhaseStepReconcilerAction[k8sObject, k8sStepObject], logger *logrus.Entry, ignoresDiff ...patch.CalculateOption) (res ctrl.Result, err error) {
 
 	var (
-		diff MultiPhaseDiff
-		read MultiPhaseRead
+		diff MultiPhaseDiff[k8sStepObject]
+		read MultiPhaseRead[k8sStepObject]
 	)
 
 	// Init logger

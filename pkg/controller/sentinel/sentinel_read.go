@@ -1,64 +1,78 @@
 package sentinel
 
-import "sigs.k8s.io/controller-runtime/pkg/client"
+import (
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller/multiphase"
+	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+)
 
 // SentinelRead is the interface to store the result of read from sentinel reconciler
 // objectType is the key if you need to handle some type of object to not shuffle them
 type SentinelRead interface {
 
 	// GetAllCurrentObjects premit to get the map of current objects, mapped by type
-	GetAllCurrentObjects() map[string][]client.Object
+	GetReads() map[string]multiphase.MultiPhaseRead[client.Object]
 
-	// GetCurrentObjects permit to get the list of current objects
-	GetCurrentObjects(objectType string) []client.Object
+	// SetCurrentObjects will add object on the right list
+	SetCurrentObjects(objects []client.Object)
 
-	// SetCurrentObjects permit to set the list of current objects
-	SetCurrentObjects(objectType string, objects []client.Object)
+	// AddCurrentObject will add object on the right list
+	AddCurrentObject(o client.Object)
 
-	// GetAllExpectedObjects premit to get the map of expected objects, mapped by type
-	GetAllExpectedObjects() map[string][]client.Object
+	// AddExpectedObject will add object on the right list
+	AddExpectedObject(o client.Object)
 
-	// GetExpectedObjects permit to get the list of expected objects
-	GetExpectedObjects(objectType string) []client.Object
-
-	// SetExpectedObjects permit to set the list of expected objects
-	SetExpectedObjects(objectType string, objects []client.Object)
+	// SetExpectedObjects will add object on the right list
+	SetExpectedObjects(objects []client.Object)
 }
 
 // DefaultSentinelRead is the default implementation of SentinelRead
 type DefaultSentinelRead struct {
-	currentObjects  map[string][]client.Object
-	expectedObjects map[string][]client.Object
+	reads  map[string]multiphase.MultiPhaseRead[client.Object]
+	scheme runtime.ObjectTyper
 }
 
 // NewSentinelRead is the default implementation of SentinelRead interface
-func NewSentinelRead() SentinelRead {
+func NewSentinelRead(scheme runtime.ObjectTyper) SentinelRead {
 	return &DefaultSentinelRead{
-		currentObjects:  map[string][]client.Object{},
-		expectedObjects: map[string][]client.Object{},
+		reads:  map[string]multiphase.MultiPhaseRead[client.Object]{},
+		scheme: scheme,
 	}
 }
 
-func (h *DefaultSentinelRead) GetAllCurrentObjects() map[string][]client.Object {
-	return h.currentObjects
+func (h *DefaultSentinelRead) GetReads() map[string]multiphase.MultiPhaseRead[client.Object] {
+	return h.reads
 }
 
-func (h *DefaultSentinelRead) GetCurrentObjects(objectType string) []client.Object {
-	return h.currentObjects[objectType]
+func (h *DefaultSentinelRead) SetCurrentObjects(objects []client.Object) {
+	for _, o := range objects {
+		h.AddCurrentObject(o)
+	}
 }
 
-func (h *DefaultSentinelRead) SetCurrentObjects(objectType string, objects []client.Object) {
-	h.currentObjects[objectType] = objects
+func (h *DefaultSentinelRead) AddCurrentObject(o client.Object) {
+	o = GetObjectWithMeta(o, h.scheme)
+	t := GetObjectType(o.GetObjectKind())
+	if h.reads[t] == nil {
+		h.reads[t] = multiphase.NewMultiPhaseRead[client.Object]()
+	}
+
+	h.reads[t].AddCurrentObject(o)
+
 }
 
-func (h *DefaultSentinelRead) GetAllExpectedObjects() map[string][]client.Object {
-	return h.expectedObjects
+func (h *DefaultSentinelRead) SetExpectedObjects(objects []client.Object) {
+	for _, o := range objects {
+		h.AddExpectedObject(o)
+	}
 }
 
-func (h *DefaultSentinelRead) GetExpectedObjects(objectType string) []client.Object {
-	return h.expectedObjects[objectType]
-}
+func (h *DefaultSentinelRead) AddExpectedObject(o client.Object) {
+	o = GetObjectWithMeta(o, h.scheme)
+	t := GetObjectType(o.GetObjectKind())
+	if h.reads[t] == nil {
+		h.reads[t] = multiphase.NewMultiPhaseRead[client.Object]()
+	}
 
-func (h *DefaultSentinelRead) SetExpectedObjects(objectType string, objects []client.Object) {
-	h.expectedObjects[objectType] = objects
+	h.reads[t].AddExpectedObject(o)
 }

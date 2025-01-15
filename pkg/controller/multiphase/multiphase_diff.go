@@ -7,7 +7,7 @@ import (
 )
 
 // MultiPhaseDiff is used to know if currents resources differ with expected
-type MultiPhaseDiff interface {
+type MultiPhaseDiff[k8sStepObject client.Object] interface {
 
 	// NeedCreate is true when need to create K8s object
 	NeedCreate() bool
@@ -19,22 +19,31 @@ type MultiPhaseDiff interface {
 	NeedDelete() bool
 
 	// GetObjectsToCreate is the list of object to create on K8s
-	GetObjectsToCreate() []client.Object
+	GetObjectsToCreate() []k8sStepObject
 
 	// SetObjectsToCreate permit to set the list of object to create on K8s
-	SetObjectsToCreate(objects []client.Object)
+	SetObjectsToCreate(objects []k8sStepObject)
+
+	// AddObjectToCreate permit to add object on create list
+	AddObjectToCreate(o k8sStepObject)
 
 	// GetObjectsToUpdate is the list of object to update on K8s
-	GetObjectsToUpdate() []client.Object
+	GetObjectsToUpdate() []k8sStepObject
 
 	// SetObjectsToUpdate permit to set the list of object to update on K8s
-	SetObjectsToUpdate(objects []client.Object)
+	SetObjectsToUpdate(objects []k8sStepObject)
+
+	// AddObjectToUpdate permit to add object on update list
+	AddObjectToUpdate(o k8sStepObject)
 
 	// GetObjectsToDelete is the list of Object to delete on K8s
-	GetObjectsToDelete() []client.Object
+	GetObjectsToDelete() []k8sStepObject
 
 	// SetObjectsToDelete permit to set the list of object to delete
-	SetObjectsToDelete(objects []client.Object)
+	SetObjectsToDelete(objects []k8sStepObject)
+
+	// AddObjectToDelete permit to add object on delete list
+	AddObjectToDelete(o k8sStepObject)
 
 	// AddDiff permit to add diff
 	// It add return line at the end
@@ -48,71 +57,120 @@ type MultiPhaseDiff interface {
 }
 
 // DefaultMultiPhaseDiff is the default implementation of MultiPhaseDiff interface
-type DefaultMultiPhaseDiff struct {
+type DefaultMultiPhaseDiff[k8sStepObject client.Object] struct {
 
 	// CreateObjects is the list of object to create on K8s
-	createObjects []client.Object
+	createObjects []k8sStepObject
 
 	// UpdateObjects is the list of object to update on K8s
-	updateObjects []client.Object
+	updateObjects []k8sStepObject
 
 	// DeleteObjects is the list of object to delete on K8s
-	deleteObjects []client.Object
+	deleteObjects []k8sStepObject
 
 	// Diff is the diff as string for human knowlegment
 	diff strings.Builder
 }
 
 // NewMultiPhaseDiff is the default implementation of MultiPhaseDiff interface
-func NewMultiPhaseDiff() MultiPhaseDiff {
-	return &DefaultMultiPhaseDiff{}
+func NewMultiPhaseDiff[k8sStepObject client.Object]() MultiPhaseDiff[k8sStepObject] {
+	return &DefaultMultiPhaseDiff[k8sStepObject]{
+		createObjects: make([]k8sStepObject, 0),
+		updateObjects: make([]k8sStepObject, 0),
+		deleteObjects: make([]k8sStepObject, 0),
+	}
 }
 
-func (h *DefaultMultiPhaseDiff) NeedCreate() bool {
+func (h *DefaultMultiPhaseDiff[k8sStepObject]) NeedCreate() bool {
 	return len(h.createObjects) > 0
 }
 
-func (h *DefaultMultiPhaseDiff) NeedUpdate() bool {
+func (h *DefaultMultiPhaseDiff[k8sStepObject]) NeedUpdate() bool {
 	return len(h.updateObjects) > 0
 }
 
-func (h *DefaultMultiPhaseDiff) NeedDelete() bool {
+func (h *DefaultMultiPhaseDiff[k8sStepObject]) NeedDelete() bool {
 	return len(h.deleteObjects) > 0
 }
 
-func (h *DefaultMultiPhaseDiff) GetObjectsToCreate() []client.Object {
+func (h *DefaultMultiPhaseDiff[k8sStepObject]) GetObjectsToCreate() []k8sStepObject {
 	return h.createObjects
 }
 
-func (h *DefaultMultiPhaseDiff) SetObjectsToCreate(objects []client.Object) {
-	h.createObjects = objects
+func (h *DefaultMultiPhaseDiff[k8sStepObject]) SetObjectsToCreate(objects []k8sStepObject) {
+	if len(objects) == 0 {
+		return
+	}
+
+	if len(h.createObjects) == 0 {
+		h.createObjects = objects
+	} else {
+		for _, o := range objects {
+			h.AddObjectToCreate(o)
+		}
+	}
+
 }
 
-func (h *DefaultMultiPhaseDiff) GetObjectsToUpdate() []client.Object {
+func (h *DefaultMultiPhaseDiff[k8sStepObject]) AddObjectToCreate(o k8sStepObject) {
+	h.createObjects = append(h.createObjects, o)
+}
+
+func (h *DefaultMultiPhaseDiff[k8sStepObject]) GetObjectsToUpdate() []k8sStepObject {
 	return h.updateObjects
 }
 
-func (h *DefaultMultiPhaseDiff) SetObjectsToUpdate(objects []client.Object) {
-	h.updateObjects = objects
+func (h *DefaultMultiPhaseDiff[k8sStepObject]) SetObjectsToUpdate(objects []k8sStepObject) {
+	if len(objects) == 0 {
+		return
+	}
+
+	if len(h.updateObjects) == 0 {
+		h.updateObjects = objects
+	} else {
+		for _, o := range objects {
+			h.AddObjectToUpdate(o)
+		}
+	}
+
 }
 
-func (h *DefaultMultiPhaseDiff) GetObjectsToDelete() []client.Object {
+func (h *DefaultMultiPhaseDiff[k8sStepObject]) AddObjectToUpdate(o k8sStepObject) {
+	h.updateObjects = append(h.updateObjects, o)
+}
+
+func (h *DefaultMultiPhaseDiff[k8sStepObject]) GetObjectsToDelete() []k8sStepObject {
 	return h.deleteObjects
 }
 
-func (h *DefaultMultiPhaseDiff) SetObjectsToDelete(objects []client.Object) {
-	h.deleteObjects = objects
+func (h *DefaultMultiPhaseDiff[k8sStepObject]) SetObjectsToDelete(objects []k8sStepObject) {
+	if len(objects) == 0 {
+		return
+	}
+
+	if len(h.deleteObjects) == 0 {
+		h.deleteObjects = objects
+	} else {
+		for _, o := range objects {
+			h.AddObjectToDelete(o)
+		}
+	}
+
 }
 
-func (h *DefaultMultiPhaseDiff) AddDiff(diff string) {
+func (h *DefaultMultiPhaseDiff[k8sStepObject]) AddObjectToDelete(o k8sStepObject) {
+	h.deleteObjects = append(h.deleteObjects, o)
+}
+
+func (h *DefaultMultiPhaseDiff[k8sStepObject]) AddDiff(diff string) {
 	h.diff.WriteString(diff)
 	h.diff.WriteString("\n")
 }
 
-func (h *DefaultMultiPhaseDiff) Diff() string {
+func (h *DefaultMultiPhaseDiff[k8sStepObject]) Diff() string {
 	return h.diff.String()
 }
 
-func (h *DefaultMultiPhaseDiff) IsDiff() bool {
+func (h *DefaultMultiPhaseDiff[k8sStepObject]) IsDiff() bool {
 	return h.diff.Len() > 0
 }

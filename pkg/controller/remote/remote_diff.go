@@ -4,7 +4,7 @@ import (
 	"strings"
 )
 
-type RemoteDiff[T any] interface {
+type RemoteDiff[apiObject comparable] interface {
 
 	// NeedCreate is true when need to create K8s object
 	NeedCreate() bool
@@ -13,16 +13,16 @@ type RemoteDiff[T any] interface {
 	NeedUpdate() bool
 
 	// GetObjectsToCreate is the list of object to create on K8s
-	GetObjectToCreate() T
+	GetObjectToCreate() apiObject
 
 	// SetObjectsToCreate permit to set the list of object to create on K8s
-	SetObjectToCreate(object T)
+	SetObjectToCreate(object apiObject)
 
 	// GetObjectsToUpdate is the list of object to update on K8s
-	GetObjectToUpdate() T
+	GetObjectToUpdate() apiObject
 
 	// SetObjectsToUpdate permit to set the list of object to update on K8s
-	SetObjectToUpdate(object T)
+	SetObjectToUpdate(object apiObject)
 
 	// AddDiff permit to add diff
 	// It add return line at the end
@@ -36,13 +36,13 @@ type RemoteDiff[T any] interface {
 }
 
 // DefaultRemoteDiff is the default implementation of RemoteDiff interface
-type DefaultRemoteDiff[T any] struct {
+type DefaultRemoteDiff[apiObject comparable] struct {
 
 	// CreateObject is the  object to create
-	createObject T
+	createObject apiObject
 
 	// UpdateObject is the object to update
-	updateObject T
+	updateObject apiObject
 
 	needCreate bool
 
@@ -53,45 +53,45 @@ type DefaultRemoteDiff[T any] struct {
 }
 
 // NewBasicRemoteDiff is the basic contructor of RemoteDiff interface
-func NewRemoteDiff[T any]() RemoteDiff[T] {
-	return &DefaultRemoteDiff[T]{}
+func NewRemoteDiff[apiObject comparable]() RemoteDiff[apiObject] {
+	return &DefaultRemoteDiff[apiObject]{}
 }
 
-func (h *DefaultRemoteDiff[T]) NeedCreate() bool {
+func (h *DefaultRemoteDiff[apiObject]) NeedCreate() bool {
 	return h.needCreate
 }
 
-func (h *DefaultRemoteDiff[T]) NeedUpdate() bool {
+func (h *DefaultRemoteDiff[apiObject]) NeedUpdate() bool {
 	return h.needUpdate
 }
 
-func (h *DefaultRemoteDiff[T]) GetObjectToCreate() T {
+func (h *DefaultRemoteDiff[apiObject]) GetObjectToCreate() apiObject {
 	return h.createObject
 }
 
-func (h *DefaultRemoteDiff[T]) SetObjectToCreate(object T) {
+func (h *DefaultRemoteDiff[apiObject]) SetObjectToCreate(object apiObject) {
 	h.createObject = object
 	h.needCreate = true
 }
 
-func (h *DefaultRemoteDiff[T]) GetObjectToUpdate() T {
+func (h *DefaultRemoteDiff[apiObject]) GetObjectToUpdate() apiObject {
 	return h.updateObject
 }
 
-func (h *DefaultRemoteDiff[T]) SetObjectToUpdate(object T) {
+func (h *DefaultRemoteDiff[apiObject]) SetObjectToUpdate(object apiObject) {
 	h.updateObject = object
 	h.needUpdate = true
 }
 
-func (h *DefaultRemoteDiff[T]) AddDiff(diff string) {
+func (h *DefaultRemoteDiff[apiObject]) AddDiff(diff string) {
 	h.diff.WriteString(diff)
 	h.diff.WriteString("\n")
 }
 
-func (h *DefaultRemoteDiff[T]) Diff() string {
+func (h *DefaultRemoteDiff[apiObject]) Diff() string {
 	return h.diff.String()
 }
 
-func (h *DefaultRemoteDiff[T]) IsDiff() bool {
+func (h *DefaultRemoteDiff[apiObject]) IsDiff() bool {
 	return h.diff.Len() > 0
 }

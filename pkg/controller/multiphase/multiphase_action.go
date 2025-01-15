@@ -17,40 +17,40 @@ import (
 )
 
 // MultiPhaseReconcilerAction is the methode needed by step reconciler to reconcile your custom resource
-type MultiPhaseReconcilerAction interface {
+type MultiPhaseReconcilerAction[k8sObject object.MultiPhaseObject] interface {
 	controller.ReconcilerAction
 
 	// Configure permit to init condition on status
-	Configure(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject, data map[string]any, logger *logrus.Entry) (res ctrl.Result, err error)
+	Configure(ctx context.Context, req ctrl.Request, o k8sObject, data map[string]any, logger *logrus.Entry) (res ctrl.Result, err error)
 
 	// Read permit to read kubernetes resources
-	Read(ctx context.Context, o object.MultiPhaseObject, data map[string]any, logger *logrus.Entry) (res ctrl.Result, err error)
+	Read(ctx context.Context, o k8sObject, data map[string]any, logger *logrus.Entry) (res ctrl.Result, err error)
 
 	// Delete permit to delete resources on kubernetes
-	Delete(ctx context.Context, o object.MultiPhaseObject, data map[string]any, logger *logrus.Entry) (err error)
+	Delete(ctx context.Context, o k8sObject, data map[string]any, logger *logrus.Entry) (err error)
 
 	// OnError is call when error is throwing on current phase
 	// It the right way to set status condition when error
-	OnError(ctx context.Context, o object.MultiPhaseObject, data map[string]any, currentErr error, logger *logrus.Entry) (res ctrl.Result, err error)
+	OnError(ctx context.Context, o k8sObject, data map[string]any, currentErr error, logger *logrus.Entry) (res ctrl.Result, err error)
 
 	// OnSuccess is call at the end of current phase, if not error
 	// It's the right way to set status condition when everithink is good
-	OnSuccess(ctx context.Context, o object.MultiPhaseObject, data map[string]any, logger *logrus.Entry) (res ctrl.Result, err error)
+	OnSuccess(ctx context.Context, o k8sObject, data map[string]any, logger *logrus.Entry) (res ctrl.Result, err error)
 }
 
 // BasicMultiPhaseReconcilerAction is the default implementation of MultiPhaseReconcilerAction interface
-type BasicMultiPhaseReconcilerAction struct {
+type BasicMultiPhaseReconcilerAction[k8sObject object.MultiPhaseObject] struct {
 	controller.ReconcilerAction
 }
 
 // NewMultiPhaseReconcilerAction is the default implementation of MultiPhaseReconcilerAction interface
-func NewMultiPhaseReconcilerAction(client client.Client, conditionName shared.ConditionName, recorder record.EventRecorder) (multiPhaseReconciler MultiPhaseReconcilerAction) {
-	return &BasicMultiPhaseReconcilerAction{
+func NewMultiPhaseReconcilerAction[k8sObject object.MultiPhaseObject](client client.Client, conditionName shared.ConditionName, recorder record.EventRecorder) (multiPhaseReconciler MultiPhaseReconcilerAction[k8sObject]) {
+	return &BasicMultiPhaseReconcilerAction[k8sObject]{
 		ReconcilerAction: controller.NewReconcilerAction(client, recorder, conditionName),
 	}
 }
 
-func (h *BasicMultiPhaseReconcilerAction) Configure(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject, data map[string]any, logger *logrus.Entry) (res ctrl.Result, err error) {
+func (h *BasicMultiPhaseReconcilerAction[k8sObject]) Configure(ctx context.Context, req ctrl.Request, o k8sObject, data map[string]any, logger *logrus.Entry) (res ctrl.Result, err error) {
 
 	conditions := o.GetStatus().GetConditions()
 	if condition.FindStatusCondition(conditions, h.Condition().String()) == nil {
@@ -65,15 +65,15 @@ func (h *BasicMultiPhaseReconcilerAction) Configure(ctx context.Context, req ctr
 	return res, nil
 }
 
-func (h *BasicMultiPhaseReconcilerAction) Read(ctx context.Context, o object.MultiPhaseObject, data map[string]any, logger *logrus.Entry) (res ctrl.Result, err error) {
+func (h *BasicMultiPhaseReconcilerAction[k8sObject]) Read(ctx context.Context, o k8sObject, data map[string]any, logger *logrus.Entry) (res ctrl.Result, err error) {
 	return
 }
 
-func (h *BasicMultiPhaseReconcilerAction) Delete(ctx context.Context, o object.MultiPhaseObject, data map[string]any, logger *logrus.Entry) (err error) {
+func (h *BasicMultiPhaseReconcilerAction[k8sObject]) Delete(ctx context.Context, o k8sObject, data map[string]any, logger *logrus.Entry) (err error) {
 	return
 }
 
-func (h *BasicMultiPhaseReconcilerAction) OnError(ctx context.Context, o object.MultiPhaseObject, data map[string]any, currentErr error, logger *logrus.Entry) (res ctrl.Result, err error) {
+func (h *BasicMultiPhaseReconcilerAction[k8sObject]) OnError(ctx context.Context, o k8sObject, data map[string]any, currentErr error, logger *logrus.Entry) (res ctrl.Result, err error) {
 
 	o.GetStatus().SetIsOnError(true)
 	o.GetStatus().SetLastErrorMessage(strings.ShortenString(currentErr.Error(), controller.ShortenError))
@@ -90,7 +90,7 @@ func (h *BasicMultiPhaseReconcilerAction) OnError(ctx context.Context, o object.
 	return res, errors.Wrap(currentErr, "Error on reconciler")
 }
 
-func (h *BasicMultiPhaseReconcilerAction) OnSuccess(ctx context.Context, o object.MultiPhaseObject, data map[string]any, logger *logrus.Entry) (res ctrl.Result, err error) {
+func (h *BasicMultiPhaseReconcilerAction[k8sObject]) OnSuccess(ctx context.Context, o k8sObject, data map[string]any, logger *logrus.Entry) (res ctrl.Result, err error) {
 
 	conditions := o.GetStatus().GetConditions()
 	if !condition.IsStatusConditionPresentAndEqual(conditions, h.Condition().String(), metav1.ConditionTrue) {

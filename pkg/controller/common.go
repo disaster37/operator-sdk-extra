@@ -44,7 +44,7 @@ func GetObjectStatus(r client.Object) any {
 	return om.Interface()
 }
 
-// MustInjectTypeMeta permit ton ject the typeMeta on client.Object
+// MustInjectTypeMeta permit to inject the typeMeta from src to dst
 func MustInjectTypeMeta(src, dst client.Object) {
 	var (
 		rt reflect.Type

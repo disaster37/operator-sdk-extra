@@ -6,18 +6,17 @@ import (
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func TestBasicMultiPhaseReadCurrent(t *testing.T) {
 
 	// With default object
-	o := &DefaultMultiPhaseRead{}
+	o := &DefaultMultiPhaseRead[*corev1.ConfigMap]{}
 
 	assert.Empty(t, o.GetCurrentObjects())
 
 	// When current objects
-	objects := []client.Object{
+	objects := []*corev1.ConfigMap{
 		&corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test",
@@ -33,12 +32,12 @@ func TestBasicMultiPhaseReadCurrent(t *testing.T) {
 func TestBasicMultiPhaseReadExpected(t *testing.T) {
 
 	// With default object
-	o := &DefaultMultiPhaseRead{}
+	o := &DefaultMultiPhaseRead[*corev1.ConfigMap]{}
 
 	assert.Empty(t, o.GetExpectedObjects())
 
 	// When current objects
-	objects := []client.Object{
+	objects := []*corev1.ConfigMap{
 		&corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test",

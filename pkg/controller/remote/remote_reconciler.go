@@ -21,20 +21,20 @@ import (
 )
 
 // RemoteReconciler is the reconciler to reconcile the remote resource
-type RemoteReconciler[k8sObject comparable, apiObject comparable, apiClient any] interface {
+type RemoteReconciler[k8sObject object.RemoteObject, apiObject comparable, apiClient any] interface {
 	controller.Reconciler
 
 	// Reconcile permit to reconcile the step (one K8s resource)
-	Reconcile(ctx context.Context, req ctrl.Request, o object.RemoteObject, data map[string]interface{}, reconciler RemoteReconcilerAction[k8sObject, apiObject, apiClient]) (res ctrl.Result, err error)
+	Reconcile(ctx context.Context, req ctrl.Request, o k8sObject, data map[string]interface{}, reconciler RemoteReconcilerAction[k8sObject, apiObject, apiClient]) (res ctrl.Result, err error)
 }
 
 // DefaultRemoteReconciler is the default implementation of RemoteReconciler interface
-type DefaultRemoteReconciler[k8sObject comparable, apiObject comparable, apiClient any] struct {
+type DefaultRemoteReconciler[k8sObject object.RemoteObject, apiObject comparable, apiClient any] struct {
 	controller.Reconciler
 }
 
 // NewRemoteReconciler permit to instanciate new basic multiphase resonciler
-func NewRemoteReconciler[k8sObject comparable, apiObject comparable, apiClient any](client client.Client, name string, finalizer shared.FinalizerName, logger *logrus.Entry, recorder record.EventRecorder) (remoteReconciler RemoteReconciler[k8sObject, apiObject, apiClient]) {
+func NewRemoteReconciler[k8sObject object.RemoteObject, apiObject comparable, apiClient any](client client.Client, name string, finalizer shared.FinalizerName, logger *logrus.Entry, recorder record.EventRecorder) (remoteReconciler RemoteReconciler[k8sObject, apiObject, apiClient]) {
 
 	return &DefaultRemoteReconciler[k8sObject, apiObject, apiClient]{
 		Reconciler: controller.NewReconciler(
@@ -48,7 +48,7 @@ func NewRemoteReconciler[k8sObject comparable, apiObject comparable, apiClient a
 	}
 }
 
-func (h *DefaultRemoteReconciler[k8sObject, apiObject, apiClient]) Reconcile(ctx context.Context, req ctrl.Request, o object.RemoteObject, data map[string]interface{}, reconciler RemoteReconcilerAction[k8sObject, apiObject, apiClient]) (res ctrl.Result, err error) {
+func (h *DefaultRemoteReconciler[k8sObject, apiObject, apiClient]) Reconcile(ctx context.Context, req ctrl.Request, o k8sObject, data map[string]interface{}, reconciler RemoteReconcilerAction[k8sObject, apiObject, apiClient]) (res ctrl.Result, err error) {
 
 	var (
 		handler RemoteExternalReconciler[k8sObject, apiObject, apiClient]

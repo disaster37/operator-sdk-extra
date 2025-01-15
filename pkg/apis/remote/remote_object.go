@@ -5,9 +5,9 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-// RemoteObjectStatus is the default status for CRD used to call remote API (not create K8s resources)
-type BasicRemoteObjectStatus struct {
-	apis.BasicObjectStatus `json:",inline"`
+// DefaultRemoteObjectStatus is the default status for CRD used to call remote API (not create K8s resources)
+type DefaultRemoteObjectStatus struct {
+	apis.DefaultObjectStatus `json:",inline"`
 
 	// IsSync is true if controller successfully apply on remote API
 	// +operator-sdk:csv:customresourcedefinitions:type=status
@@ -18,7 +18,7 @@ type BasicRemoteObjectStatus struct {
 	LastAppliedConfiguration string `json:"lastAppliedConfiguration,omitempty"`
 }
 
-func (h *BasicRemoteObjectStatus) GetIsSync() bool {
+func (h *DefaultRemoteObjectStatus) GetIsSync() bool {
 	if h.IsSync == nil || !*h.IsSync {
 		return false
 	}
@@ -26,14 +26,14 @@ func (h *BasicRemoteObjectStatus) GetIsSync() bool {
 	return true
 }
 
-func (h *BasicRemoteObjectStatus) SetIsSync(isSync bool) {
+func (h *DefaultRemoteObjectStatus) SetIsSync(isSync bool) {
 	h.IsSync = ptr.To[bool](isSync)
 }
 
-func (h *BasicRemoteObjectStatus) GetLastAppliedConfiguration() string {
+func (h *DefaultRemoteObjectStatus) GetLastAppliedConfiguration() string {
 	return h.LastAppliedConfiguration
 }
 
-func (h *BasicRemoteObjectStatus) SetLastAppliedConfiguration(object string) {
+func (h *DefaultRemoteObjectStatus) SetLastAppliedConfiguration(object string) {
 	h.LastAppliedConfiguration = object
 }

@@ -21,36 +21,36 @@ import (
 )
 
 // MultiPhaseReconciler the reconciler to implement whe you need to create multiple resources on k8s
-type MultiPhaseReconciler interface {
+type MultiPhaseReconciler[k8sObject object.MultiPhaseObject] interface {
 	controller.Reconciler
 
 	// Reconcile permit to orchestrate all phase needed to successfully reconcile the object
-	Reconcile(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject, data map[string]interface{}, reconcilerAction MultiPhaseReconcilerAction, reconcilersStepAction ...MultiPhaseStepReconcilerAction) (res ctrl.Result, err error)
+	Reconcile(ctx context.Context, req ctrl.Request, o k8sObject, data map[string]interface{}, reconcilerAction MultiPhaseReconcilerAction[k8sObject], reconcilersStepAction ...MultiPhaseStepReconcilerAction[k8sObject, client.Object]) (res ctrl.Result, err error)
 }
 
 // DefaultMultiPhaseReconciler is the default multi phase reconsiler you can used when  you should to create multiple k8s resources
-type DefaultMultiPhaseReconciler struct {
+type DefaultMultiPhaseReconciler[k8sObject object.MultiPhaseObject] struct {
 	controller.Reconciler
-	reconcilerStep MultiPhaseStepReconciler
+	reconcilerStep MultiPhaseStepReconciler[k8sObject, client.Object]
 }
 
 // NewMultiPhaseReconciler is the default implementation of MultiPhaseReconciler
-func NewMultiPhaseReconciler(client client.Client, name string, finalizer shared.FinalizerName, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseReconciler MultiPhaseReconciler) {
+func NewMultiPhaseReconciler[k8sObject object.MultiPhaseObject](c client.Client, name string, finalizer shared.FinalizerName, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseReconciler MultiPhaseReconciler[k8sObject]) {
 
-	return &DefaultMultiPhaseReconciler{
+	return &DefaultMultiPhaseReconciler[k8sObject]{
 		Reconciler: controller.NewReconciler(
-			client,
+			c,
 			recorder,
 			finalizer,
 			logger.WithFields(logrus.Fields{
 				"reconciler": name,
 			}),
 		),
-		reconcilerStep: NewMultiPhaseStepReconciler(client, logger, recorder),
+		reconcilerStep: NewMultiPhaseStepReconciler[k8sObject, client.Object](c, logger, recorder),
 	}
 }
 
-func (h *DefaultMultiPhaseReconciler) Reconcile(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject, data map[string]interface{}, reconcilerAction MultiPhaseReconcilerAction, reconcilersStepAction ...MultiPhaseStepReconcilerAction) (res ctrl.Result, err error) {
+func (h *DefaultMultiPhaseReconciler[k8sObject]) Reconcile(ctx context.Context, req ctrl.Request, o k8sObject, data map[string]interface{}, reconcilerAction MultiPhaseReconcilerAction[k8sObject], reconcilersStepAction ...MultiPhaseStepReconcilerAction[k8sObject, client.Object]) (res ctrl.Result, err error) {
 
 	// Init logger
 	logger := h.Logger().WithFields(logrus.Fields{

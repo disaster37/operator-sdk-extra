@@ -1,52 +1,33 @@
 package controller
 
 import (
-	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/apis"
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/object"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/suite"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
-
-type testApiObject struct {
-	Name string
-}
-
-type testRemoteObject struct {
-	Status            apis.BasicRemoteObjectStatus `json:"status,omitempty"`
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-}
-
-func (h *testRemoteObject) DeepCopyObject() runtime.Object       { return nil }
-func (h *testRemoteObject) GetExternalName() string              { return "test" }
-func (h *testRemoteObject) GetStatus() object.RemoteObjectStatus { return &h.Status }
-
-type testHandler struct{}
 
 var testEnv *envtest.Environment
 
-type RemoteReconcilerTestSuite struct {
+type ControllerTestSuite struct {
 	suite.Suite
-	k8sClient client.Client
+	k8sClient  client.Client
+	k8sManager manager.Manager
 }
 
-func TestRemoteReconcilerSuite(t *testing.T) {
-	suite.Run(t, new(RemoteReconcilerTestSuite))
+func TestControllerSuite(t *testing.T) {
+	suite.Run(t, new(ControllerTestSuite))
 }
 
-func (t *RemoteReconcilerTestSuite) SetupSuite() {
+func (t *ControllerTestSuite) SetupSuite() {
 	logf.SetLogger(zap.New(zap.UseDevMode(true)))
 	logrus.SetLevel(logrus.TraceLevel)
 	logrus.SetFormatter(&logrus.TextFormatter{
@@ -55,10 +36,7 @@ func (t *RemoteReconcilerTestSuite) SetupSuite() {
 
 	// Setup testenv
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths: []string{
-			filepath.Join("../..", "config", "crd", "bases"),
-		},
-		ErrorIfCRDPathMissing:    true,
+		ErrorIfCRDPathMissing:    false,
 		ControlPlaneStopTimeout:  120 * time.Second,
 		ControlPlaneStartTimeout: 120 * time.Second,
 	}
@@ -82,6 +60,7 @@ func (t *RemoteReconcilerTestSuite) SetupSuite() {
 	}
 	k8sClient := k8sManager.GetClient()
 	t.k8sClient = k8sClient
+	t.k8sManager = k8sManager
 
 	go func() {
 		err = k8sManager.Start(ctrl.SetupSignalHandler())
@@ -91,7 +70,7 @@ func (t *RemoteReconcilerTestSuite) SetupSuite() {
 	}()
 }
 
-func (t *RemoteReconcilerTestSuite) TearDownSuite() {
+func (t *ControllerTestSuite) TearDownSuite() {
 
 	// Teardown the test environment once controller is fnished.
 	// Otherwise from Kubernetes 1.21+, teardon timeouts waiting on

@@ -1,19 +1,19 @@
 package remote
 
 // RemoteRead is the interface to store the result of read on remote reconciler
-type RemoteRead[T any] interface {
+type RemoteRead[apiObject comparable] interface {
 
 	// GetCurrentObject permit to get the current object
-	GetCurrentObject() T
+	GetCurrentObject() apiObject
 
 	// SetCurrentObject permit to set the current object
-	SetCurrentObject(object T)
+	SetCurrentObject(object apiObject)
 
 	// GetExpectedObject permit to get the  expected object
-	GetExpectedObject() T
+	GetExpectedObject() apiObject
 
 	// SetExpectedObject permit to set the expected object
-	SetExpectedObject(object T)
+	SetExpectedObject(object apiObject)
 }
 
 // DefaultRemoteRead is the default implementation of RemoteRead
@@ -23,22 +23,22 @@ type DefaultRemoteRead[T any] struct {
 }
 
 // NewRemoteRead is the default implementation of RemoteRead interface
-func NewRemoteRead[T any]() RemoteRead[T] {
-	return &DefaultRemoteRead[T]{}
+func NewRemoteRead[apiObject comparable]() RemoteRead[apiObject] {
+	return &DefaultRemoteRead[apiObject]{}
 }
 
-func (h *DefaultRemoteRead[T]) GetCurrentObject() T {
+func (h *DefaultRemoteRead[apiObject]) GetCurrentObject() apiObject {
 	return h.currentObject
 }
 
-func (h *DefaultRemoteRead[T]) SetCurrentObject(object T) {
+func (h *DefaultRemoteRead[apiObject]) SetCurrentObject(object apiObject) {
 	h.currentObject = object
 }
 
-func (h *DefaultRemoteRead[T]) GetExpectedObject() T {
+func (h *DefaultRemoteRead[apiObject]) GetExpectedObject() apiObject {
 	return h.expectedObject
 }
 
-func (h *DefaultRemoteRead[T]) SetExpectedObject(object T) {
+func (h *DefaultRemoteRead[apiObject]) SetExpectedObject(object apiObject) {
 	h.expectedObject = object
 }

@@ -5,8 +5,8 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-// BasicObjectStatus is the default status for basic Object
-type BasicObjectStatus struct {
+// DefaultObjectStatus is the default status for default Object
+type DefaultObjectStatus struct {
 
 	// IsOnError is true if controller is stuck on Error
 	// +operator-sdk:csv:customresourcedefinitions:type=status
@@ -25,15 +25,15 @@ type BasicObjectStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
-func (h *BasicObjectStatus) GetConditions() []metav1.Condition {
+func (h *DefaultObjectStatus) GetConditions() []metav1.Condition {
 	return h.Conditions
 }
 
-func (h *BasicObjectStatus) SetConditions(conditions []metav1.Condition) {
+func (h *DefaultObjectStatus) SetConditions(conditions []metav1.Condition) {
 	h.Conditions = conditions
 }
 
-func (h *BasicObjectStatus) GetIsOnError() bool {
+func (h *DefaultObjectStatus) GetIsOnError() bool {
 	if h.IsOnError == nil || !*h.IsOnError {
 		return false
 	}
@@ -41,22 +41,22 @@ func (h *BasicObjectStatus) GetIsOnError() bool {
 	return true
 }
 
-func (h *BasicObjectStatus) SetIsOnError(isError bool) {
+func (h *DefaultObjectStatus) SetIsOnError(isError bool) {
 	h.IsOnError = ptr.To[bool](isError)
 }
 
-func (h *BasicObjectStatus) GetLastErrorMessage() string {
+func (h *DefaultObjectStatus) GetLastErrorMessage() string {
 	return h.LastErrorMessage
 }
 
-func (h *BasicObjectStatus) SetLastErrorMessage(message string) {
+func (h *DefaultObjectStatus) SetLastErrorMessage(message string) {
 	h.LastErrorMessage = message
 }
 
-func (h *BasicObjectStatus) GetObservedGeneration() int64 {
+func (h *DefaultObjectStatus) GetObservedGeneration() int64 {
 	return h.ObservedGeneration
 }
 
-func (h *BasicObjectStatus) SetObservedGeneration(version int64) {
+func (h *DefaultObjectStatus) SetObservedGeneration(version int64) {
 	h.ObservedGeneration = version
 }

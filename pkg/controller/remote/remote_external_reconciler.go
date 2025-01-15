@@ -5,11 +5,12 @@ import (
 
 	"emperror.dev/errors"
 	"github.com/disaster37/generic-objectmatcher/patch"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/object"
 	jsonIterator "github.com/json-iterator/go"
 )
 
 // RemoteExternalReconciler is the interface to call the remote API to handler resource
-type RemoteExternalReconciler[k8sObject comparable, apiObject comparable, apiClient any] interface {
+type RemoteExternalReconciler[k8sObject object.RemoteObject, apiObject comparable, apiClient any] interface {
 	Build(k8sO k8sObject) (object apiObject, err error)
 	Get(k8sO k8sObject) (object apiObject, err error)
 	Create(apiO apiObject, k8sO k8sObject) (err error)
@@ -21,11 +22,11 @@ type RemoteExternalReconciler[k8sObject comparable, apiObject comparable, apiCli
 
 // DefaultRemoteExternalReconciler is the default implementation of RemoteExternalReconciler
 // It only implement the Diff method, because of is generic with 3-way merge patch
-type DefaultRemoteExternalReconciler[k8sObject comparable, apiObject comparable, apiClient any] struct {
+type DefaultRemoteExternalReconciler[k8sObject object.RemoteObject, apiObject comparable, apiClient any] struct {
 	client apiClient
 }
 
-func NewRemoteExternalReconciler[k8sObject comparable, apiObject comparable, apiClient any](handler apiClient) RemoteExternalReconciler[k8sObject, apiObject, apiClient] {
+func NewRemoteExternalReconciler[k8sObject object.RemoteObject, apiObject comparable, apiClient any](handler apiClient) RemoteExternalReconciler[k8sObject, apiObject, apiClient] {
 	return &DefaultRemoteExternalReconciler[k8sObject, apiObject, apiClient]{
 		client: handler,
 	}
