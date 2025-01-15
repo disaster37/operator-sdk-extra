@@ -1,4 +1,4 @@
-package controller
+package remote
 
 import (
 	"testing"
@@ -8,7 +8,7 @@ import (
 )
 
 func TestBasicRemoteDiffDiff(t *testing.T) {
-	o := NewBasicRemoteDiff[*kbapi.LogstashPipeline]()
+	o := NewRemoteDiff[*kbapi.LogstashPipeline]()
 
 	assert.False(t, o.IsDiff())
 	assert.Empty(t, o.Diff())
@@ -20,7 +20,7 @@ func TestBasicRemoteDiffDiff(t *testing.T) {
 }
 
 func TestBasicRemoteDiffCreate(t *testing.T) {
-	o := NewBasicRemoteDiff[*kbapi.LogstashPipeline]()
+	o := NewRemoteDiff[*kbapi.LogstashPipeline]()
 
 	assert.False(t, o.NeedCreate())
 	assert.Nil(t, o.GetObjectToCreate())
@@ -35,7 +35,7 @@ func TestBasicRemoteDiffCreate(t *testing.T) {
 }
 
 func TestBasicRemoteDiffUpdate(t *testing.T) {
-	o := NewBasicRemoteDiff[*kbapi.LogstashPipeline]()
+	o := NewRemoteDiff[*kbapi.LogstashPipeline]()
 
 	assert.False(t, o.NeedUpdate())
 	assert.Nil(t, o.GetObjectToUpdate())

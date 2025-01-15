@@ -4,7 +4,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/disaster37/operator-sdk-extra/testdata/memcached-operator/api/v1alpha1"
+	"github.com/disaster37/operator-sdk-extra/v2/testdata/memcached-operator/api/v1alpha1"
 	"github.com/thoas/go-funk"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"

@@ -1,11 +1,12 @@
-package controller
+package multiphase
 
 import (
 	"context"
 
 	"emperror.dev/errors"
-	"github.com/disaster37/operator-sdk-extra/pkg/apis/shared"
-	"github.com/disaster37/operator-sdk-extra/pkg/object"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/apis/shared"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/object"
 	"github.com/sirupsen/logrus"
 	condition "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -17,7 +18,7 @@ import (
 
 // MultiPhaseReconcilerAction is the methode needed by step reconciler to reconcile your custom resource
 type MultiPhaseReconcilerAction interface {
-	BaseReconciler
+	controller.ReconcilerAction
 
 	// Configure permit to init condition on status
 	Configure(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject, data map[string]any, logger *logrus.Entry) (res ctrl.Result, err error)
@@ -37,27 +38,24 @@ type MultiPhaseReconcilerAction interface {
 	OnSuccess(ctx context.Context, o object.MultiPhaseObject, data map[string]any, logger *logrus.Entry) (res ctrl.Result, err error)
 }
 
-// BasicMultiPhaseReconcilerAction is the basic implementation of MultiPhaseReconcilerAction interface
+// BasicMultiPhaseReconcilerAction is the default implementation of MultiPhaseReconcilerAction interface
 type BasicMultiPhaseReconcilerAction struct {
-	BasicReconcilerAction
+	controller.ReconcilerAction
 }
 
-// NewBasicMultiPhaseReconcilerAction is the basic contructor of MultiPhaseReconcilerAction interface
-func NewBasicMultiPhaseReconcilerAction(client client.Client, conditionName shared.ConditionName, recorder record.EventRecorder) (multiPhaseReconciler MultiPhaseReconcilerAction) {
+// NewMultiPhaseReconcilerAction is the default implementation of MultiPhaseReconcilerAction interface
+func NewMultiPhaseReconcilerAction(client client.Client, conditionName shared.ConditionName, recorder record.EventRecorder) (multiPhaseReconciler MultiPhaseReconcilerAction) {
 	return &BasicMultiPhaseReconcilerAction{
-		BasicReconcilerAction: BasicReconcilerAction{
-			BaseReconciler: NewBaseReconciler(client, recorder),
-			conditionName:  conditionName,
-		},
+		ReconcilerAction: controller.NewReconcilerAction(client, recorder, conditionName),
 	}
 }
 
 func (h *BasicMultiPhaseReconcilerAction) Configure(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject, data map[string]any, logger *logrus.Entry) (res ctrl.Result, err error) {
 
 	conditions := o.GetStatus().GetConditions()
-	if condition.FindStatusCondition(conditions, h.conditionName.String()) == nil {
+	if condition.FindStatusCondition(conditions, h.Condition().String()) == nil {
 		condition.SetStatusCondition(&conditions, metav1.Condition{
-			Type:   h.conditionName.String(),
+			Type:   h.Condition().String(),
 			Status: metav1.ConditionFalse,
 			Reason: "Initialize",
 		})
@@ -78,14 +76,14 @@ func (h *BasicMultiPhaseReconcilerAction) Delete(ctx context.Context, o object.M
 func (h *BasicMultiPhaseReconcilerAction) OnError(ctx context.Context, o object.MultiPhaseObject, data map[string]any, currentErr error, logger *logrus.Entry) (res ctrl.Result, err error) {
 
 	o.GetStatus().SetIsOnError(true)
-	o.GetStatus().SetLastErrorMessage(strings.ShortenString(currentErr.Error(), ShortenError))
+	o.GetStatus().SetLastErrorMessage(strings.ShortenString(currentErr.Error(), controller.ShortenError))
 
 	conditions := o.GetStatus().GetConditions()
 	condition.SetStatusCondition(&conditions, metav1.Condition{
-		Type:    h.conditionName.String(),
+		Type:    h.Condition().String(),
 		Status:  metav1.ConditionFalse,
 		Reason:  "Failed",
-		Message: strings.ShortenString(currentErr.Error(), ShortenError),
+		Message: strings.ShortenString(currentErr.Error(), controller.ShortenError),
 	})
 	o.GetStatus().SetConditions(conditions)
 
@@ -95,16 +93,16 @@ func (h *BasicMultiPhaseReconcilerAction) OnError(ctx context.Context, o object.
 func (h *BasicMultiPhaseReconcilerAction) OnSuccess(ctx context.Context, o object.MultiPhaseObject, data map[string]any, logger *logrus.Entry) (res ctrl.Result, err error) {
 
 	conditions := o.GetStatus().GetConditions()
-	if !condition.IsStatusConditionPresentAndEqual(conditions, h.conditionName.String(), metav1.ConditionTrue) {
+	if !condition.IsStatusConditionPresentAndEqual(conditions, h.Condition().String(), metav1.ConditionTrue) {
 		condition.SetStatusCondition(&conditions, metav1.Condition{
-			Type:   h.conditionName.String(),
+			Type:   h.Condition().String(),
 			Status: metav1.ConditionTrue,
 			Reason: "Ready",
 		})
 	}
 	o.GetStatus().SetConditions(conditions)
 
-	o.GetStatus().SetPhaseName(RunningPhase)
+	o.GetStatus().SetPhaseName(controller.RunningPhase)
 	o.GetStatus().SetIsOnError(false)
 	o.GetStatus().SetObservedGeneration(o.GetGeneration())
 

@@ -9,7 +9,7 @@ import (
 
 	"emperror.dev/errors"
 	eshandler "github.com/disaster37/es-handler/v8"
-	elasticsearchapicrd "github.com/disaster37/operator-sdk-extra/testdata/elasticsearch-operator/api/v1alpha1"
+	elasticsearchapicrd "github.com/disaster37/operator-sdk-extra/v2/testdata/elasticsearch-operator/api/v1alpha1"
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
 	elastic "github.com/elastic/go-elasticsearch/v8"
 	"github.com/sirupsen/logrus"

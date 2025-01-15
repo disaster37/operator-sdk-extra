@@ -1,11 +1,11 @@
-module github.com/disaster37/operator-sdk-extra/testdata/memcached-operator
+module github.com/disaster37/operator-sdk-extra/v2/testdata/memcached-operator
 
 go 1.19
 
 require (
 	emperror.dev/errors v0.8.1
 	github.com/disaster37/k8s-objectmatcher v1.8.2
-	github.com/disaster37/operator-sdk-extra v0.1.3-0.20231107132719-b3884284ad9d
+	github.com/disaster37/operator-sdk-extra/v2 v0.1.3-0.20231107132719-b3884284ad9d
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.8.4
 	github.com/thoas/go-funk v0.9.3

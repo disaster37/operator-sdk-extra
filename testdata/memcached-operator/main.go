@@ -33,8 +33,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	cachev1alpha1 "github.com/disaster37/operator-sdk-extra/testdata/memcached-operator/api/v1alpha1"
-	"github.com/disaster37/operator-sdk-extra/testdata/memcached-operator/controllers"
+	cachev1alpha1 "github.com/disaster37/operator-sdk-extra/v2/testdata/memcached-operator/api/v1alpha1"
+	"github.com/disaster37/operator-sdk-extra/v2/testdata/memcached-operator/controllers"
 	"github.com/sirupsen/logrus"
 	//+kubebuilder:scaffold:imports
 )

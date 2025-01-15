@@ -1,4 +1,4 @@
-package controller
+package multiphase
 
 import "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -18,29 +18,29 @@ type MultiPhaseRead interface {
 	SetExpectedObjects(objects []client.Object)
 }
 
-// BasicMultiPhaseRead is the basic implementation if MultiPhaseRead
-type BasicMultiPhaseRead struct {
+// DefaultMultiPhaseRead is the default implementation if MultiPhaseRead
+type DefaultMultiPhaseRead struct {
 	currentObjects  []client.Object
 	expectedObjects []client.Object
 }
 
-// NewBasicMultiPhaseRead is the basic constructor of MultiPhaseRead interface
-func NewBasicMultiPhaseRead() MultiPhaseRead {
-	return &BasicMultiPhaseRead{}
+// NewMultiPhaseRead is the default implementation of MultiPhaseRead interface
+func NewMultiPhaseRead() MultiPhaseRead {
+	return &DefaultMultiPhaseRead{}
 }
 
-func (h *BasicMultiPhaseRead) GetCurrentObjects() []client.Object {
+func (h *DefaultMultiPhaseRead) GetCurrentObjects() []client.Object {
 	return h.currentObjects
 }
 
-func (h *BasicMultiPhaseRead) SetCurrentObjects(objects []client.Object) {
+func (h *DefaultMultiPhaseRead) SetCurrentObjects(objects []client.Object) {
 	h.currentObjects = objects
 }
 
-func (h *BasicMultiPhaseRead) GetExpectedObjects() []client.Object {
+func (h *DefaultMultiPhaseRead) GetExpectedObjects() []client.Object {
 	return h.expectedObjects
 }
 
-func (h *BasicMultiPhaseRead) SetExpectedObjects(objects []client.Object) {
+func (h *DefaultMultiPhaseRead) SetExpectedObjects(objects []client.Object) {
 	h.expectedObjects = objects
 }

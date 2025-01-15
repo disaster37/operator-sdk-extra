@@ -13,7 +13,7 @@
  ### Bootstrap new operator
 
 ```bash
-operator-sdk init --domain=example.com --repo=github.com/disaster37/operator-sdk-extra/testdata/memcached-operator
+operator-sdk init --domain=example.com --repo=github.com/disaster37/operator-sdk-extra/v2/testdata/memcached-operator
 
 operator-sdk create api --group cache --version v1alpha1 --kind Memcached --resource --controller
 ```
@@ -88,7 +88,7 @@ Some explains:
 ```golang
 package v1alpha1
 
-import "github.com/disaster37/operator-sdk-extra/pkg/object"
+import "github.com/disaster37/operator-sdk-extra/v2/pkg/object"
 
 func (h *Memcached) GetStatus() object.MultiPhaseObjectStatus {
 	return &h.Status
@@ -118,7 +118,7 @@ We start to create the configMap builder to generate the expected configMap
 package controllers
 
 import (
-	"github.com/disaster37/operator-sdk-extra/testdata/memcached-operator/api/v1alpha1"
+	"github.com/disaster37/operator-sdk-extra/v2/testdata/memcached-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -159,11 +159,11 @@ import (
 	"fmt"
 
 	"emperror.dev/errors"
-	"github.com/disaster37/operator-sdk-extra/pkg/apis/shared"
-	"github.com/disaster37/operator-sdk-extra/pkg/controller"
-	"github.com/disaster37/operator-sdk-extra/pkg/helper"
-	"github.com/disaster37/operator-sdk-extra/pkg/object"
-	"github.com/disaster37/operator-sdk-extra/testdata/memcached-operator/api/v1alpha1"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/apis/shared"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/helper"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/object"
+	"github.com/disaster37/operator-sdk-extra/v2/testdata/memcached-operator/api/v1alpha1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -245,7 +245,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/disaster37/operator-sdk-extra/testdata/memcached-operator/api/v1alpha1"
+	"github.com/disaster37/operator-sdk-extra/v2/testdata/memcached-operator/api/v1alpha1"
 	"github.com/thoas/go-funk"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -415,11 +415,11 @@ import (
 	"fmt"
 
 	"emperror.dev/errors"
-	"github.com/disaster37/operator-sdk-extra/pkg/apis/shared"
-	"github.com/disaster37/operator-sdk-extra/pkg/controller"
-	"github.com/disaster37/operator-sdk-extra/pkg/helper"
-	"github.com/disaster37/operator-sdk-extra/pkg/object"
-	"github.com/disaster37/operator-sdk-extra/testdata/memcached-operator/api/v1alpha1"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/apis/shared"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/helper"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/object"
+	"github.com/disaster37/operator-sdk-extra/v2/testdata/memcached-operator/api/v1alpha1"
 	"github.com/sirupsen/logrus"
 	appv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -525,8 +525,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/disaster37/operator-sdk-extra/pkg/controller"
-	cachecrd "github.com/disaster37/operator-sdk-extra/testdata/memcached-operator/api/v1alpha1"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller"
+	cachecrd "github.com/disaster37/operator-sdk-extra/v2/testdata/memcached-operator/api/v1alpha1"
 	"github.com/sirupsen/logrus"
 )
 
@@ -661,8 +661,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	cachev1alpha1 "github.com/disaster37/operator-sdk-extra/testdata/memcached-operator/api/v1alpha1"
-	"github.com/disaster37/operator-sdk-extra/testdata/memcached-operator/controllers"
+	cachev1alpha1 "github.com/disaster37/operator-sdk-extra/v2/testdata/memcached-operator/api/v1alpha1"
+	"github.com/disaster37/operator-sdk-extra/v2/testdata/memcached-operator/controllers"
 	"github.com/sirupsen/logrus"
 	//+kubebuilder:scaffold:imports
 )

@@ -1,4 +1,4 @@
-package controller
+package remote
 
 import (
 	"testing"
@@ -8,7 +8,7 @@ import (
 )
 
 func TestBasicRemoteReadCurrent(t *testing.T) {
-	o := NewBasicRemoteRead[*kbapi.LogstashPipeline]()
+	o := NewRemoteRead[*kbapi.LogstashPipeline]()
 
 	assert.Empty(t, o.GetCurrentObject())
 
@@ -19,7 +19,7 @@ func TestBasicRemoteReadCurrent(t *testing.T) {
 }
 
 func TestBasicRemoteReadExpected(t *testing.T) {
-	o := NewBasicRemoteRead[*kbapi.LogstashPipeline]()
+	o := NewRemoteRead[*kbapi.LogstashPipeline]()
 
 	assert.Empty(t, o.GetExpectedObject())
 

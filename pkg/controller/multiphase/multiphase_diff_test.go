@@ -1,4 +1,4 @@
-package controller
+package multiphase
 
 import (
 	"testing"
@@ -12,7 +12,7 @@ import (
 func TestBasicMultiPhaseDiffDiff(t *testing.T) {
 
 	// With default object
-	o := &BasicMultiPhaseDiff{}
+	o := &DefaultMultiPhaseDiff{}
 
 	assert.False(t, o.IsDiff())
 	assert.Empty(t, o.Diff())
@@ -27,7 +27,7 @@ func TestBasicMultiPhaseDiffDiff(t *testing.T) {
 func TestBasicMultiPhaseDiffCreate(t *testing.T) {
 
 	// With default object
-	o := &BasicMultiPhaseDiff{}
+	o := &DefaultMultiPhaseDiff{}
 
 	assert.False(t, o.NeedCreate())
 	assert.Empty(t, o.GetObjectsToCreate())
@@ -50,7 +50,7 @@ func TestBasicMultiPhaseDiffCreate(t *testing.T) {
 func TestBasicMultiPhaseDiffUpdate(t *testing.T) {
 
 	// With default object
-	o := &BasicMultiPhaseDiff{}
+	o := &DefaultMultiPhaseDiff{}
 
 	assert.False(t, o.NeedUpdate())
 	assert.Empty(t, o.GetObjectsToUpdate())
@@ -73,7 +73,7 @@ func TestBasicMultiPhaseDiffUpdate(t *testing.T) {
 func TestBasicMultiPhaseDiffDelete(t *testing.T) {
 
 	// With default object
-	o := &BasicMultiPhaseDiff{}
+	o := &DefaultMultiPhaseDiff{}
 
 	assert.False(t, o.NeedDelete())
 	assert.Empty(t, o.GetObjectsToDelete())

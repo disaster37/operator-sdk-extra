@@ -1,4 +1,4 @@
-package controller
+package sentinel
 
 import (
 	"context"
@@ -6,7 +6,8 @@ import (
 
 	"emperror.dev/errors"
 	"github.com/disaster37/k8s-objectmatcher/patch"
-	"github.com/disaster37/operator-sdk-extra/pkg/helper"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/helper"
 	"github.com/sirupsen/logrus"
 	"github.com/thoas/go-funk"
 	corev1 "k8s.io/api/core/v1"
@@ -16,10 +17,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// SentinelAction is the interface that use by sentinel reconciler
+// SentinelReconcilerAction is the interface that use by sentinel reconciler
 // Put logger param on each function, permit to set contextual fields like namespace and object name, object type
 type SentinelReconcilerAction interface {
-	BaseReconciler
+	controller.ReconcilerAction
 
 	// Confirgure permit to init external provider driver (API client REST)
 	// It can also permit to init condition on status
@@ -54,27 +55,27 @@ type SentinelReconcilerAction interface {
 	GetIgnoresDiff() []patch.CalculateOption
 }
 
-// BasicSentinelAction is the basic implementation of SentinelAction
-type BasicSentinelAction struct {
-	BasicReconcilerAction
+// DefaultSentinelAction is the default implementation of SentinelAction
+type DefaultSentinelAction struct {
+	controller.ReconcilerAction
 }
 
-// NewRemoteReconcilerAction is the basic constructor of RemoteReconcilerAction interface
-func NewBasicSentinelAction(client client.Client, recorder record.EventRecorder) (sentinelReconciler SentinelReconcilerAction) {
-	return &BasicSentinelAction{
-		BasicReconcilerAction: NewBasicReconcilerAction(client, recorder, ReadyCondition),
+// NewSentinelAction is the default implementation of SentinelReconcilerAction interface
+func NewSentinelAction(client client.Client, recorder record.EventRecorder) (sentinelReconciler SentinelReconcilerAction) {
+	return &DefaultSentinelAction{
+		ReconcilerAction: controller.NewReconcilerAction(client, recorder, controller.ReadyCondition),
 	}
 }
 
-func (h *BasicSentinelAction) Configure(ctx context.Context, req ctrl.Request, o client.Object, data map[string]any, logger *logrus.Entry) (res ctrl.Result, err error) {
+func (h *DefaultSentinelAction) Configure(ctx context.Context, req ctrl.Request, o client.Object, data map[string]any, logger *logrus.Entry) (res ctrl.Result, err error) {
 	return res, nil
 }
 
-func (h *BasicSentinelAction) Read(ctx context.Context, o client.Object, data map[string]any, logger *logrus.Entry) (read SentinelRead, res ctrl.Result, err error) {
+func (h *DefaultSentinelAction) Read(ctx context.Context, o client.Object, data map[string]any, logger *logrus.Entry) (read SentinelRead, res ctrl.Result, err error) {
 	panic("You need implement it")
 }
 
-func (h *BasicSentinelAction) Create(ctx context.Context, o client.Object, data map[string]any, objects []client.Object, logger *logrus.Entry) (res ctrl.Result, err error) {
+func (h *DefaultSentinelAction) Create(ctx context.Context, o client.Object, data map[string]any, objects []client.Object, logger *logrus.Entry) (res ctrl.Result, err error) {
 
 	for _, oChild := range objects {
 
@@ -101,7 +102,7 @@ func (h *BasicSentinelAction) Create(ctx context.Context, o client.Object, data 
 
 // Update can be call on your own version
 // It only add some log / events
-func (h *BasicSentinelAction) Update(ctx context.Context, o client.Object, data map[string]any, objects []client.Object, logger *logrus.Entry) (res ctrl.Result, err error) {
+func (h *DefaultSentinelAction) Update(ctx context.Context, o client.Object, data map[string]any, objects []client.Object, logger *logrus.Entry) (res ctrl.Result, err error) {
 
 	for _, oChild := range objects {
 		if err = h.Client().Update(ctx, oChild); err != nil {
@@ -115,7 +116,7 @@ func (h *BasicSentinelAction) Update(ctx context.Context, o client.Object, data 
 }
 
 // Delete delete objects
-func (h *BasicSentinelAction) Delete(ctx context.Context, o client.Object, data map[string]any, objects []client.Object, logger *logrus.Entry) (err error) {
+func (h *DefaultSentinelAction) Delete(ctx context.Context, o client.Object, data map[string]any, objects []client.Object, logger *logrus.Entry) (err error) {
 
 	for _, oChild := range objects {
 		if err = h.Client().Delete(ctx, oChild); err != nil {
@@ -128,18 +129,18 @@ func (h *BasicSentinelAction) Delete(ctx context.Context, o client.Object, data 
 	return nil
 }
 
-func (h *BasicSentinelAction) OnError(ctx context.Context, o client.Object, data map[string]any, currentErr error, logger *logrus.Entry) (res ctrl.Result, err error) {
-	h.Recorder().Event(o, corev1.EventTypeWarning, "SentinelActionError", k8sstrings.ShortenString(currentErr.Error(), ShortenError))
+func (h *DefaultSentinelAction) OnError(ctx context.Context, o client.Object, data map[string]any, currentErr error, logger *logrus.Entry) (res ctrl.Result, err error) {
+	h.Recorder().Event(o, corev1.EventTypeWarning, "SentinelActionError", k8sstrings.ShortenString(currentErr.Error(), controller.ShortenError))
 	return res, currentErr
 }
 
-func (h *BasicSentinelAction) OnSuccess(ctx context.Context, o client.Object, data map[string]any, diff SentinelDiff, logger *logrus.Entry) (res ctrl.Result, err error) {
+func (h *DefaultSentinelAction) OnSuccess(ctx context.Context, o client.Object, data map[string]any, diff SentinelDiff, logger *logrus.Entry) (res ctrl.Result, err error) {
 	return res, nil
 }
 
-func (h *BasicSentinelAction) Diff(ctx context.Context, o client.Object, read SentinelRead, data map[string]any, logger *logrus.Entry, ignoreDiff ...patch.CalculateOption) (diff SentinelDiff, res ctrl.Result, err error) {
+func (h *DefaultSentinelAction) Diff(ctx context.Context, o client.Object, read SentinelRead, data map[string]any, logger *logrus.Entry, ignoreDiff ...patch.CalculateOption) (diff SentinelDiff, res ctrl.Result, err error) {
 
-	diff = NewBasicSentinelDiff()
+	diff = NewSentinelDiff()
 
 	patchOptions := []patch.CalculateOption{
 		patch.CleanMetadata(),
@@ -166,7 +167,7 @@ func (h *BasicSentinelAction) Diff(ctx context.Context, o client.Object, read Se
 					isFound = true
 
 					// Copy TypeMeta to work with some ignore rules like IgnorePDBSelector()
-					MustInjectTypeMeta(currentObject, expectedObject)
+					controller.MustInjectTypeMeta(currentObject, expectedObject)
 					patchResult, err := patch.DefaultPatchMaker.Calculate(currentObject, expectedObject, patchOptions...)
 					if err != nil {
 						return diff, res, errors.Wrapf(err, "Error when diffing object '%s'", currentObject.GetName())
@@ -212,6 +213,6 @@ func (h *BasicSentinelAction) Diff(ctx context.Context, o client.Object, read Se
 	return diff, res, nil
 }
 
-func (h *BasicSentinelAction) GetIgnoresDiff() []patch.CalculateOption {
+func (h *DefaultSentinelAction) GetIgnoresDiff() []patch.CalculateOption {
 	return make([]patch.CalculateOption, 0)
 }

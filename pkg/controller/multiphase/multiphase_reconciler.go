@@ -1,4 +1,4 @@
-package controller
+package multiphase
 
 import (
 	"context"
@@ -7,8 +7,9 @@ import (
 	"time"
 
 	"emperror.dev/errors"
-	"github.com/disaster37/operator-sdk-extra/pkg/apis/shared"
-	"github.com/disaster37/operator-sdk-extra/pkg/object"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/apis/shared"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/object"
 	"github.com/google/go-cmp/cmp"
 	"github.com/mitchellh/copystructure"
 	"github.com/sirupsen/logrus"
@@ -21,22 +22,23 @@ import (
 
 // MultiPhaseReconciler the reconciler to implement whe you need to create multiple resources on k8s
 type MultiPhaseReconciler interface {
+	controller.Reconciler
 
 	// Reconcile permit to orchestrate all phase needed to successfully reconcile the object
 	Reconcile(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject, data map[string]interface{}, reconcilerAction MultiPhaseReconcilerAction, reconcilersStepAction ...MultiPhaseStepReconcilerAction) (res ctrl.Result, err error)
 }
 
-// BasicMultiPhaseReconciler is the basic multi phase reconsiler you can used whe  you should to create multiple k8s resources
-type BasicMultiPhaseReconciler struct {
-	BasicReconciler
+// DefaultMultiPhaseReconciler is the default multi phase reconsiler you can used when  you should to create multiple k8s resources
+type DefaultMultiPhaseReconciler struct {
+	controller.Reconciler
 	reconcilerStep MultiPhaseStepReconciler
 }
 
-// NewBasicMultiPhaseReconciler permit to instanciate new basic multiphase resonciler
-func NewBasicMultiPhaseReconciler(client client.Client, name string, finalizer shared.FinalizerName, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseReconciler MultiPhaseReconciler) {
+// NewMultiPhaseReconciler is the default implementation of MultiPhaseReconciler
+func NewMultiPhaseReconciler(client client.Client, name string, finalizer shared.FinalizerName, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseReconciler MultiPhaseReconciler) {
 
-	return &BasicMultiPhaseReconciler{
-		BasicReconciler: NewBasicReconciler(
+	return &DefaultMultiPhaseReconciler{
+		Reconciler: controller.NewReconciler(
 			client,
 			recorder,
 			finalizer,
@@ -44,14 +46,14 @@ func NewBasicMultiPhaseReconciler(client client.Client, name string, finalizer s
 				"reconciler": name,
 			}),
 		),
-		reconcilerStep: NewBasicMultiPhaseStepReconciler(client, logger, recorder),
+		reconcilerStep: NewMultiPhaseStepReconciler(client, logger, recorder),
 	}
 }
 
-func (h *BasicMultiPhaseReconciler) Reconcile(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject, data map[string]interface{}, reconcilerAction MultiPhaseReconcilerAction, reconcilersStepAction ...MultiPhaseStepReconcilerAction) (res ctrl.Result, err error) {
+func (h *DefaultMultiPhaseReconciler) Reconcile(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject, data map[string]interface{}, reconcilerAction MultiPhaseReconcilerAction, reconcilersStepAction ...MultiPhaseStepReconcilerAction) (res ctrl.Result, err error) {
 
 	// Init logger
-	logger := h.BasicReconciler.logger.WithFields(logrus.Fields{
+	logger := h.Logger().WithFields(logrus.Fields{
 		"name":      req.Name,
 		"namespace": req.Namespace,
 	})
@@ -67,17 +69,17 @@ func (h *BasicMultiPhaseReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			return res, nil
 		}
 		logger.Errorf("Error when get object: %s", err.Error())
-		return res, errors.Wrap(err, ErrWhenGetObjectFromReconciler.Error())
+		return res, errors.Wrap(err, controller.ErrWhenGetObjectFromReconciler.Error())
 	}
 	logger.Debug("Get object successfully")
 
 	// Add finalizer
-	if h.finalizer != "" {
-		if !controllerutil.ContainsFinalizer(o, h.finalizer.String()) {
-			controllerutil.AddFinalizer(o, h.finalizer.String())
+	if h.Finalizer() != "" {
+		if !controllerutil.ContainsFinalizer(o, h.Finalizer().String()) {
+			controllerutil.AddFinalizer(o, h.Finalizer().String())
 			if err = h.Client().Update(ctx, o); err != nil {
 				logger.Errorf("Error when add finalizer: %s", err.Error())
-				return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, ErrWhenAddFinalizer.Error()), logger)
+				return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenAddFinalizer.Error()), logger)
 			}
 			logger.Debug("Add finalizer successfully, force requeue object")
 			return ctrl.Result{Requeue: true}, nil
@@ -85,15 +87,15 @@ func (h *BasicMultiPhaseReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	// Handle status update if exist
-	if getObjectStatus(o) != nil {
-		currentStatus, err := copystructure.Copy(getObjectStatus(o))
+	if controller.GetObjectStatus(o) != nil {
+		currentStatus, err := copystructure.Copy(controller.GetObjectStatus(o))
 		if err != nil {
 			logger.Errorf("Error when get object status: %s", err.Error())
-			return res, errors.Wrap(err, ErrWhenGetObjectStatus.Error())
+			return res, errors.Wrap(err, controller.ErrWhenGetObjectStatus.Error())
 		}
 		defer func() {
-			if !reflect.DeepEqual(currentStatus, getObjectStatus(o)) {
-				logger.Debugf("Detect that it need to update status with diff:\n%s", cmp.Diff(currentStatus, getObjectStatus(o)))
+			if !reflect.DeepEqual(currentStatus, controller.GetObjectStatus(o)) {
+				logger.Debugf("Detect that it need to update status with diff:\n%s", cmp.Diff(currentStatus, controller.GetObjectStatus(o)))
 				if err = h.Client().Status().Update(ctx, o); err != nil {
 					logger.Errorf("Error when update resource status: %s", err.Error())
 				}
@@ -103,7 +105,7 @@ func (h *BasicMultiPhaseReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	// Ignore if needed by annotation
-	if o.GetAnnotations()[fmt.Sprintf("%s/ignoreReconcile", BaseAnnotation)] == "true" {
+	if o.GetAnnotations()[fmt.Sprintf("%s/ignoreReconcile", controller.BaseAnnotation)] == "true" {
 		logger.Info("Found annotation on ressource to ignore reconcile")
 		return res, nil
 	}
@@ -112,7 +114,7 @@ func (h *BasicMultiPhaseReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	res, err = reconcilerAction.Configure(ctx, req, o, data, logger)
 	if err != nil {
 		logger.Errorf("Error when call 'configure' from reconciler: %s", err.Error())
-		return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, ErrWhenCallConfigureFromReconciler.Error()), logger)
+		return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallConfigureFromReconciler.Error()), logger)
 	}
 	logger.Debug("Call 'configure' from reconciler successfully")
 	if res != (ctrl.Result{}) {
@@ -123,7 +125,7 @@ func (h *BasicMultiPhaseReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	res, err = reconcilerAction.Read(ctx, o, data, logger)
 	if err != nil {
 		logger.Errorf("Error when call 'read' from reconciler: %s", err.Error())
-		return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, ErrWhenCallReadFromReconciler.Error()), logger)
+		return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallReadFromReconciler.Error()), logger)
 	}
 	logger.Debug("Call 'read' from reconciler successfully")
 	if res != (ctrl.Result{}) {
@@ -131,18 +133,18 @@ func (h *BasicMultiPhaseReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	// Handle delete finalizer
-	if !getObjectMeta(o).DeletionTimestamp.IsZero() {
-		if h.finalizer.String() != "" && controllerutil.ContainsFinalizer(o, h.finalizer.String()) {
+	if !controller.GetObjectMeta(o).DeletionTimestamp.IsZero() {
+		if h.Finalizer().String() != "" && controllerutil.ContainsFinalizer(o, h.Finalizer().String()) {
 			if err = reconcilerAction.Delete(ctx, o, data, logger); err != nil {
 				logger.Errorf("Error when call 'delete' from reconciler: %s", err.Error())
-				return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, ErrWhenCallDeleteFromReconciler.Error()), logger)
+				return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallDeleteFromReconciler.Error()), logger)
 			}
 			logger.Debug("Delete successfully")
 
-			controllerutil.RemoveFinalizer(o, h.finalizer.String())
+			controllerutil.RemoveFinalizer(o, h.Finalizer().String())
 			if err = h.Client().Update(ctx, o); err != nil {
 				logger.Errorf("Failed to remove finalizer: %s", err.Error())
-				return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, ErrWhenDeleteFinalizer.Error()), logger)
+				return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenDeleteFinalizer.Error()), logger)
 			}
 			logger.Debug("Remove finalizer successfully")
 		}
@@ -156,7 +158,7 @@ func (h *BasicMultiPhaseReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		res, err = h.reconcilerStep.Reconcile(ctx, req, o, data, reconciler, logger, reconciler.GetIgnoresDiff()...)
 		if err != nil {
 			logger.Errorf("Error when call 'reconcile' from step reconciler %s", reconciler.GetPhaseName().String())
-			return reconciler.OnError(ctx, o, data, errors.Wrap(err, ErrWhenCallStepReconcilerFromReconciler.Error()), logger)
+			return reconciler.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallStepReconcilerFromReconciler.Error()), logger)
 		}
 		logger.Debug("Call 'reconcile' from step reconciler successfully")
 		if res != (ctrl.Result{}) {
@@ -169,7 +171,7 @@ func (h *BasicMultiPhaseReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	res, err = reconcilerAction.OnSuccess(ctx, o, data, logger)
 	if err != nil {
 		logger.Errorf("Error when call 'onSuccess' from reconciler: %s", err.Error())
-		return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, ErrWhenCallOnSuccessFromReconciler.Error()), logger)
+		return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallOnSuccessFromReconciler.Error()), logger)
 	}
 	logger.Debug("Call 'onSuccess' from reconciler")
 

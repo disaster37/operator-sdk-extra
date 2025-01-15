@@ -1,4 +1,4 @@
-package controller
+package remote
 
 import (
 	"strings"
@@ -35,8 +35,8 @@ type RemoteDiff[T any] interface {
 	IsDiff() bool
 }
 
-// BasicRemoteDiff is the basic implementation of RemoteDiff interface
-type BasicRemoteDiff[T any] struct {
+// DefaultRemoteDiff is the default implementation of RemoteDiff interface
+type DefaultRemoteDiff[T any] struct {
 
 	// CreateObject is the  object to create
 	createObject T
@@ -53,45 +53,45 @@ type BasicRemoteDiff[T any] struct {
 }
 
 // NewBasicRemoteDiff is the basic contructor of RemoteDiff interface
-func NewBasicRemoteDiff[T any]() RemoteDiff[T] {
-	return &BasicRemoteDiff[T]{}
+func NewRemoteDiff[T any]() RemoteDiff[T] {
+	return &DefaultRemoteDiff[T]{}
 }
 
-func (h *BasicRemoteDiff[T]) NeedCreate() bool {
+func (h *DefaultRemoteDiff[T]) NeedCreate() bool {
 	return h.needCreate
 }
 
-func (h *BasicRemoteDiff[T]) NeedUpdate() bool {
+func (h *DefaultRemoteDiff[T]) NeedUpdate() bool {
 	return h.needUpdate
 }
 
-func (h *BasicRemoteDiff[T]) GetObjectToCreate() T {
+func (h *DefaultRemoteDiff[T]) GetObjectToCreate() T {
 	return h.createObject
 }
 
-func (h *BasicRemoteDiff[T]) SetObjectToCreate(object T) {
+func (h *DefaultRemoteDiff[T]) SetObjectToCreate(object T) {
 	h.createObject = object
 	h.needCreate = true
 }
 
-func (h *BasicRemoteDiff[T]) GetObjectToUpdate() T {
+func (h *DefaultRemoteDiff[T]) GetObjectToUpdate() T {
 	return h.updateObject
 }
 
-func (h *BasicRemoteDiff[T]) SetObjectToUpdate(object T) {
+func (h *DefaultRemoteDiff[T]) SetObjectToUpdate(object T) {
 	h.updateObject = object
 	h.needUpdate = true
 }
 
-func (h *BasicRemoteDiff[T]) AddDiff(diff string) {
+func (h *DefaultRemoteDiff[T]) AddDiff(diff string) {
 	h.diff.WriteString(diff)
 	h.diff.WriteString("\n")
 }
 
-func (h *BasicRemoteDiff[T]) Diff() string {
+func (h *DefaultRemoteDiff[T]) Diff() string {
 	return h.diff.String()
 }
 
-func (h *BasicRemoteDiff[T]) IsDiff() bool {
+func (h *DefaultRemoteDiff[T]) IsDiff() bool {
 	return h.diff.Len() > 0
 }

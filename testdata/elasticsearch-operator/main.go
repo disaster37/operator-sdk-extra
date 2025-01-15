@@ -33,8 +33,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	elasticsearchapiv1alpha1 "github.com/disaster37/operator-sdk-extra/testdata/elasticsearch-operator/api/v1alpha1"
-	"github.com/disaster37/operator-sdk-extra/testdata/elasticsearch-operator/controllers"
+	elasticsearchapiv1alpha1 "github.com/disaster37/operator-sdk-extra/v2/testdata/elasticsearch-operator/api/v1alpha1"
+	"github.com/disaster37/operator-sdk-extra/v2/testdata/elasticsearch-operator/controllers"
 	"github.com/sirupsen/logrus"
 	//+kubebuilder:scaffold:imports
 )

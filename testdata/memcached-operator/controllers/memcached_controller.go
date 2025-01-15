@@ -25,8 +25,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/disaster37/operator-sdk-extra/pkg/controller"
-	cachecrd "github.com/disaster37/operator-sdk-extra/testdata/memcached-operator/api/v1alpha1"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller"
+	cachecrd "github.com/disaster37/operator-sdk-extra/v2/testdata/memcached-operator/api/v1alpha1"
 	"github.com/sirupsen/logrus"
 )
 

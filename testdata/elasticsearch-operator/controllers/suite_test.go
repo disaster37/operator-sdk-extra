@@ -8,13 +8,13 @@ import (
 
 	eshandler "github.com/disaster37/es-handler/v8"
 	"github.com/disaster37/es-handler/v8/mocks"
-	"github.com/disaster37/operator-sdk-extra/pkg/controller"
-	"github.com/disaster37/operator-sdk-extra/pkg/mock"
-	"github.com/disaster37/operator-sdk-extra/pkg/object"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/mock"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/object"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/suite"
 
-	elasticsearchapicrd "github.com/disaster37/operator-sdk-extra/testdata/elasticsearch-operator/api/v1alpha1"
+	elasticsearchapicrd "github.com/disaster37/operator-sdk-extra/v2/testdata/elasticsearch-operator/api/v1alpha1"
 	"go.uber.org/mock/gomock"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"

@@ -1,4 +1,4 @@
-package controller
+package multiphase
 
 import (
 	"strings"
@@ -6,8 +6,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// SentinelDiff is used to know if currents resources differ with expected
-type SentinelDiff interface {
+// MultiPhaseDiff is used to know if currents resources differ with expected
+type MultiPhaseDiff interface {
 
 	// NeedCreate is true when need to create K8s object
 	NeedCreate() bool
@@ -47,8 +47,8 @@ type SentinelDiff interface {
 	IsDiff() bool
 }
 
-// BasicSentinelDiff is the basic implementation of SentinelDiff interface
-type BasicSentinelDiff struct {
+// DefaultMultiPhaseDiff is the default implementation of MultiPhaseDiff interface
+type DefaultMultiPhaseDiff struct {
 
 	// CreateObjects is the list of object to create on K8s
 	createObjects []client.Object
@@ -63,56 +63,56 @@ type BasicSentinelDiff struct {
 	diff strings.Builder
 }
 
-// NewBasicSentinelDiff is the basic contructor of SentinelDiff interface
-func NewBasicSentinelDiff() SentinelDiff {
-	return &BasicSentinelDiff{}
+// NewMultiPhaseDiff is the default implementation of MultiPhaseDiff interface
+func NewMultiPhaseDiff() MultiPhaseDiff {
+	return &DefaultMultiPhaseDiff{}
 }
 
-func (h *BasicSentinelDiff) NeedCreate() bool {
+func (h *DefaultMultiPhaseDiff) NeedCreate() bool {
 	return len(h.createObjects) > 0
 }
 
-func (h *BasicSentinelDiff) NeedUpdate() bool {
+func (h *DefaultMultiPhaseDiff) NeedUpdate() bool {
 	return len(h.updateObjects) > 0
 }
 
-func (h *BasicSentinelDiff) NeedDelete() bool {
+func (h *DefaultMultiPhaseDiff) NeedDelete() bool {
 	return len(h.deleteObjects) > 0
 }
 
-func (h *BasicSentinelDiff) GetObjectsToCreate() []client.Object {
+func (h *DefaultMultiPhaseDiff) GetObjectsToCreate() []client.Object {
 	return h.createObjects
 }
 
-func (h *BasicSentinelDiff) SetObjectsToCreate(objects []client.Object) {
+func (h *DefaultMultiPhaseDiff) SetObjectsToCreate(objects []client.Object) {
 	h.createObjects = objects
 }
 
-func (h *BasicSentinelDiff) GetObjectsToUpdate() []client.Object {
+func (h *DefaultMultiPhaseDiff) GetObjectsToUpdate() []client.Object {
 	return h.updateObjects
 }
 
-func (h *BasicSentinelDiff) SetObjectsToUpdate(objects []client.Object) {
+func (h *DefaultMultiPhaseDiff) SetObjectsToUpdate(objects []client.Object) {
 	h.updateObjects = objects
 }
 
-func (h *BasicSentinelDiff) GetObjectsToDelete() []client.Object {
+func (h *DefaultMultiPhaseDiff) GetObjectsToDelete() []client.Object {
 	return h.deleteObjects
 }
 
-func (h *BasicSentinelDiff) SetObjectsToDelete(objects []client.Object) {
+func (h *DefaultMultiPhaseDiff) SetObjectsToDelete(objects []client.Object) {
 	h.deleteObjects = objects
 }
 
-func (h *BasicSentinelDiff) AddDiff(diff string) {
+func (h *DefaultMultiPhaseDiff) AddDiff(diff string) {
 	h.diff.WriteString(diff)
 	h.diff.WriteString("\n")
 }
 
-func (h *BasicSentinelDiff) Diff() string {
+func (h *DefaultMultiPhaseDiff) Diff() string {
 	return h.diff.String()
 }
 
-func (h *BasicSentinelDiff) IsDiff() bool {
+func (h *DefaultMultiPhaseDiff) IsDiff() bool {
 	return h.diff.Len() > 0
 }

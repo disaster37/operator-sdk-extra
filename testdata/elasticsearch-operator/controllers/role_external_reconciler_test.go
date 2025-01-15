@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	eshandler "github.com/disaster37/es-handler/v8"
-	elasticsearchapicrd "github.com/disaster37/operator-sdk-extra/testdata/elasticsearch-operator/api/v1alpha1"
+	elasticsearchapicrd "github.com/disaster37/operator-sdk-extra/v2/testdata/elasticsearch-operator/api/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

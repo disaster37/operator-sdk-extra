@@ -1,4 +1,4 @@
-package apis
+package remote
 
 import (
 	"testing"

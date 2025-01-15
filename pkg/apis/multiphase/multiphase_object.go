@@ -1,12 +1,13 @@
-package apis
+package multiphase
 
 import (
-	"github.com/disaster37/operator-sdk-extra/pkg/apis/shared"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/apis"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/apis/shared"
 )
 
 // MultiPhaseObjectStatus is the default status for CRD used to create multiple K8s resources
 type BasicMultiPhaseObjectStatus struct {
-	BasicObjectStatus `json:",inline"`
+	apis.BasicObjectStatus `json:",inline"`
 
 	// Phase is the current phase
 	// +operator-sdk:csv:customresourcedefinitions:type=status

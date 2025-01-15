@@ -1,4 +1,4 @@
-package controller
+package sentinel
 
 import "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -25,40 +25,40 @@ type SentinelRead interface {
 	SetExpectedObjects(objectType string, objects []client.Object)
 }
 
-// BasicSentinelRead is the basic implementation of SentinelRead
-type BasicSentinelRead struct {
+// DefaultSentinelRead is the default implementation of SentinelRead
+type DefaultSentinelRead struct {
 	currentObjects  map[string][]client.Object
 	expectedObjects map[string][]client.Object
 }
 
-// NewBasicSentinelRead is the basic constructor of SentinelRead interface
-func NewBasicSentinelRead() SentinelRead {
-	return &BasicSentinelRead{
+// NewSentinelRead is the default implementation of SentinelRead interface
+func NewSentinelRead() SentinelRead {
+	return &DefaultSentinelRead{
 		currentObjects:  map[string][]client.Object{},
 		expectedObjects: map[string][]client.Object{},
 	}
 }
 
-func (h *BasicSentinelRead) GetAllCurrentObjects() map[string][]client.Object {
+func (h *DefaultSentinelRead) GetAllCurrentObjects() map[string][]client.Object {
 	return h.currentObjects
 }
 
-func (h *BasicSentinelRead) GetCurrentObjects(objectType string) []client.Object {
+func (h *DefaultSentinelRead) GetCurrentObjects(objectType string) []client.Object {
 	return h.currentObjects[objectType]
 }
 
-func (h *BasicSentinelRead) SetCurrentObjects(objectType string, objects []client.Object) {
+func (h *DefaultSentinelRead) SetCurrentObjects(objectType string, objects []client.Object) {
 	h.currentObjects[objectType] = objects
 }
 
-func (h *BasicSentinelRead) GetAllExpectedObjects() map[string][]client.Object {
+func (h *DefaultSentinelRead) GetAllExpectedObjects() map[string][]client.Object {
 	return h.expectedObjects
 }
 
-func (h *BasicSentinelRead) GetExpectedObjects(objectType string) []client.Object {
+func (h *DefaultSentinelRead) GetExpectedObjects(objectType string) []client.Object {
 	return h.expectedObjects[objectType]
 }
 
-func (h *BasicSentinelRead) SetExpectedObjects(objectType string, objects []client.Object) {
+func (h *DefaultSentinelRead) SetExpectedObjects(objectType string, objects []client.Object) {
 	h.expectedObjects[objectType] = objects
 }

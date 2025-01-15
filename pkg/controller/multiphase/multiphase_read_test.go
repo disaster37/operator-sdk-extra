@@ -1,4 +1,4 @@
-package controller
+package multiphase
 
 import (
 	"testing"
@@ -12,7 +12,7 @@ import (
 func TestBasicMultiPhaseReadCurrent(t *testing.T) {
 
 	// With default object
-	o := BasicMultiPhaseRead{}
+	o := &DefaultMultiPhaseRead{}
 
 	assert.Empty(t, o.GetCurrentObjects())
 
@@ -33,7 +33,7 @@ func TestBasicMultiPhaseReadCurrent(t *testing.T) {
 func TestBasicMultiPhaseReadExpected(t *testing.T) {
 
 	// With default object
-	o := BasicMultiPhaseRead{}
+	o := &DefaultMultiPhaseRead{}
 
 	assert.Empty(t, o.GetExpectedObjects())
 

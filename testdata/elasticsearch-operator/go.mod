@@ -1,4 +1,4 @@
-module github.com/disaster37/operator-sdk-extra/testdata/elasticsearch-operator
+module github.com/disaster37/operator-sdk-extra/v2/testdata/elasticsearch-operator
 
 go 1.19
 
@@ -6,7 +6,7 @@ require (
 	emperror.dev/errors v0.8.1
 	github.com/disaster37/es-handler/v8 v8.1.4
 	github.com/disaster37/generic-objectmatcher v1.0.2
-	github.com/disaster37/operator-sdk-extra v0.1.3-0.20231020093826-828ae11bdbc6
+	github.com/disaster37/operator-sdk-extra/v2 v0.1.3-0.20231020093826-828ae11bdbc6
 	github.com/elastic/elastic-transport-go/v8 v8.3.0
 	github.com/elastic/go-elasticsearch/v8 v8.9.0
 	github.com/sirupsen/logrus v1.9.3

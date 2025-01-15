@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 
 	eshandler "github.com/disaster37/es-handler/v8"
-	"github.com/disaster37/operator-sdk-extra/pkg/controller"
-	elasticsearchapicrd "github.com/disaster37/operator-sdk-extra/testdata/elasticsearch-operator/api/v1alpha1"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller"
+	elasticsearchapicrd "github.com/disaster37/operator-sdk-extra/v2/testdata/elasticsearch-operator/api/v1alpha1"
 )
 
 type roleApiClient struct {

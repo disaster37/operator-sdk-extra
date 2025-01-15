@@ -1,12 +1,12 @@
-package controller
+package multiphase
 
 import (
 	"context"
-	"reflect"
 
 	"emperror.dev/errors"
 	"github.com/disaster37/k8s-objectmatcher/patch"
-	"github.com/disaster37/operator-sdk-extra/pkg/object"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/object"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -15,26 +15,26 @@ import (
 
 // MultiPhaseStepReconciler is the reconciler to implement to create one step for MultiPhaseReconciler
 type MultiPhaseStepReconciler interface {
-	BaseReconciler
+	controller.BaseReconciler
 
 	// Reconcile permit to reconcile the step (one K8s resource)
 	Reconcile(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject, data map[string]interface{}, reconciler MultiPhaseStepReconcilerAction, logger *logrus.Entry, ignoresDiff ...patch.CalculateOption) (res ctrl.Result, err error)
 }
 
-// BasicMultiPhaseStepReconciler is the basic implementation of MultiPhaseStepReconciler interface
-type BasicMultiPhaseStepReconciler struct {
-	BaseReconciler
+// DefaultMultiPhaseStepReconciler is the default implementation of MultiPhaseStepReconciler interface
+type DefaultMultiPhaseStepReconciler struct {
+	controller.BaseReconciler
 }
 
-// NewBasicMultiPhaseStepReconciler is the basic constructor of MultiPhaseStepReconciler interface
-func NewBasicMultiPhaseStepReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseStepReconciler MultiPhaseStepReconciler) {
-	return &BasicMultiPhaseStepReconciler{
-		BaseReconciler: NewBaseReconciler(client, recorder),
+// NewMultiPhaseStepReconciler is the default implementation of MultiPhaseStepReconciler interface
+func NewMultiPhaseStepReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseStepReconciler MultiPhaseStepReconciler) {
+	return &DefaultMultiPhaseStepReconciler{
+		BaseReconciler: controller.NewBaseReconciler(client, recorder),
 	}
 }
 
 // Reconcile permit to reconcile the step (one K8s resource)
-func (h *BasicMultiPhaseStepReconciler) Reconcile(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject, data map[string]interface{}, reconcilerAction MultiPhaseStepReconcilerAction, logger *logrus.Entry, ignoresDiff ...patch.CalculateOption) (res ctrl.Result, err error) {
+func (h *DefaultMultiPhaseStepReconciler) Reconcile(ctx context.Context, req ctrl.Request, o object.MultiPhaseObject, data map[string]interface{}, reconcilerAction MultiPhaseStepReconcilerAction, logger *logrus.Entry, ignoresDiff ...patch.CalculateOption) (res ctrl.Result, err error) {
 
 	var (
 		diff MultiPhaseDiff
@@ -50,7 +50,7 @@ func (h *BasicMultiPhaseStepReconciler) Reconcile(ctx context.Context, req ctrl.
 	res, err = reconcilerAction.Configure(ctx, req, o, logger)
 	if err != nil {
 		logger.Errorf("Error when call 'configure' from step reconciler: %s", err.Error())
-		return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, ErrWhenCallConfigureFromReconciler.Error()), logger)
+		return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallConfigureFromReconciler.Error()), logger)
 	}
 	logger.Debug("Call 'configure' from step reconciler successfully")
 	if res != (ctrl.Result{}) {
@@ -61,7 +61,7 @@ func (h *BasicMultiPhaseStepReconciler) Reconcile(ctx context.Context, req ctrl.
 	read, res, err = reconcilerAction.Read(ctx, o, data, logger)
 	if err != nil {
 		logger.Errorf("Error when call 'read' from step reconciler: %s", err.Error())
-		return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, ErrWhenCallReadFromReconciler.Error()), logger)
+		return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallReadFromReconciler.Error()), logger)
 	}
 	logger.Debug("Call 'read' from step reconciler successfully")
 	if res != (ctrl.Result{}) {
@@ -72,7 +72,7 @@ func (h *BasicMultiPhaseStepReconciler) Reconcile(ctx context.Context, req ctrl.
 	diff, res, err = reconcilerAction.Diff(ctx, o, read, data, logger, ignoresDiff...)
 	if err != nil {
 		logger.Errorf("Error when call 'diff' from step reconciler: %s", err.Error())
-		return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, ErrWhenCallDiffFromReconciler.Error()), logger)
+		return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallDiffFromReconciler.Error()), logger)
 	}
 	logger.Debug("Call 'diff' from step reconciler successfully")
 	if diff.IsDiff() {
@@ -88,7 +88,7 @@ func (h *BasicMultiPhaseStepReconciler) Reconcile(ctx context.Context, req ctrl.
 		res, err = reconcilerAction.Create(ctx, o, data, diff.GetObjectsToCreate(), logger)
 		if err != nil {
 			logger.Errorf("Error when call 'create' from step reconciler: %s", err.Error())
-			return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, ErrWhenCallCreateFromReconciler.Error()), logger)
+			return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallCreateFromReconciler.Error()), logger)
 		}
 		logger.Debug("Call 'create' from step reconciler successfully")
 		if res != (ctrl.Result{}) {
@@ -102,7 +102,7 @@ func (h *BasicMultiPhaseStepReconciler) Reconcile(ctx context.Context, req ctrl.
 		res, err = reconcilerAction.Update(ctx, o, data, diff.GetObjectsToUpdate(), logger)
 		if err != nil {
 			logger.Errorf("Error when call 'update' from step reconciler: %s", err.Error())
-			return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, ErrWhenCallUpdateFromReconciler.Error()), logger)
+			return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallUpdateFromReconciler.Error()), logger)
 		}
 		logger.Debug("Call 'update' from step reconciler successfully")
 		if res != (ctrl.Result{}) {
@@ -116,7 +116,7 @@ func (h *BasicMultiPhaseStepReconciler) Reconcile(ctx context.Context, req ctrl.
 		res, err = reconcilerAction.Delete(ctx, o, data, diff.GetObjectsToDelete(), logger)
 		if err != nil {
 			logger.Errorf("Error when call 'delete' from step reconciler: %s", err.Error())
-			return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, ErrWhenCallDeleteFromReconciler.Error()), logger)
+			return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallDeleteFromReconciler.Error()), logger)
 		}
 		logger.Debug("Call 'delete' from step reconciler successfully")
 		if res != (ctrl.Result{}) {
@@ -127,37 +127,9 @@ func (h *BasicMultiPhaseStepReconciler) Reconcile(ctx context.Context, req ctrl.
 	res, err = reconcilerAction.OnSuccess(ctx, o, data, diff, logger)
 	if err != nil {
 		logger.Errorf("Error when call 'onSuccess' from step reconciler: %s", err.Error())
-		return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, ErrWhenCallOnSuccessFromReconciler.Error()), logger)
+		return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallOnSuccessFromReconciler.Error()), logger)
 	}
 	logger.Debug("Call 'onSuccess' from step reconciler successfully")
 
 	return res, nil
-}
-
-func MustInjectTypeMeta(src, dst client.Object) {
-	var (
-		rt reflect.Type
-	)
-
-	rt = reflect.TypeOf(src)
-	if rt.Kind() != reflect.Ptr {
-		panic("Resource must be pointer")
-	}
-	rt = reflect.TypeOf(dst)
-	if rt.Kind() != reflect.Ptr {
-		panic("Resource must be pointer")
-	}
-
-	rvSrc := reflect.ValueOf(src).Elem()
-	omSrc := rvSrc.FieldByName("TypeMeta")
-	if !omSrc.IsValid() {
-		panic("src must have field TypeMeta")
-	}
-	rvDst := reflect.ValueOf(dst).Elem()
-	omDst := rvDst.FieldByName("TypeMeta")
-	if !omDst.IsValid() {
-		panic("dst must have field TypeMeta")
-	}
-
-	omDst.Set(omSrc)
 }

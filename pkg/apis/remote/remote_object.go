@@ -1,12 +1,13 @@
-package apis
+package remote
 
 import (
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/apis"
 	"k8s.io/utils/ptr"
 )
 
 // RemoteObjectStatus is the default status for CRD used to call remote API (not create K8s resources)
 type BasicRemoteObjectStatus struct {
-	BasicObjectStatus `json:",inline"`
+	apis.BasicObjectStatus `json:",inline"`
 
 	// IsSync is true if controller successfully apply on remote API
 	// +operator-sdk:csv:customresourcedefinitions:type=status

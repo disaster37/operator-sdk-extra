@@ -2,7 +2,7 @@ package controller
 
 import (
 	"emperror.dev/errors"
-	"github.com/disaster37/operator-sdk-extra/pkg/apis/shared"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/apis/shared"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -23,79 +23,40 @@ var (
 	ErrWhenGetObjectStatus                  = errors.Sentinel("Error when get object status")
 )
 
-// BaseReconciler is the interface for all reconciler
-type BaseReconciler interface {
+type Reconciler interface {
+	BaseReconciler
 
-	// Client get the client
-	Client() client.Client
+	// Finalizer get the finalier name
+	Finalizer() shared.FinalizerName
 
-	// Recorder get the recorder
-	Recorder() record.EventRecorder
+	// Logger get the logger
+	Logger() *logrus.Entry
 }
 
-type DefaultBaseReconciler struct {
-	client   client.Client
-	recorder record.EventRecorder
-}
-
-func NewBaseReconciler(client client.Client, recorder record.EventRecorder) BaseReconciler {
-
-	if recorder == nil {
-		panic("recorder can't be nil")
-	}
-
-	if client == nil {
-		panic("client can't be nil")
-	}
-
-	return &DefaultBaseReconciler{
-		client:   client,
-		recorder: recorder,
-	}
-}
-
-func (h *DefaultBaseReconciler) Client() client.Client {
-	return h.client
-}
-
-func (h *DefaultBaseReconciler) Recorder() record.EventRecorder {
-	return h.recorder
-}
-
-// BasicReconciler is the basic implementation of BaseReconciler
-// It also provide attributes needed by all reconciler
-type BasicReconciler struct {
+// DefaultReconciler is the default implementation of Reconciler interface
+type DefaultReconciler struct {
 	BaseReconciler
 	finalizer shared.FinalizerName
 	logger    *logrus.Entry
 }
 
-func NewBasicReconciler(client client.Client, recorder record.EventRecorder, finalizer shared.FinalizerName, logger *logrus.Entry) BasicReconciler {
+func (h *DefaultReconciler) Finalizer() shared.FinalizerName {
+	return h.finalizer
+}
+
+func (h *DefaultReconciler) Logger() *logrus.Entry {
+	return h.logger
+}
+
+// NewReconciler is the default implementation of the Reconciler interface
+func NewReconciler(client client.Client, recorder record.EventRecorder, finalizer shared.FinalizerName, logger *logrus.Entry) Reconciler {
 	if logger == nil {
 		panic("logger can't be nil")
 	}
 
-	return BasicReconciler{
+	return &DefaultReconciler{
 		BaseReconciler: NewBaseReconciler(client, recorder),
 		finalizer:      finalizer,
 		logger:         logger,
-	}
-}
-
-// BasicReconcilerAction provide attribute needed by all reconciler action
-type BasicReconcilerAction struct {
-	BaseReconciler
-	conditionName shared.ConditionName
-}
-
-func NewBasicReconcilerAction(client client.Client, recorder record.EventRecorder, conditionName shared.ConditionName) BasicReconcilerAction {
-
-	if conditionName == "" {
-		panic("Condition name must be provided")
-	}
-
-	return BasicReconcilerAction{
-		BaseReconciler: NewBaseReconciler(client, recorder),
-		conditionName:  conditionName,
 	}
 }
