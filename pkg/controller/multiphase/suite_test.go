@@ -1,4 +1,4 @@
-package controller
+package multiphase_test
 
 import (
 	"testing"
@@ -6,29 +6,31 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/suite"
-	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 )
 
 var testEnv *envtest.Environment
 
-type ControllerTestSuite struct {
+type ControllerMultiphaseTestSuite struct {
 	suite.Suite
-	k8sClient  client.Client
-	k8sManager manager.Manager
+	k8sClient client.Client
+	cfg       *rest.Config
 }
 
-func TestControllerSuite(t *testing.T) {
-	suite.Run(t, new(ControllerTestSuite))
+func TestControllerMultiphaseSuite(t *testing.T) {
+	suite.Run(t, new(ControllerMultiphaseTestSuite))
 }
 
-func (t *ControllerTestSuite) SetupSuite() {
+func (t *ControllerMultiphaseTestSuite) SetupSuite() {
 	logf.SetLogger(zap.New(zap.UseDevMode(true)))
 	logrus.SetLevel(logrus.TraceLevel)
 	logrus.SetFormatter(&logrus.TextFormatter{
@@ -37,7 +39,8 @@ func (t *ControllerTestSuite) SetupSuite() {
 
 	// Setup testenv
 	testEnv = &envtest.Environment{
-		ErrorIfCRDPathMissing:    false,
+		CRDDirectoryPaths:        []string{"crd"},
+		ErrorIfCRDPathMissing:    true,
 		ControlPlaneStopTimeout:  120 * time.Second,
 		ControlPlaneStartTimeout: 120 * time.Second,
 	}
@@ -45,16 +48,16 @@ func (t *ControllerTestSuite) SetupSuite() {
 	if err != nil {
 		panic(err)
 	}
+	t.cfg = cfg
 
 	// Add CRD sheme
-	err = scheme.AddToScheme(scheme.Scheme)
-	if err != nil {
-		panic(err)
-	}
+	scheme := runtime.NewScheme()
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(AddToScheme(scheme))
 
 	// Init k8smanager and k8sclient
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
-		Scheme:  scheme.Scheme,
+		Scheme:  scheme,
 		Metrics: metricsserver.Options{BindAddress: "0"},
 	})
 	if err != nil {
@@ -62,7 +65,11 @@ func (t *ControllerTestSuite) SetupSuite() {
 	}
 	k8sClient := k8sManager.GetClient()
 	t.k8sClient = k8sClient
-	t.k8sManager = k8sManager
+
+	reconciler := NewTestReconciler(k8sClient, logrus.NewEntry(logrus.StandardLogger()), k8sManager.GetEventRecorderFor("test-controller"))
+	if err = reconciler.SetupWithManager(k8sManager); err != nil {
+		panic(err)
+	}
 
 	go func() {
 		err = k8sManager.Start(ctrl.SetupSignalHandler())
@@ -72,7 +79,7 @@ func (t *ControllerTestSuite) SetupSuite() {
 	}()
 }
 
-func (t *ControllerTestSuite) TearDownSuite() {
+func (t *ControllerMultiphaseTestSuite) TearDownSuite() {
 
 	// Teardown the test environment once controller is fnished.
 	// Otherwise from Kubernetes 1.21+, teardon timeouts waiting on

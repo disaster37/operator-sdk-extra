@@ -105,9 +105,7 @@ func (h *DefaultMultiPhaseDiff[k8sStepObject]) SetObjectsToCreate(objects []k8sS
 	if len(h.createObjects) == 0 {
 		h.createObjects = objects
 	} else {
-		for _, o := range objects {
-			h.AddObjectToCreate(o)
-		}
+		h.createObjects = append(h.createObjects, objects...)
 	}
 
 }
@@ -128,9 +126,7 @@ func (h *DefaultMultiPhaseDiff[k8sStepObject]) SetObjectsToUpdate(objects []k8sS
 	if len(h.updateObjects) == 0 {
 		h.updateObjects = objects
 	} else {
-		for _, o := range objects {
-			h.AddObjectToUpdate(o)
-		}
+		h.updateObjects = append(h.updateObjects, objects...)
 	}
 
 }
@@ -151,9 +147,7 @@ func (h *DefaultMultiPhaseDiff[k8sStepObject]) SetObjectsToDelete(objects []k8sS
 	if len(h.deleteObjects) == 0 {
 		h.deleteObjects = objects
 	} else {
-		for _, o := range objects {
-			h.AddObjectToDelete(o)
-		}
+		h.deleteObjects = append(h.deleteObjects, objects...)
 	}
 
 }

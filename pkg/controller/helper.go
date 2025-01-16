@@ -2,9 +2,12 @@ package controller
 
 import (
 	"reflect"
+	"time"
 
 	"github.com/disaster37/operator-sdk-extra/v2/pkg/apis/shared"
+	"golang.org/x/time/rate"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -71,4 +74,12 @@ func MustInjectTypeMeta(src, dst client.Object) {
 	}
 
 	omDst.Set(omSrc)
+}
+
+// DefaultControllerRateLimiter set rate limiter that is lower agressive than the default
+func DefaultControllerRateLimiter[T comparable]() workqueue.TypedRateLimiter[T] {
+	return workqueue.NewTypedMaxOfRateLimiter(
+		workqueue.NewTypedItemExponentialFailureRateLimiter[T](1*time.Second, 1000*time.Second),
+		&workqueue.TypedBucketRateLimiter[T]{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
+	)
 }

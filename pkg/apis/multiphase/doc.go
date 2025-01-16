@@ -2,5 +2,5 @@
 
 // Package shared contains types and functions used by API definitions in the
 // operators package
-// +groupName=operators.example.com
+// +groupName=operators.webcenter.fr
 package multiphase

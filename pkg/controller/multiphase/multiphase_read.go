@@ -43,7 +43,15 @@ func (h *DefaultMultiPhaseRead[k8sObject]) GetCurrentObjects() []k8sObject {
 }
 
 func (h *DefaultMultiPhaseRead[k8sObject]) SetCurrentObjects(objects []k8sObject) {
-	h.currentObjects = objects
+	if len(objects) == 0 {
+		return
+	}
+	if len(h.currentObjects) == 0 {
+		h.currentObjects = objects
+	} else {
+		h.currentObjects = append(h.currentObjects, objects...)
+	}
+
 }
 
 func (h *DefaultMultiPhaseRead[k8sObject]) AddCurrentObject(o k8sObject) {
@@ -55,9 +63,17 @@ func (h *DefaultMultiPhaseRead[k8sObject]) GetExpectedObjects() []k8sObject {
 }
 
 func (h *DefaultMultiPhaseRead[k8sObject]) SetExpectedObjects(objects []k8sObject) {
-	h.expectedObjects = objects
+
+	if len(objects) == 0 {
+		return
+	}
+	if len(h.expectedObjects) == 0 {
+		h.expectedObjects = objects
+	} else {
+		h.expectedObjects = append(h.expectedObjects, objects...)
+	}
 }
 
 func (h *DefaultMultiPhaseRead[k8sObject]) AddExpectedObject(o k8sObject) {
-	h.currentObjects = append(h.currentObjects, o)
+	h.expectedObjects = append(h.expectedObjects, o)
 }
