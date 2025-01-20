@@ -18,6 +18,7 @@ import (
 	k8sstrings "k8s.io/utils/strings"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 // MultiPhaseStepReconcilerAction is the interface that use by reconciler step to reconcile your intermediate K8s resources
@@ -25,30 +26,30 @@ type MultiPhaseStepReconcilerAction[k8sObject object.MultiPhaseObject, k8sStepOb
 	controller.ReconcilerAction
 
 	// Configure permit to init condition on status
-	Configure(ctx context.Context, req ctrl.Request, o k8sObject, logger *logrus.Entry) (res ctrl.Result, err error)
+	Configure(ctx context.Context, req reconcile.Request, o k8sObject, logger *logrus.Entry) (res reconcile.Result, err error)
 
 	// Read permit to read kubernetes resources
-	Read(ctx context.Context, o k8sObject, data map[string]any, logger *logrus.Entry) (read MultiPhaseRead[k8sStepObject], res ctrl.Result, err error)
+	Read(ctx context.Context, o k8sObject, data map[string]any, logger *logrus.Entry) (read MultiPhaseRead[k8sStepObject], res reconcile.Result, err error)
 
 	// Create permit to create resources on kubernetes
-	Create(ctx context.Context, o k8sObject, data map[string]any, objects []k8sStepObject, logger *logrus.Entry) (res ctrl.Result, err error)
+	Create(ctx context.Context, o k8sObject, data map[string]any, objects []k8sStepObject, logger *logrus.Entry) (res reconcile.Result, err error)
 
 	// Update permit to update resources on kubernetes
-	Update(ctx context.Context, o k8sObject, data map[string]any, objects []k8sStepObject, logger *logrus.Entry) (res ctrl.Result, err error)
+	Update(ctx context.Context, o k8sObject, data map[string]any, objects []k8sStepObject, logger *logrus.Entry) (res reconcile.Result, err error)
 
 	// Delete permit to delete resources on kubernetes
-	Delete(ctx context.Context, o k8sObject, data map[string]any, objects []k8sStepObject, logger *logrus.Entry) (res ctrl.Result, err error)
+	Delete(ctx context.Context, o k8sObject, data map[string]any, objects []k8sStepObject, logger *logrus.Entry) (res reconcile.Result, err error)
 
 	// OnError is call when error is throwing on current phase
 	// It the right way to set status condition when error
-	OnError(ctx context.Context, o k8sObject, data map[string]any, currentErr error, logger *logrus.Entry) (res ctrl.Result, err error)
+	OnError(ctx context.Context, o k8sObject, data map[string]any, currentErr error, logger *logrus.Entry) (res reconcile.Result, err error)
 
 	// OnSuccess is call at the end of current phase, if not error
 	// It's the right way to set status condition when everithink is good
-	OnSuccess(ctx context.Context, o k8sObject, data map[string]any, diff MultiPhaseDiff[k8sStepObject], logger *logrus.Entry) (res ctrl.Result, err error)
+	OnSuccess(ctx context.Context, o k8sObject, data map[string]any, diff MultiPhaseDiff[k8sStepObject], logger *logrus.Entry) (res reconcile.Result, err error)
 
 	// Diff permit to compare the actual state and the expected state
-	Diff(ctx context.Context, o k8sObject, read MultiPhaseRead[k8sStepObject], data map[string]any, logger *logrus.Entry, ignoreDiff ...patch.CalculateOption) (diff MultiPhaseDiff[k8sStepObject], res ctrl.Result, err error)
+	Diff(ctx context.Context, o k8sObject, read MultiPhaseRead[k8sStepObject], data map[string]any, logger *logrus.Entry, ignoreDiff ...patch.CalculateOption) (diff MultiPhaseDiff[k8sStepObject], res reconcile.Result, err error)
 
 	// GetPhaseName permit to get the phase name
 	GetPhaseName() shared.PhaseName
@@ -79,7 +80,7 @@ func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) GetIgn
 	return make([]patch.CalculateOption, 0)
 }
 
-func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Configure(ctx context.Context, req ctrl.Request, o k8sObject, logger *logrus.Entry) (res ctrl.Result, err error) {
+func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Configure(ctx context.Context, req reconcile.Request, o k8sObject, logger *logrus.Entry) (res reconcile.Result, err error) {
 	conditions := o.GetStatus().GetConditions()
 
 	// Init condition
@@ -96,11 +97,11 @@ func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Config
 
 	return res, nil
 }
-func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Read(ctx context.Context, o k8sObject, data map[string]any, logger *logrus.Entry) (read MultiPhaseRead[k8sStepObject], res ctrl.Result, err error) {
+func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Read(ctx context.Context, o k8sObject, data map[string]any, logger *logrus.Entry) (read MultiPhaseRead[k8sStepObject], res reconcile.Result, err error) {
 	panic("You need implement it")
 }
 
-func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Create(ctx context.Context, o k8sObject, data map[string]any, objects []k8sStepObject, logger *logrus.Entry) (res ctrl.Result, err error) {
+func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Create(ctx context.Context, o k8sObject, data map[string]any, objects []k8sStepObject, logger *logrus.Entry) (res reconcile.Result, err error) {
 
 	for _, oChild := range objects {
 
@@ -125,7 +126,7 @@ func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Create
 	return res, nil
 }
 
-func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Update(ctx context.Context, o k8sObject, data map[string]any, objects []k8sStepObject, logger *logrus.Entry) (res ctrl.Result, err error) {
+func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Update(ctx context.Context, o k8sObject, data map[string]any, objects []k8sStepObject, logger *logrus.Entry) (res reconcile.Result, err error) {
 
 	for _, oChild := range objects {
 		if err = h.Client().Update(ctx, oChild); err != nil {
@@ -138,7 +139,7 @@ func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Update
 	return res, nil
 }
 
-func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Delete(ctx context.Context, o k8sObject, data map[string]any, objects []k8sStepObject, logger *logrus.Entry) (res ctrl.Result, err error) {
+func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Delete(ctx context.Context, o k8sObject, data map[string]any, objects []k8sStepObject, logger *logrus.Entry) (res reconcile.Result, err error) {
 
 	for _, oChild := range objects {
 		if err = h.Client().Delete(ctx, oChild); err != nil {
@@ -151,7 +152,7 @@ func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Delete
 	return res, nil
 }
 
-func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) OnError(ctx context.Context, o k8sObject, data map[string]any, currentErr error, logger *logrus.Entry) (res ctrl.Result, err error) {
+func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) OnError(ctx context.Context, o k8sObject, data map[string]any, currentErr error, logger *logrus.Entry) (res reconcile.Result, err error) {
 	conditions := o.GetStatus().GetConditions()
 
 	condition.SetStatusCondition(&conditions, metav1.Condition{
@@ -166,7 +167,7 @@ func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) OnErro
 
 }
 
-func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) OnSuccess(ctx context.Context, o k8sObject, data map[string]any, diff MultiPhaseDiff[k8sStepObject], logger *logrus.Entry) (res ctrl.Result, err error) {
+func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) OnSuccess(ctx context.Context, o k8sObject, data map[string]any, diff MultiPhaseDiff[k8sStepObject], logger *logrus.Entry) (res reconcile.Result, err error) {
 	conditions := o.GetStatus().GetConditions()
 
 	// Update condition status if needed
@@ -182,7 +183,7 @@ func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) OnSucc
 	return res, nil
 }
 
-func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Diff(ctx context.Context, o k8sObject, read MultiPhaseRead[k8sStepObject], data map[string]any, logger *logrus.Entry, ignoreDiff ...patch.CalculateOption) (diff MultiPhaseDiff[k8sStepObject], res ctrl.Result, err error) {
+func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Diff(ctx context.Context, o k8sObject, read MultiPhaseRead[k8sStepObject], data map[string]any, logger *logrus.Entry, ignoreDiff ...patch.CalculateOption) (diff MultiPhaseDiff[k8sStepObject], res reconcile.Result, err error) {
 
 	tmpCurrentObjects := make([]k8sStepObject, len(read.GetCurrentObjects()))
 	copy(tmpCurrentObjects, read.GetCurrentObjects())

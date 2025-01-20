@@ -15,6 +15,7 @@ import (
 	k8sstrings "k8s.io/utils/strings"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 // SentinelReconcilerAction is the interface that use by sentinel reconciler
@@ -24,18 +25,18 @@ type SentinelReconcilerAction[k8sObject client.Object] interface {
 
 	// Confirgure permit to init external provider driver (API client REST)
 	// It can also permit to init condition on status
-	Configure(ctx context.Context, req ctrl.Request, o k8sObject, data map[string]any, logger *logrus.Entry) (res ctrl.Result, err error)
+	Configure(ctx context.Context, req reconcile.Request, o k8sObject, data map[string]any, logger *logrus.Entry) (res reconcile.Result, err error)
 
 	// Read permit to read the actual resource state from provider and set it on data map
-	Read(ctx context.Context, o k8sObject, data map[string]any, logger *logrus.Entry) (read SentinelRead, res ctrl.Result, err error)
+	Read(ctx context.Context, o k8sObject, data map[string]any, logger *logrus.Entry) (read SentinelRead, res reconcile.Result, err error)
 
 	// Create permit to create resource on provider
 	// It only call if diff.NeeCreated is true
-	Create(ctx context.Context, o k8sObject, data map[string]any, objects []client.Object, logger *logrus.Entry) (res ctrl.Result, err error)
+	Create(ctx context.Context, o k8sObject, data map[string]any, objects []client.Object, logger *logrus.Entry) (res reconcile.Result, err error)
 
 	// Update permit to update resource on provider
 	// It only call if diff.NeedUpdated is true
-	Update(ctx context.Context, o k8sObject, data map[string]any, objects []client.Object, logger *logrus.Entry) (res ctrl.Result, err error)
+	Update(ctx context.Context, o k8sObject, data map[string]any, objects []client.Object, logger *logrus.Entry) (res reconcile.Result, err error)
 
 	// Delete permit to delete resource on provider
 	// It only call if you have specified finalizer name when you create reconciler and if resource as marked to be deleted
@@ -43,14 +44,14 @@ type SentinelReconcilerAction[k8sObject client.Object] interface {
 
 	// OnError is call when error is throwing
 	// It the right way to set status condition when error
-	OnError(ctx context.Context, o k8sObject, data map[string]any, currentErr error, logger *logrus.Entry) (res ctrl.Result, err error)
+	OnError(ctx context.Context, o k8sObject, data map[string]any, currentErr error, logger *logrus.Entry) (res reconcile.Result, err error)
 
 	// OnSuccess is call at the end if no error
 	// It's the right way to set status condition when everithink is good
-	OnSuccess(ctx context.Context, o k8sObject, data map[string]any, diff multiphase.MultiPhaseDiff[client.Object], logger *logrus.Entry) (res ctrl.Result, err error)
+	OnSuccess(ctx context.Context, o k8sObject, data map[string]any, diff multiphase.MultiPhaseDiff[client.Object], logger *logrus.Entry) (res reconcile.Result, err error)
 
 	// Diff permit to compare the actual state and the expected state
-	Diff(ctx context.Context, o k8sObject, read SentinelRead, data map[string]any, logger *logrus.Entry, ignoreDiff ...patch.CalculateOption) (diff multiphase.MultiPhaseDiff[client.Object], res ctrl.Result, err error)
+	Diff(ctx context.Context, o k8sObject, read SentinelRead, data map[string]any, logger *logrus.Entry, ignoreDiff ...patch.CalculateOption) (diff multiphase.MultiPhaseDiff[client.Object], res reconcile.Result, err error)
 
 	GetIgnoresDiff() []patch.CalculateOption
 }
@@ -67,15 +68,15 @@ func NewSentinelAction[k8sObject client.Object](client client.Client, recorder r
 	}
 }
 
-func (h *DefaultSentinelAction[k8sObject]) Configure(ctx context.Context, req ctrl.Request, o k8sObject, data map[string]any, logger *logrus.Entry) (res ctrl.Result, err error) {
+func (h *DefaultSentinelAction[k8sObject]) Configure(ctx context.Context, req reconcile.Request, o k8sObject, data map[string]any, logger *logrus.Entry) (res reconcile.Result, err error) {
 	return res, nil
 }
 
-func (h *DefaultSentinelAction[k8sObject]) Read(ctx context.Context, o k8sObject, data map[string]any, logger *logrus.Entry) (read SentinelRead, res ctrl.Result, err error) {
+func (h *DefaultSentinelAction[k8sObject]) Read(ctx context.Context, o k8sObject, data map[string]any, logger *logrus.Entry) (read SentinelRead, res reconcile.Result, err error) {
 	panic("You need implement it")
 }
 
-func (h *DefaultSentinelAction[k8sObject]) Create(ctx context.Context, o k8sObject, data map[string]any, objects []client.Object, logger *logrus.Entry) (res ctrl.Result, err error) {
+func (h *DefaultSentinelAction[k8sObject]) Create(ctx context.Context, o k8sObject, data map[string]any, objects []client.Object, logger *logrus.Entry) (res reconcile.Result, err error) {
 
 	for _, oChild := range objects {
 
@@ -102,7 +103,7 @@ func (h *DefaultSentinelAction[k8sObject]) Create(ctx context.Context, o k8sObje
 
 // Update can be call on your own version
 // It only add some log / events
-func (h *DefaultSentinelAction[k8sObject]) Update(ctx context.Context, o k8sObject, data map[string]any, objects []client.Object, logger *logrus.Entry) (res ctrl.Result, err error) {
+func (h *DefaultSentinelAction[k8sObject]) Update(ctx context.Context, o k8sObject, data map[string]any, objects []client.Object, logger *logrus.Entry) (res reconcile.Result, err error) {
 
 	for _, oChild := range objects {
 		if err = h.Client().Update(ctx, oChild); err != nil {
@@ -129,16 +130,16 @@ func (h *DefaultSentinelAction[k8sObject]) Delete(ctx context.Context, o k8sObje
 	return nil
 }
 
-func (h *DefaultSentinelAction[k8sObject]) OnError(ctx context.Context, o k8sObject, data map[string]any, currentErr error, logger *logrus.Entry) (res ctrl.Result, err error) {
+func (h *DefaultSentinelAction[k8sObject]) OnError(ctx context.Context, o k8sObject, data map[string]any, currentErr error, logger *logrus.Entry) (res reconcile.Result, err error) {
 	h.Recorder().Event(o, corev1.EventTypeWarning, "SentinelActionError", k8sstrings.ShortenString(currentErr.Error(), controller.ShortenError))
 	return res, currentErr
 }
 
-func (h *DefaultSentinelAction[k8sObject]) OnSuccess(ctx context.Context, o k8sObject, data map[string]any, diff multiphase.MultiPhaseDiff[client.Object], logger *logrus.Entry) (res ctrl.Result, err error) {
+func (h *DefaultSentinelAction[k8sObject]) OnSuccess(ctx context.Context, o k8sObject, data map[string]any, diff multiphase.MultiPhaseDiff[client.Object], logger *logrus.Entry) (res reconcile.Result, err error) {
 	return res, nil
 }
 
-func (h *DefaultSentinelAction[k8sObject]) Diff(ctx context.Context, o k8sObject, read SentinelRead, data map[string]any, logger *logrus.Entry, ignoreDiff ...patch.CalculateOption) (diff multiphase.MultiPhaseDiff[client.Object], res ctrl.Result, err error) {
+func (h *DefaultSentinelAction[k8sObject]) Diff(ctx context.Context, o k8sObject, read SentinelRead, data map[string]any, logger *logrus.Entry, ignoreDiff ...patch.CalculateOption) (diff multiphase.MultiPhaseDiff[client.Object], res reconcile.Result, err error) {
 
 	diff = multiphase.NewMultiPhaseDiff[client.Object]()
 

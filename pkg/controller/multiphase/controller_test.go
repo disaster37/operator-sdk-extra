@@ -24,11 +24,10 @@ func (t *ControllerMultiphaseTestSuite) TestController() {
 		Name:      "t-test-" + helper.RandomString(10),
 		Namespace: "default",
 	}
-	o := &MultiPhaseObject{}
 	data := map[string]any{}
 
-	testCase := test.NewTestCase(t.T(), t.k8sClient, key, o, 5*time.Second, data)
-	testCase.Steps = []test.TestStep{
+	testCase := test.NewTestCase[*MultiPhaseObject](t.T(), t.k8sClient, key, 5*time.Second, data)
+	testCase.Steps = []test.TestStep[*MultiPhaseObject]{
 		doCreateStep(),
 		doUpdateStep(),
 		doDeleteStep(),
@@ -37,13 +36,13 @@ func (t *ControllerMultiphaseTestSuite) TestController() {
 	testCase.Run()
 }
 
-func doCreateStep() test.TestStep {
-	return test.TestStep{
+func doCreateStep() test.TestStep[*MultiPhaseObject] {
+	return test.TestStep[*MultiPhaseObject]{
 		Name: "create",
-		Do: func(c client.Client, key types.NamespacedName, o client.Object, data map[string]any) (err error) {
+		Do: func(c client.Client, key types.NamespacedName, o *MultiPhaseObject, data map[string]any) (err error) {
 			logrus.Infof("=== Add new MultiphaseObject %s/%s ===\n\n", key.Namespace, key.Name)
 
-			m := &MultiPhaseObject{
+			o = &MultiPhaseObject{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      key.Name,
 					Namespace: key.Namespace,
@@ -53,24 +52,24 @@ func doCreateStep() test.TestStep {
 				},
 			}
 
-			if err = c.Create(context.Background(), m); err != nil {
+			if err = c.Create(context.Background(), o); err != nil {
 				return err
 			}
 
 			return nil
 		},
-		Check: func(t *testing.T, c client.Client, key types.NamespacedName, o client.Object, data map[string]any) (err error) {
-			m := &MultiPhaseObject{}
+		Check: func(t *testing.T, c client.Client, key types.NamespacedName, o *MultiPhaseObject, data map[string]any) (err error) {
+			o = &MultiPhaseObject{}
 			var (
 				cm *corev1.ConfigMap
 			)
 
 			isTimeout, err := test.RunWithTimeout(func() error {
-				if err := c.Get(context.Background(), key, m); err != nil {
+				if err := c.Get(context.Background(), key, o); err != nil {
 					t.Fatal("MultiPhaseObject not found")
 				}
 
-				if m.GetStatus().GetObservedGeneration() > 0 {
+				if o.GetStatus().GetObservedGeneration() > 0 {
 					return nil
 				}
 
@@ -93,35 +92,33 @@ func doCreateStep() test.TestStep {
 	}
 }
 
-func doUpdateStep() test.TestStep {
-	return test.TestStep{
+func doUpdateStep() test.TestStep[*MultiPhaseObject] {
+	return test.TestStep[*MultiPhaseObject]{
 		Name: "update",
-		Do: func(c client.Client, key types.NamespacedName, o client.Object, data map[string]any) (err error) {
+		Do: func(c client.Client, key types.NamespacedName, o *MultiPhaseObject, data map[string]any) (err error) {
 			logrus.Infof("=== Update MultiPhaseObject %s/%s ===\n\n", key.Namespace, key.Name)
 
 			if o == nil {
-				return errors.New("Cerebro is null")
+				return errors.New("MultiphaseObject is null")
 			}
-			m := o.(*MultiPhaseObject)
 
 			// Add labels must force to update all resources
-			m.Labels = map[string]string{
+			o.Labels = map[string]string{
 				"test": "fu",
 			}
 
 			// Change spec to track generation
-			m.Spec.Test = "test2"
+			o.Spec.Test = "test2"
 
-			data["lastGeneration"] = m.GetStatus().GetObservedGeneration()
+			data["lastGeneration"] = o.GetStatus().GetObservedGeneration()
 
-			if err = c.Update(context.Background(), m); err != nil {
+			if err = c.Update(context.Background(), o); err != nil {
 				return err
 			}
 
 			return nil
 		},
-		Check: func(t *testing.T, c client.Client, key types.NamespacedName, o client.Object, data map[string]any) (err error) {
-			m := &MultiPhaseObject{}
+		Check: func(t *testing.T, c client.Client, key types.NamespacedName, o *MultiPhaseObject, data map[string]any) (err error) {
 
 			var (
 				cm *corev1.ConfigMap
@@ -130,11 +127,11 @@ func doUpdateStep() test.TestStep {
 			lastGeneration := data["lastGeneration"].(int64)
 
 			isTimeout, err := test.RunWithTimeout(func() error {
-				if err := c.Get(context.Background(), key, m); err != nil {
+				if err := c.Get(context.Background(), key, o); err != nil {
 					t.Fatal("MultiPhaseObject not found")
 				}
 
-				if lastGeneration < m.GetStatus().GetObservedGeneration() {
+				if lastGeneration < o.GetStatus().GetObservedGeneration() {
 					return nil
 				}
 
@@ -158,31 +155,29 @@ func doUpdateStep() test.TestStep {
 	}
 }
 
-func doDeleteStep() test.TestStep {
-	return test.TestStep{
+func doDeleteStep() test.TestStep[*MultiPhaseObject] {
+	return test.TestStep[*MultiPhaseObject]{
 		Name: "delete",
-		Do: func(c client.Client, key types.NamespacedName, o client.Object, data map[string]any) (err error) {
+		Do: func(c client.Client, key types.NamespacedName, o *MultiPhaseObject, data map[string]any) (err error) {
 			logrus.Infof("=== Delete MultiPhaseObject cluster %s/%s ===\n\n", key.Namespace, key.Name)
 
 			if o == nil {
 				return errors.New("Cerebro is null")
 			}
-			m := o.(*MultiPhaseObject)
 
-			if err = c.Delete(context.Background(), m, &client.DeleteOptions{GracePeriodSeconds: ptr.To(int64(0))}); err != nil {
+			if err = c.Delete(context.Background(), o, &client.DeleteOptions{GracePeriodSeconds: ptr.To(int64(0))}); err != nil {
 				return err
 			}
 
 			return nil
 		},
-		Check: func(t *testing.T, c client.Client, key types.NamespacedName, o client.Object, data map[string]any) (err error) {
-			m := &MultiPhaseObject{}
+		Check: func(t *testing.T, c client.Client, key types.NamespacedName, o *MultiPhaseObject, data map[string]any) (err error) {
 			isDeleted := false
 
 			// In envtest, no kubelet
 			// So the cascading children delation not works
 			isTimeout, err := test.RunWithTimeout(func() error {
-				if err = c.Get(context.Background(), key, m); err != nil {
+				if err = c.Get(context.Background(), key, o); err != nil {
 					if k8serrors.IsNotFound(err) {
 						isDeleted = true
 						return nil

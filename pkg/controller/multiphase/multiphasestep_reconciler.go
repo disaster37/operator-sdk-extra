@@ -9,8 +9,8 @@ import (
 	"github.com/disaster37/operator-sdk-extra/v2/pkg/object"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/tools/record"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 // MultiPhaseStepReconciler is the reconciler to implement to create one step for MultiPhaseReconciler
@@ -18,7 +18,7 @@ type MultiPhaseStepReconciler[k8sObject object.MultiPhaseObject, k8sStepObject c
 	controller.BaseReconciler
 
 	// Reconcile permit to reconcile the step (one K8s resource)
-	Reconcile(ctx context.Context, req ctrl.Request, o k8sObject, data map[string]interface{}, reconciler MultiPhaseStepReconcilerAction[k8sObject, k8sStepObject], logger *logrus.Entry, ignoresDiff ...patch.CalculateOption) (res ctrl.Result, err error)
+	Reconcile(ctx context.Context, req reconcile.Request, o k8sObject, data map[string]interface{}, reconciler MultiPhaseStepReconcilerAction[k8sObject, k8sStepObject], logger *logrus.Entry, ignoresDiff ...patch.CalculateOption) (res reconcile.Result, err error)
 }
 
 // DefaultMultiPhaseStepReconciler is the default implementation of MultiPhaseStepReconciler interface
@@ -34,7 +34,7 @@ func NewMultiPhaseStepReconciler[k8sObject object.MultiPhaseObject, k8sStepObjec
 }
 
 // Reconcile permit to reconcile the step (one K8s resource)
-func (h *DefaultMultiPhaseStepReconciler[k8sObject, k8sStepObject]) Reconcile(ctx context.Context, req ctrl.Request, o k8sObject, data map[string]interface{}, reconcilerAction MultiPhaseStepReconcilerAction[k8sObject, k8sStepObject], logger *logrus.Entry, ignoresDiff ...patch.CalculateOption) (res ctrl.Result, err error) {
+func (h *DefaultMultiPhaseStepReconciler[k8sObject, k8sStepObject]) Reconcile(ctx context.Context, req reconcile.Request, o k8sObject, data map[string]interface{}, reconcilerAction MultiPhaseStepReconcilerAction[k8sObject, k8sStepObject], logger *logrus.Entry, ignoresDiff ...patch.CalculateOption) (res reconcile.Result, err error) {
 
 	var (
 		diff MultiPhaseDiff[k8sStepObject]
@@ -53,7 +53,7 @@ func (h *DefaultMultiPhaseStepReconciler[k8sObject, k8sStepObject]) Reconcile(ct
 		return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallConfigureFromReconciler.Error()), logger)
 	}
 	logger.Debug("Call 'configure' from step reconciler successfully")
-	if res != (ctrl.Result{}) {
+	if res != (reconcile.Result{}) {
 		return res, nil
 	}
 
@@ -64,7 +64,7 @@ func (h *DefaultMultiPhaseStepReconciler[k8sObject, k8sStepObject]) Reconcile(ct
 		return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallReadFromReconciler.Error()), logger)
 	}
 	logger.Debug("Call 'read' from step reconciler successfully")
-	if res != (ctrl.Result{}) {
+	if res != (reconcile.Result{}) {
 		return res, nil
 	}
 
@@ -78,7 +78,7 @@ func (h *DefaultMultiPhaseStepReconciler[k8sObject, k8sStepObject]) Reconcile(ct
 	if diff.IsDiff() {
 		logger.Debugf("Found diff: %s", diff.Diff())
 	}
-	if res != (ctrl.Result{}) {
+	if res != (reconcile.Result{}) {
 		return res, nil
 	}
 
@@ -91,7 +91,7 @@ func (h *DefaultMultiPhaseStepReconciler[k8sObject, k8sStepObject]) Reconcile(ct
 			return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallCreateFromReconciler.Error()), logger)
 		}
 		logger.Debug("Call 'create' from step reconciler successfully")
-		if res != (ctrl.Result{}) {
+		if res != (reconcile.Result{}) {
 			return res, nil
 		}
 	}
@@ -105,7 +105,7 @@ func (h *DefaultMultiPhaseStepReconciler[k8sObject, k8sStepObject]) Reconcile(ct
 			return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallUpdateFromReconciler.Error()), logger)
 		}
 		logger.Debug("Call 'update' from step reconciler successfully")
-		if res != (ctrl.Result{}) {
+		if res != (reconcile.Result{}) {
 			return res, nil
 		}
 	}
@@ -119,7 +119,7 @@ func (h *DefaultMultiPhaseStepReconciler[k8sObject, k8sStepObject]) Reconcile(ct
 			return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallDeleteFromReconciler.Error()), logger)
 		}
 		logger.Debug("Call 'delete' from step reconciler successfully")
-		if res != (ctrl.Result{}) {
+		if res != (reconcile.Result{}) {
 			return res, nil
 		}
 	}

@@ -15,9 +15,9 @@ import (
 	"github.com/sirupsen/logrus"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/record"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 // MultiPhaseReconciler the reconciler to implement whe you need to create multiple resources on k8s
@@ -25,7 +25,7 @@ type MultiPhaseReconciler[k8sObject object.MultiPhaseObject] interface {
 	controller.Reconciler
 
 	// Reconcile permit to orchestrate all phase needed to successfully reconcile the object
-	Reconcile(ctx context.Context, req ctrl.Request, o k8sObject, data map[string]interface{}, reconcilerAction MultiPhaseReconcilerAction[k8sObject], reconcilersStepAction ...MultiPhaseStepReconcilerAction[k8sObject, client.Object]) (res ctrl.Result, err error)
+	Reconcile(ctx context.Context, req reconcile.Request, o k8sObject, data map[string]interface{}, reconcilerAction MultiPhaseReconcilerAction[k8sObject], reconcilersStepAction ...MultiPhaseStepReconcilerAction[k8sObject, client.Object]) (res reconcile.Result, err error)
 }
 
 // DefaultMultiPhaseReconciler is the default multi phase reconsiler you can used when  you should to create multiple k8s resources
@@ -50,7 +50,7 @@ func NewMultiPhaseReconciler[k8sObject object.MultiPhaseObject](c client.Client,
 	}
 }
 
-func (h *DefaultMultiPhaseReconciler[k8sObject]) Reconcile(ctx context.Context, req ctrl.Request, o k8sObject, data map[string]interface{}, reconcilerAction MultiPhaseReconcilerAction[k8sObject], reconcilersStepAction ...MultiPhaseStepReconcilerAction[k8sObject, client.Object]) (res ctrl.Result, err error) {
+func (h *DefaultMultiPhaseReconciler[k8sObject]) Reconcile(ctx context.Context, req reconcile.Request, o k8sObject, data map[string]interface{}, reconcilerAction MultiPhaseReconcilerAction[k8sObject], reconcilersStepAction ...MultiPhaseStepReconcilerAction[k8sObject, client.Object]) (res reconcile.Result, err error) {
 
 	// Init logger
 	logger := h.Logger().WithFields(logrus.Fields{
@@ -82,7 +82,7 @@ func (h *DefaultMultiPhaseReconciler[k8sObject]) Reconcile(ctx context.Context, 
 				return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenAddFinalizer.Error()), logger)
 			}
 			logger.Debug("Add finalizer successfully, force requeue object")
-			return ctrl.Result{Requeue: true}, nil
+			return reconcile.Result{Requeue: true}, nil
 		}
 	}
 
@@ -117,7 +117,7 @@ func (h *DefaultMultiPhaseReconciler[k8sObject]) Reconcile(ctx context.Context, 
 		return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallConfigureFromReconciler.Error()), logger)
 	}
 	logger.Debug("Call 'configure' from reconciler successfully")
-	if res != (ctrl.Result{}) {
+	if res != (reconcile.Result{}) {
 		return res, nil
 	}
 
@@ -128,7 +128,7 @@ func (h *DefaultMultiPhaseReconciler[k8sObject]) Reconcile(ctx context.Context, 
 		return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallReadFromReconciler.Error()), logger)
 	}
 	logger.Debug("Call 'read' from reconciler successfully")
-	if res != (ctrl.Result{}) {
+	if res != (reconcile.Result{}) {
 		return res, nil
 	}
 
@@ -148,7 +148,7 @@ func (h *DefaultMultiPhaseReconciler[k8sObject]) Reconcile(ctx context.Context, 
 			}
 			logger.Debug("Remove finalizer successfully")
 		}
-		return ctrl.Result{}, nil
+		return reconcile.Result{}, nil
 	}
 
 	// Call step resonsilers
@@ -161,7 +161,7 @@ func (h *DefaultMultiPhaseReconciler[k8sObject]) Reconcile(ctx context.Context, 
 			return reconciler.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallStepReconcilerFromReconciler.Error()), logger)
 		}
 		logger.Debug("Call 'reconcile' from step reconciler successfully")
-		if res != (ctrl.Result{}) {
+		if res != (reconcile.Result{}) {
 			return res, nil
 		}
 

@@ -15,9 +15,9 @@ import (
 	"github.com/sirupsen/logrus"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/record"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 // RemoteReconciler is the reconciler to reconcile the remote resource
@@ -25,7 +25,7 @@ type RemoteReconciler[k8sObject object.RemoteObject, apiObject comparable, apiCl
 	controller.Reconciler
 
 	// Reconcile permit to reconcile the step (one K8s resource)
-	Reconcile(ctx context.Context, req ctrl.Request, o k8sObject, data map[string]interface{}, reconciler RemoteReconcilerAction[k8sObject, apiObject, apiClient]) (res ctrl.Result, err error)
+	Reconcile(ctx context.Context, req reconcile.Request, o k8sObject, data map[string]interface{}, reconciler RemoteReconcilerAction[k8sObject, apiObject, apiClient]) (res reconcile.Result, err error)
 }
 
 // DefaultRemoteReconciler is the default implementation of RemoteReconciler interface
@@ -48,7 +48,7 @@ func NewRemoteReconciler[k8sObject object.RemoteObject, apiObject comparable, ap
 	}
 }
 
-func (h *DefaultRemoteReconciler[k8sObject, apiObject, apiClient]) Reconcile(ctx context.Context, req ctrl.Request, o k8sObject, data map[string]interface{}, reconciler RemoteReconcilerAction[k8sObject, apiObject, apiClient]) (res ctrl.Result, err error) {
+func (h *DefaultRemoteReconciler[k8sObject, apiObject, apiClient]) Reconcile(ctx context.Context, req reconcile.Request, o k8sObject, data map[string]interface{}, reconciler RemoteReconcilerAction[k8sObject, apiObject, apiClient]) (res reconcile.Result, err error) {
 
 	var (
 		handler RemoteExternalReconciler[k8sObject, apiObject, apiClient]
@@ -87,7 +87,7 @@ func (h *DefaultRemoteReconciler[k8sObject, apiObject, apiClient]) Reconcile(ctx
 				return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, controller.ErrWhenAddFinalizer.Error()), logger)
 			}
 			logger.Debug("Add finalizer successfully, force requeue object")
-			return ctrl.Result{Requeue: true}, nil
+			return reconcile.Result{Requeue: true}, nil
 		}
 	}
 
@@ -122,7 +122,7 @@ func (h *DefaultRemoteReconciler[k8sObject, apiObject, apiClient]) Reconcile(ctx
 		return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, controller.ErrWhenCallConfigureFromReconciler.Error()), logger)
 	}
 	logger.Debug("Call 'getRemoteHandler' from reconciler successfully")
-	if res != (ctrl.Result{}) {
+	if res != (reconcile.Result{}) {
 		return res, nil
 	}
 	if handler == nil && !o.GetDeletionTimestamp().IsZero() {
@@ -144,7 +144,7 @@ func (h *DefaultRemoteReconciler[k8sObject, apiObject, apiClient]) Reconcile(ctx
 		return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, controller.ErrWhenCallReadFromReconciler.Error()), logger)
 	}
 	logger.Debug("Call 'configure' from reconciler successfully")
-	if res != (ctrl.Result{}) {
+	if res != (reconcile.Result{}) {
 		return res, nil
 	}
 
@@ -155,7 +155,7 @@ func (h *DefaultRemoteReconciler[k8sObject, apiObject, apiClient]) Reconcile(ctx
 		return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, controller.ErrWhenCallReadFromReconciler.Error()), logger)
 	}
 	logger.Debug("Call 'read' from reconciler successfully")
-	if res != (ctrl.Result{}) {
+	if res != (reconcile.Result{}) {
 		return res, nil
 	}
 
@@ -175,7 +175,7 @@ func (h *DefaultRemoteReconciler[k8sObject, apiObject, apiClient]) Reconcile(ctx
 			}
 			logger.Debug("Remove finalizer successfully")
 		}
-		return ctrl.Result{}, nil
+		return reconcile.Result{}, nil
 	}
 
 	// Check if diff exist
@@ -185,7 +185,7 @@ func (h *DefaultRemoteReconciler[k8sObject, apiObject, apiClient]) Reconcile(ctx
 		return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, controller.ErrWhenCallDiffFromReconciler.Error()), logger)
 	}
 	logger.Debugf("Call 'diff' from reconciler successfully with diff:\n%s", diff.Diff())
-	if res != (ctrl.Result{}) {
+	if res != (reconcile.Result{}) {
 		return res, nil
 	}
 
@@ -196,7 +196,7 @@ func (h *DefaultRemoteReconciler[k8sObject, apiObject, apiClient]) Reconcile(ctx
 			return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, controller.ErrWhenCallCreateFromReconciler.Error()), logger)
 		}
 		logger.Debug("Call 'create' from reconciler successfully")
-		if res != (ctrl.Result{}) {
+		if res != (reconcile.Result{}) {
 			return res, nil
 		}
 	}
@@ -208,7 +208,7 @@ func (h *DefaultRemoteReconciler[k8sObject, apiObject, apiClient]) Reconcile(ctx
 			return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, controller.ErrWhenCallUpdateFromReconciler.Error()), logger)
 		}
 		logger.Debug("Call 'update' from reconciler successfully")
-		if res != (ctrl.Result{}) {
+		if res != (reconcile.Result{}) {
 			return res, nil
 		}
 	}

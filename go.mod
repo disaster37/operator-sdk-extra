@@ -5,6 +5,7 @@ go 1.23.4
 require (
 	dario.cat/mergo v1.0.1
 	emperror.dev/errors v0.8.1
+	github.com/disaster37/es-handler/v8 v8.1.5
 	github.com/disaster37/generic-objectmatcher v1.0.2
 	github.com/disaster37/go-kibana-rest/v8 v8.5.0
 	github.com/disaster37/k8s-objectmatcher v1.8.2
@@ -13,12 +14,11 @@ require (
 	github.com/json-iterator/go v1.1.12
 	github.com/kr/pretty v0.3.1
 	github.com/mitchellh/copystructure v1.2.0
-	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.10.0
-	github.com/thoas/go-funk v0.9.3
 	github.com/urfave/cli/v2 v2.27.5
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
+	go.uber.org/mock v0.3.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/time v0.8.0
 	k8s.io/api v0.32.0
@@ -37,6 +37,9 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.5 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
+	github.com/elastic/elastic-transport-go/v8 v8.3.0 // indirect
+	github.com/elastic/go-elasticsearch/v8 v8.8.1 // indirect
+	github.com/elastic/go-ucfg v0.8.6 // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.9.0 // indirect
@@ -64,6 +67,8 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/nxadm/tail v1.4.11 // indirect
+	github.com/olivere/elastic/v7 v7.0.32 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_golang v1.19.1 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect

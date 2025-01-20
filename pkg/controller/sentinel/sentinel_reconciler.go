@@ -14,8 +14,8 @@ import (
 	"github.com/sirupsen/logrus"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/record"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 // SentinelReconciler must be used when you look resource that your operator is not the owner like ingress, secret, configMap, etc.
@@ -25,7 +25,7 @@ type SentinelReconciler[k8sObject client.Object] interface {
 	controller.Reconciler
 
 	// Reconcile permit to orchestrate all phase needed to successfully reconcile the object
-	Reconcile(ctx context.Context, req ctrl.Request, o k8sObject, data map[string]interface{}, reconciler SentinelReconcilerAction[k8sObject]) (res ctrl.Result, err error)
+	Reconcile(ctx context.Context, req reconcile.Request, o k8sObject, data map[string]interface{}, reconciler SentinelReconcilerAction[k8sObject]) (res reconcile.Result, err error)
 }
 
 // DefaultSentinelReconciler is the default implementation of SentinelReconciler interface
@@ -50,7 +50,7 @@ func NewSentinelReconciler[k8sObject client.Object](client client.Client, name s
 
 // No need to add finalizer and manage delete
 // All sub resources must be children of main parent. So the clean is handled by kubelet in lazy effort
-func (h *DefaultSentinelReconciler[k8sObject]) Reconcile(ctx context.Context, req ctrl.Request, o k8sObject, data map[string]interface{}, reconcilerAction SentinelReconcilerAction[k8sObject]) (res ctrl.Result, err error) {
+func (h *DefaultSentinelReconciler[k8sObject]) Reconcile(ctx context.Context, req reconcile.Request, o k8sObject, data map[string]interface{}, reconcilerAction SentinelReconcilerAction[k8sObject]) (res reconcile.Result, err error) {
 
 	var (
 		read SentinelRead
@@ -109,7 +109,7 @@ func (h *DefaultSentinelReconciler[k8sObject]) Reconcile(ctx context.Context, re
 		return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallConfigureFromReconciler.Error()), logger)
 	}
 	logger.Debug("Call 'configure' from reconciler successfully")
-	if res != (ctrl.Result{}) {
+	if res != (reconcile.Result{}) {
 		return res, nil
 	}
 
@@ -120,7 +120,7 @@ func (h *DefaultSentinelReconciler[k8sObject]) Reconcile(ctx context.Context, re
 		return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallReadFromReconciler.Error()), logger)
 	}
 	logger.Debug("Call 'read' from reconciler successfully")
-	if res != (ctrl.Result{}) {
+	if res != (reconcile.Result{}) {
 		return res, nil
 	}
 
@@ -131,7 +131,7 @@ func (h *DefaultSentinelReconciler[k8sObject]) Reconcile(ctx context.Context, re
 		return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallDiffFromReconciler.Error()), logger)
 	}
 	logger.Debugf("Call 'diff' from reconciler successfully with diff:\n%s", diff.Diff())
-	if res != (ctrl.Result{}) {
+	if res != (reconcile.Result{}) {
 		return res, nil
 	}
 
@@ -142,7 +142,7 @@ func (h *DefaultSentinelReconciler[k8sObject]) Reconcile(ctx context.Context, re
 			return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallCreateFromReconciler.Error()), logger)
 		}
 		logger.Debug("Call 'create' from reconciler successfully")
-		if res != (ctrl.Result{}) {
+		if res != (reconcile.Result{}) {
 			return res, nil
 		}
 	}
@@ -154,7 +154,7 @@ func (h *DefaultSentinelReconciler[k8sObject]) Reconcile(ctx context.Context, re
 			return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallUpdateFromReconciler.Error()), logger)
 		}
 		logger.Debug("Call 'update' from reconciler successfully")
-		if res != (ctrl.Result{}) {
+		if res != (reconcile.Result{}) {
 			return res, nil
 		}
 	}
@@ -166,7 +166,7 @@ func (h *DefaultSentinelReconciler[k8sObject]) Reconcile(ctx context.Context, re
 			return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallUpdateFromReconciler.Error()), logger)
 		}
 		logger.Debug("Call 'delete' from reconciler successfully")
-		if res != (ctrl.Result{}) {
+		if res != (reconcile.Result{}) {
 			return res, nil
 		}
 	}

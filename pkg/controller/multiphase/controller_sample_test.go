@@ -59,7 +59,7 @@ func NewTestReconciler(c client.Client, logger *logrus.Entry, recorder record.Ev
 	}
 }
 
-func (r *TestReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *TestReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
 	o := &MultiPhaseObject{}
 	data := map[string]any{}
 
@@ -89,6 +89,7 @@ func (h *TestReconciler) SetupWithManager(mgr ctrl.Manager) error {
 /************
 * Step reconciler
  */
+
 type configMapReconciler struct {
 	multiphase.MultiPhaseStepReconcilerAction[*MultiPhaseObject, client.Object]
 }
@@ -104,7 +105,7 @@ func newConfiMapReconciler(c client.Client, recorder record.EventRecorder) (mult
 	}
 }
 
-func (r *configMapReconciler) Read(ctx context.Context, o *MultiPhaseObject, data map[string]any, logger *logrus.Entry) (read multiphase.MultiPhaseRead[client.Object], res ctrl.Result, err error) {
+func (r *configMapReconciler) Read(ctx context.Context, o *MultiPhaseObject, data map[string]any, logger *logrus.Entry) (read multiphase.MultiPhaseRead[client.Object], res reconcile.Result, err error) {
 	cm := &corev1.ConfigMap{}
 	read = multiphase.NewMultiPhaseRead[client.Object]()
 
