@@ -77,6 +77,9 @@ func (t *ControllerMultiphaseTestSuite) SetupSuite() {
 			panic(err)
 		}
 	}()
+
+	// Wait cache is started
+	time.Sleep(10 * time.Second)
 }
 
 func (t *ControllerMultiphaseTestSuite) TearDownSuite() {

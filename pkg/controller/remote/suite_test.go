@@ -101,7 +101,7 @@ func (t *ControllerRemoteTestSuite) SetupSuite() {
 	}()
 
 	// Wait cache is started
-	time.Sleep(30 * time.Second)
+	time.Sleep(10 * time.Second)
 }
 
 func (t *ControllerRemoteTestSuite) TearDownSuite() {
