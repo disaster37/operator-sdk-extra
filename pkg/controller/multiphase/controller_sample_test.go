@@ -54,7 +54,7 @@ func NewTestReconciler(c client.Client, logger *logrus.Entry, recorder record.Ev
 		),
 		name: name,
 		stepReconcilers: []multiphase.MultiPhaseStepReconcilerAction[*MultiPhaseObject, client.Object]{
-			newConfiMapReconciler(c, recorder),
+			multiphase.NewObjectMultiPhaseStepReconcilerAction[*MultiPhaseObject, *corev1.ConfigMap, client.Object](newConfiMapReconciler(c, recorder)),
 		},
 	}
 }
@@ -91,12 +91,12 @@ func (h *TestReconciler) SetupWithManager(mgr ctrl.Manager) error {
  */
 
 type configMapReconciler struct {
-	multiphase.MultiPhaseStepReconcilerAction[*MultiPhaseObject, client.Object]
+	multiphase.MultiPhaseStepReconcilerAction[*MultiPhaseObject, *corev1.ConfigMap]
 }
 
-func newConfiMapReconciler(c client.Client, recorder record.EventRecorder) (multiPhaseStepReconcilerAction multiphase.MultiPhaseStepReconcilerAction[*MultiPhaseObject, client.Object]) {
+func newConfiMapReconciler(c client.Client, recorder record.EventRecorder) (multiPhaseStepReconcilerAction multiphase.MultiPhaseStepReconcilerAction[*MultiPhaseObject, *corev1.ConfigMap]) {
 	return &configMapReconciler{
-		MultiPhaseStepReconcilerAction: multiphase.NewMultiPhaseStepReconcilerAction[*MultiPhaseObject, client.Object](
+		MultiPhaseStepReconcilerAction: multiphase.NewMultiPhaseStepReconcilerAction[*MultiPhaseObject, *corev1.ConfigMap](
 			c,
 			ConfigmapPhase,
 			ConfigmapCondition,
@@ -105,9 +105,9 @@ func newConfiMapReconciler(c client.Client, recorder record.EventRecorder) (mult
 	}
 }
 
-func (r *configMapReconciler) Read(ctx context.Context, o *MultiPhaseObject, data map[string]any, logger *logrus.Entry) (read multiphase.MultiPhaseRead[client.Object], res reconcile.Result, err error) {
+func (r *configMapReconciler) Read(ctx context.Context, o *MultiPhaseObject, data map[string]any, logger *logrus.Entry) (read multiphase.MultiPhaseRead[*corev1.ConfigMap], res reconcile.Result, err error) {
 	cm := &corev1.ConfigMap{}
-	read = multiphase.NewMultiPhaseRead[client.Object]()
+	read = multiphase.NewMultiPhaseRead[*corev1.ConfigMap]()
 
 	if err = r.Client().Get(ctx, types.NamespacedName{Namespace: o.Namespace, Name: o.Name}, cm); err != nil {
 		if !k8serrors.IsNotFound(err) {

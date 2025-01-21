@@ -3,6 +3,7 @@ package multiphase
 import (
 	"strings"
 
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/helper"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -167,4 +168,76 @@ func (h *DefaultMultiPhaseDiff[k8sStepObject]) Diff() string {
 
 func (h *DefaultMultiPhaseDiff[k8sStepObject]) IsDiff() bool {
 	return h.diff.Len() > 0
+}
+
+// ObjectMultiPhaseDiff is the implementation of MultiPhaseDiff for a specific client.Object type needed by multiphase reconciler
+// It's kind of wrapper to conver MultiPhaseDiff[k8sStepObject] to MultiPhaseDiff[client.Object]
+type ObjectMultiPhaseDiff[k8sStepObjectSrc client.Object, k8sStepObjectDst client.Object] struct {
+	in MultiPhaseDiff[k8sStepObjectSrc]
+}
+
+func NewObjectMultiphaseDiff[k8sStepObjectSrc client.Object, k8sStepObjectDst client.Object](in MultiPhaseDiff[k8sStepObjectSrc]) MultiPhaseDiff[k8sStepObjectDst] {
+	return &ObjectMultiPhaseDiff[k8sStepObjectSrc, k8sStepObjectDst]{
+		in: in,
+	}
+}
+
+func (h *ObjectMultiPhaseDiff[k8sStepObjectSrc, k8sStepObjectDst]) NeedCreate() bool {
+	return h.in.NeedCreate()
+}
+
+func (h *ObjectMultiPhaseDiff[k8sStepObjectSrc, k8sStepObjectDst]) NeedUpdate() bool {
+	return h.in.NeedUpdate()
+}
+
+func (h *ObjectMultiPhaseDiff[k8sStepObjectSrc, k8sStepObjectDst]) NeedDelete() bool {
+	return h.in.NeedDelete()
+}
+
+func (h *ObjectMultiPhaseDiff[k8sStepObjectSrc, k8sStepObjectDst]) GetObjectsToCreate() []k8sStepObjectDst {
+	return helper.ToSliceOfObject[k8sStepObjectSrc, k8sStepObjectDst](h.in.GetObjectsToCreate())
+}
+
+func (h *ObjectMultiPhaseDiff[k8sStepObjectSrc, k8sStepObjectDst]) SetObjectsToCreate(objects []k8sStepObjectDst) {
+	h.in.SetObjectsToCreate(helper.ToSliceOfObject[k8sStepObjectDst, k8sStepObjectSrc](objects))
+}
+
+func (h *ObjectMultiPhaseDiff[k8sStepObjectSrc, k8sStepObjectDst]) AddObjectToCreate(o k8sStepObjectDst) {
+	h.in.AddObjectToCreate(helper.ToObject[k8sStepObjectDst, k8sStepObjectSrc](o))
+}
+
+func (h *ObjectMultiPhaseDiff[k8sStepObjectSrc, k8sStepObjectDst]) GetObjectsToUpdate() []k8sStepObjectDst {
+	return helper.ToSliceOfObject[k8sStepObjectSrc, k8sStepObjectDst](h.in.GetObjectsToUpdate())
+}
+
+func (h *ObjectMultiPhaseDiff[k8sStepObjectSrc, k8sStepObjectDst]) SetObjectsToUpdate(objects []k8sStepObjectDst) {
+	h.in.SetObjectsToUpdate(helper.ToSliceOfObject[k8sStepObjectDst, k8sStepObjectSrc](objects))
+}
+
+func (h *ObjectMultiPhaseDiff[k8sStepObjectSrc, k8sStepObjectDst]) AddObjectToUpdate(o k8sStepObjectDst) {
+	h.in.AddObjectToUpdate(helper.ToObject[k8sStepObjectDst, k8sStepObjectSrc](o))
+}
+
+func (h *ObjectMultiPhaseDiff[k8sStepObjectSrc, k8sStepObjectDst]) GetObjectsToDelete() []k8sStepObjectDst {
+	return helper.ToSliceOfObject[k8sStepObjectSrc, k8sStepObjectDst](h.in.GetObjectsToDelete())
+}
+
+func (h *ObjectMultiPhaseDiff[k8sStepObjectSrc, k8sStepObjectDst]) SetObjectsToDelete(objects []k8sStepObjectDst) {
+	h.in.SetObjectsToDelete(helper.ToSliceOfObject[k8sStepObjectDst, k8sStepObjectSrc](objects))
+}
+
+func (h *ObjectMultiPhaseDiff[k8sStepObjectSrc, k8sStepObjectDst]) AddObjectToDelete(o k8sStepObjectDst) {
+	h.in.AddObjectToDelete(helper.ToObject[k8sStepObjectDst, k8sStepObjectSrc](o))
+}
+
+func (h *ObjectMultiPhaseDiff[k8sStepObjectSrc, k8sStepObjectDst]) AddDiff(diff string) {
+	h.in.AddDiff(diff)
+}
+
+func (h *ObjectMultiPhaseDiff[k8sStepObjectSrc, k8sStepObjectDst]) Diff() string {
+	return h.in.Diff()
+}
+
+func (h *ObjectMultiPhaseDiff[k8sStepObjectSrc, k8sStepObjectDst]) IsDiff() bool {
+	return h.in.IsDiff()
 }
