@@ -162,7 +162,7 @@ func doDeleteStep() test.TestStep[*MultiPhaseObject] {
 			logrus.Infof("=== Delete MultiPhaseObject cluster %s/%s ===\n\n", key.Namespace, key.Name)
 
 			if o == nil {
-				return errors.New("Cerebro is null")
+				return errors.New("MultiPhaseObject is null")
 			}
 
 			if err = c.Delete(context.Background(), o, &client.DeleteOptions{GracePeriodSeconds: ptr.To(int64(0))}); err != nil {

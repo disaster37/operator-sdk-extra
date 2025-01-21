@@ -1,6 +1,8 @@
 package sentinel
 
 import (
+	"reflect"
+
 	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller/multiphase"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -51,6 +53,9 @@ func (h *DefaultSentinelRead) SetCurrentObjects(objects []client.Object) {
 }
 
 func (h *DefaultSentinelRead) AddCurrentObject(o client.Object) {
+	if reflect.ValueOf(o).IsNil() {
+		return
+	}
 	o = GetObjectWithMeta(o, h.scheme)
 	t := GetObjectType(o.GetObjectKind())
 	if h.reads[t] == nil {
@@ -68,6 +73,9 @@ func (h *DefaultSentinelRead) SetExpectedObjects(objects []client.Object) {
 }
 
 func (h *DefaultSentinelRead) AddExpectedObject(o client.Object) {
+	if reflect.ValueOf(o).IsNil() {
+		return
+	}
 	o = GetObjectWithMeta(o, h.scheme)
 	t := GetObjectType(o.GetObjectKind())
 	if h.reads[t] == nil {

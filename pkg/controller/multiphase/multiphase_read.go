@@ -1,6 +1,8 @@
 package multiphase
 
 import (
+	"reflect"
+
 	"github.com/disaster37/operator-sdk-extra/v2/pkg/helper"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -46,18 +48,15 @@ func (h *DefaultMultiPhaseRead[k8sStepObject]) GetCurrentObjects() []k8sStepObje
 }
 
 func (h *DefaultMultiPhaseRead[k8sStepObject]) SetCurrentObjects(objects []k8sStepObject) {
-	if len(objects) == 0 {
-		return
+	for _, object := range objects {
+		h.AddCurrentObject(object)
 	}
-	if len(h.currentObjects) == 0 {
-		h.currentObjects = objects
-	} else {
-		h.currentObjects = append(h.currentObjects, objects...)
-	}
-
 }
 
 func (h *DefaultMultiPhaseRead[k8sStepObject]) AddCurrentObject(o k8sStepObject) {
+	if reflect.ValueOf(o).IsNil() {
+		return
+	}
 	h.currentObjects = append(h.currentObjects, o)
 }
 
@@ -66,18 +65,16 @@ func (h *DefaultMultiPhaseRead[k8sStepObject]) GetExpectedObjects() []k8sStepObj
 }
 
 func (h *DefaultMultiPhaseRead[k8sStepObject]) SetExpectedObjects(objects []k8sStepObject) {
-
-	if len(objects) == 0 {
-		return
-	}
-	if len(h.expectedObjects) == 0 {
-		h.expectedObjects = objects
-	} else {
-		h.expectedObjects = append(h.expectedObjects, objects...)
+	for _, object := range objects {
+		h.AddExpectedObject(object)
 	}
 }
 
 func (h *DefaultMultiPhaseRead[k8sStepObject]) AddExpectedObject(o k8sStepObject) {
+	if reflect.ValueOf(o).IsNil() {
+		return
+	}
+
 	h.expectedObjects = append(h.expectedObjects, o)
 }
 
