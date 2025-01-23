@@ -6,7 +6,7 @@
     {
       "name": "codecov",
       "source": "github.com/disaster37/dagger-library-go/codecov",
-      "pin": "516ce8fdb7a58f46a3ec6312c1fb6551ccdd56f8"
+      "pin": "14ec6e1fdf5f26fd8bc295ae8d98f5559a6a1bf2"
     },
     {
       "name": "git",
