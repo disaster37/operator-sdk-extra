@@ -35,7 +35,6 @@ type DefaultSentinelReconciler[k8sObject client.Object] struct {
 
 // NewSentinelReconciler is the default implementation of SentinelReconciler interface
 func NewSentinelReconciler[k8sObject client.Object](client client.Client, name string, logger *logrus.Entry, recorder record.EventRecorder) (sentinelReconciler SentinelReconciler[k8sObject]) {
-
 	return &DefaultSentinelReconciler[k8sObject]{
 		Reconciler: controller.NewReconciler(
 			client,
@@ -51,7 +50,6 @@ func NewSentinelReconciler[k8sObject client.Object](client client.Client, name s
 // No need to add finalizer and manage delete
 // All sub resources must be children of main parent. So the clean is handled by kubelet in lazy effort
 func (h *DefaultSentinelReconciler[k8sObject]) Reconcile(ctx context.Context, req reconcile.Request, o k8sObject, data map[string]interface{}, reconcilerAction SentinelReconcilerAction[k8sObject]) (res reconcile.Result, err error) {
-
 	var (
 		read SentinelRead
 		diff multiphase.MultiPhaseDiff[client.Object]

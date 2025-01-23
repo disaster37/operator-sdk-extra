@@ -7,7 +7,6 @@ import (
 
 // BaseReconciler is the interface for all reconciler
 type BaseReconciler interface {
-
 	// Client get the client
 	Client() client.Client
 
@@ -31,7 +30,6 @@ func (h *DefaultBaseReconciler) Recorder() record.EventRecorder {
 
 // NewBaseReconciler return the default implementation of BaseReconciler interface
 func NewBaseReconciler(client client.Client, recorder record.EventRecorder) BaseReconciler {
-
 	if recorder == nil {
 		panic("recorder can't be nil")
 	}

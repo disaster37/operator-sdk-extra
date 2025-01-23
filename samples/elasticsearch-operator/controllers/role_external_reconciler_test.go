@@ -10,7 +10,6 @@ import (
 )
 
 func TestRoleBuild(t *testing.T) {
-
 	var (
 		o            *elasticsearchapicrd.Role
 		role         *eshandler.XPackSecurityRole
@@ -194,5 +193,4 @@ func TestRoleBuild(t *testing.T) {
 	role, err = client.Build(o)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedRole, role)
-
 }

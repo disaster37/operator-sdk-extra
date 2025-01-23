@@ -36,7 +36,6 @@ type DefaultMultiPhaseReconciler[k8sObject object.MultiPhaseObject] struct {
 
 // NewMultiPhaseReconciler is the default implementation of MultiPhaseReconciler
 func NewMultiPhaseReconciler[k8sObject object.MultiPhaseObject](c client.Client, name string, finalizer shared.FinalizerName, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseReconciler MultiPhaseReconciler[k8sObject]) {
-
 	return &DefaultMultiPhaseReconciler[k8sObject]{
 		Reconciler: controller.NewReconciler(
 			c,
@@ -51,7 +50,6 @@ func NewMultiPhaseReconciler[k8sObject object.MultiPhaseObject](c client.Client,
 }
 
 func (h *DefaultMultiPhaseReconciler[k8sObject]) Reconcile(ctx context.Context, req reconcile.Request, o k8sObject, data map[string]interface{}, reconcilerAction MultiPhaseReconcilerAction[k8sObject], reconcilersStepAction ...MultiPhaseStepReconcilerAction[k8sObject, client.Object]) (res reconcile.Result, err error) {
-
 	// Init logger
 	logger := h.Logger().WithFields(logrus.Fields{
 		"name":      req.Name,

@@ -77,7 +77,6 @@ func (h *DefaultSentinelAction[k8sObject]) Read(ctx context.Context, o k8sObject
 }
 
 func (h *DefaultSentinelAction[k8sObject]) Create(ctx context.Context, o k8sObject, data map[string]any, objects []client.Object, logger *logrus.Entry) (res reconcile.Result, err error) {
-
 	for _, oChild := range objects {
 
 		// Set owner
@@ -104,7 +103,6 @@ func (h *DefaultSentinelAction[k8sObject]) Create(ctx context.Context, o k8sObje
 // Update can be call on your own version
 // It only add some log / events
 func (h *DefaultSentinelAction[k8sObject]) Update(ctx context.Context, o k8sObject, data map[string]any, objects []client.Object, logger *logrus.Entry) (res reconcile.Result, err error) {
-
 	for _, oChild := range objects {
 		if err = h.Client().Update(ctx, oChild); err != nil {
 			return res, errors.Wrapf(err, "Error when update object '%s'", oChild.GetName())
@@ -118,7 +116,6 @@ func (h *DefaultSentinelAction[k8sObject]) Update(ctx context.Context, o k8sObje
 
 // Delete delete objects
 func (h *DefaultSentinelAction[k8sObject]) Delete(ctx context.Context, o k8sObject, data map[string]any, objects []client.Object, logger *logrus.Entry) (err error) {
-
 	for _, oChild := range objects {
 		if err = h.Client().Delete(ctx, oChild); err != nil {
 			return errors.Wrapf(err, "Error when delete object '%s'", oChild.GetName())
@@ -140,7 +137,6 @@ func (h *DefaultSentinelAction[k8sObject]) OnSuccess(ctx context.Context, o k8sO
 }
 
 func (h *DefaultSentinelAction[k8sObject]) Diff(ctx context.Context, o k8sObject, read SentinelRead, data map[string]any, logger *logrus.Entry, ignoreDiff ...patch.CalculateOption) (diff multiphase.MultiPhaseDiff[client.Object], res reconcile.Result, err error) {
-
 	diff = multiphase.NewMultiPhaseDiff[client.Object]()
 
 	patchOptions := []patch.CalculateOption{

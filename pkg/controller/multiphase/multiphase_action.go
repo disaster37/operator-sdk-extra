@@ -51,7 +51,6 @@ func NewMultiPhaseReconcilerAction[k8sObject object.MultiPhaseObject](client cli
 }
 
 func (h *BasicMultiPhaseReconcilerAction[k8sObject]) Configure(ctx context.Context, req reconcile.Request, o k8sObject, data map[string]any, logger *logrus.Entry) (res reconcile.Result, err error) {
-
 	conditions := o.GetStatus().GetConditions()
 	if condition.FindStatusCondition(conditions, h.Condition().String()) == nil {
 		condition.SetStatusCondition(&conditions, metav1.Condition{
@@ -74,7 +73,6 @@ func (h *BasicMultiPhaseReconcilerAction[k8sObject]) Delete(ctx context.Context,
 }
 
 func (h *BasicMultiPhaseReconcilerAction[k8sObject]) OnError(ctx context.Context, o k8sObject, data map[string]any, currentErr error, logger *logrus.Entry) (res reconcile.Result, err error) {
-
 	o.GetStatus().SetIsOnError(true)
 	o.GetStatus().SetLastErrorMessage(strings.ShortenString(currentErr.Error(), controller.ShortenError))
 
@@ -91,7 +89,6 @@ func (h *BasicMultiPhaseReconcilerAction[k8sObject]) OnError(ctx context.Context
 }
 
 func (h *BasicMultiPhaseReconcilerAction[k8sObject]) OnSuccess(ctx context.Context, o k8sObject, data map[string]any, logger *logrus.Entry) (res reconcile.Result, err error) {
-
 	conditions := o.GetStatus().GetConditions()
 	if !condition.IsStatusConditionPresentAndEqual(conditions, h.Condition().String(), metav1.ConditionTrue) {
 		condition.SetStatusCondition(&conditions, metav1.Condition{

@@ -10,12 +10,10 @@ import (
 )
 
 func TestStringToSlice(t *testing.T) {
-
 	assert.Equal(t, []string{"test"}, StringToSlice("test", ","))
 	assert.Equal(t, []string{}, StringToSlice("", ","))
 	assert.Equal(t, []string{"test", "test2"}, StringToSlice("test,test2", ","))
 	assert.Equal(t, []string{"test", "test2"}, StringToSlice("test, test2", ","))
-
 }
 
 func TestDeleteItemFromSlice(t *testing.T) {
@@ -59,7 +57,6 @@ func TestDeleteItemFromSlice(t *testing.T) {
 
 	// When slcie is nil
 	assert.Equal(t, nil, DeleteItemFromSlice(nil, 10))
-
 }
 
 func TestToSliceOfObject(t *testing.T) {

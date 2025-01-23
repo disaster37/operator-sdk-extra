@@ -9,7 +9,6 @@ import (
 )
 
 func TestBasicMultiPhaseReadCurrent(t *testing.T) {
-
 	// With default object
 	o := NewMultiPhaseRead[*corev1.ConfigMap]()
 	assert.Empty(t, o.GetCurrentObjects())
@@ -49,11 +48,9 @@ func TestBasicMultiPhaseReadCurrent(t *testing.T) {
 	objects = []*corev1.ConfigMap{cm}
 	o.AddCurrentObject(cm)
 	assert.Equal(t, objects, o.GetCurrentObjects())
-
 }
 
 func TestBasicMultiPhaseReadExpected(t *testing.T) {
-
 	// With default object
 	o := NewMultiPhaseRead[*corev1.ConfigMap]()
 	assert.Empty(t, o.GetExpectedObjects())

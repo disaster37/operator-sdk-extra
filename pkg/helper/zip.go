@@ -11,7 +11,6 @@ import (
 )
 
 func ZipAndBase64Encode(originalObject any) (string, error) {
-
 	original, err := json.Marshal(originalObject)
 	if err != nil {
 		return "", errors.Wrap(err, "Error when convert object to byte sequence")
@@ -42,7 +41,6 @@ func ZipAndBase64Encode(originalObject any) (string, error) {
 }
 
 func UnZipBase64Decode(original string, originalObject any) error {
-
 	if original == "" {
 		return nil
 	}

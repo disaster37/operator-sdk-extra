@@ -35,7 +35,6 @@ type DefaultRemoteReconciler[k8sObject object.RemoteObject, apiObject comparable
 
 // NewRemoteReconciler permit to instanciate new basic multiphase resonciler
 func NewRemoteReconciler[k8sObject object.RemoteObject, apiObject comparable, apiClient any](client client.Client, name string, finalizer shared.FinalizerName, logger *logrus.Entry, recorder record.EventRecorder) (remoteReconciler RemoteReconciler[k8sObject, apiObject, apiClient]) {
-
 	return &DefaultRemoteReconciler[k8sObject, apiObject, apiClient]{
 		Reconciler: controller.NewReconciler(
 			client,
@@ -49,7 +48,6 @@ func NewRemoteReconciler[k8sObject object.RemoteObject, apiObject comparable, ap
 }
 
 func (h *DefaultRemoteReconciler[k8sObject, apiObject, apiClient]) Reconcile(ctx context.Context, req reconcile.Request, o k8sObject, data map[string]interface{}, reconciler RemoteReconcilerAction[k8sObject, apiObject, apiClient]) (res reconcile.Result, err error) {
-
 	var (
 		handler RemoteExternalReconciler[k8sObject, apiObject, apiClient]
 		read    RemoteRead[apiObject]

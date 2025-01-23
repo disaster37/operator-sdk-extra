@@ -20,7 +20,6 @@ func TestObjectStatusCondition(t *testing.T) {
 	o.SetConditions([]v1.Condition{condition})
 
 	assert.Equal(t, []v1.Condition{condition}, o.GetConditions())
-
 }
 
 func TestObjectStatusError(t *testing.T) {

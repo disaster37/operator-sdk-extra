@@ -43,7 +43,6 @@ func TestElasticsearchapiControllerSuite(t *testing.T) {
 }
 
 func (t *ElasticsearchapiControllerTestSuite) SetupSuite() {
-
 	t.mockCtrl = gomock.NewController(t.T())
 	t.mockElasticsearchHandler = mocks.NewMockElasticsearchHandler(t.mockCtrl)
 
@@ -114,7 +113,6 @@ func (t *ElasticsearchapiControllerTestSuite) SetupSuite() {
 }
 
 func (t *ElasticsearchapiControllerTestSuite) TearDownSuite() {
-
 	// Teardown the test environment once controller is fnished.
 	// Otherwise from Kubernetes 1.21+, teardon timeouts waiting on
 	// kube-apiserver to return
@@ -125,7 +123,6 @@ func (t *ElasticsearchapiControllerTestSuite) TearDownSuite() {
 }
 
 func (t *ElasticsearchapiControllerTestSuite) BeforeTest(suiteName, testName string) {
-
 }
 
 func (t *ElasticsearchapiControllerTestSuite) AfterTest(suiteName, testName string) {

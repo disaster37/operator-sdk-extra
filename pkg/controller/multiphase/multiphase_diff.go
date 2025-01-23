@@ -9,7 +9,6 @@ import (
 
 // MultiPhaseDiff is used to know if currents resources differ with expected
 type MultiPhaseDiff[k8sStepObject client.Object] interface {
-
 	// NeedCreate is true when need to create K8s object
 	NeedCreate() bool
 
@@ -59,7 +58,6 @@ type MultiPhaseDiff[k8sStepObject client.Object] interface {
 
 // DefaultMultiPhaseDiff is the default implementation of MultiPhaseDiff interface
 type DefaultMultiPhaseDiff[k8sStepObject client.Object] struct {
-
 	// CreateObjects is the list of object to create on K8s
 	createObjects []k8sStepObject
 
@@ -108,7 +106,6 @@ func (h *DefaultMultiPhaseDiff[k8sStepObject]) SetObjectsToCreate(objects []k8sS
 	} else {
 		h.createObjects = append(h.createObjects, objects...)
 	}
-
 }
 
 func (h *DefaultMultiPhaseDiff[k8sStepObject]) AddObjectToCreate(o k8sStepObject) {
@@ -129,7 +126,6 @@ func (h *DefaultMultiPhaseDiff[k8sStepObject]) SetObjectsToUpdate(objects []k8sS
 	} else {
 		h.updateObjects = append(h.updateObjects, objects...)
 	}
-
 }
 
 func (h *DefaultMultiPhaseDiff[k8sStepObject]) AddObjectToUpdate(o k8sStepObject) {
@@ -150,7 +146,6 @@ func (h *DefaultMultiPhaseDiff[k8sStepObject]) SetObjectsToDelete(objects []k8sS
 	} else {
 		h.deleteObjects = append(h.deleteObjects, objects...)
 	}
-
 }
 
 func (h *DefaultMultiPhaseDiff[k8sStepObject]) AddObjectToDelete(o k8sStepObject) {

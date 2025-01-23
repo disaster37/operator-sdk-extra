@@ -62,12 +62,15 @@ func (h *DefaultRemoteExternalReconciler[k8sObject, apiObject, apiClient]) Build
 func (h *DefaultRemoteExternalReconciler[k8sObject, apiObject, apiClient]) Get(k8sO k8sObject) (object apiObject, err error) {
 	panic("You need to implement it")
 }
+
 func (h *DefaultRemoteExternalReconciler[k8sObject, apiObject, apiClient]) Create(apiO apiObject, k8sO k8sObject) (err error) {
 	panic("You need to implement it")
 }
+
 func (h *DefaultRemoteExternalReconciler[k8sObject, apiObject, apiClient]) Update(apiO apiObject, k8sO k8sObject) (err error) {
 	panic("You need to implement it")
 }
+
 func (h *DefaultRemoteExternalReconciler[k8sObject, apiObject, apiClient]) Delete(k8sO k8sObject) (err error) {
 	panic("You need to implement it")
 }

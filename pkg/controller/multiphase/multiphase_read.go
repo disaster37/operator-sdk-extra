@@ -9,7 +9,6 @@ import (
 
 // MultiPhaseRead is the interface to store the result of read step on multi phase reconciler
 type MultiPhaseRead[k8sStepObject client.Object] interface {
-
 	// GetCurrentObjects permit to get the list of current objects
 	GetCurrentObjects() []k8sStepObject
 

@@ -51,6 +51,7 @@ func (in *MultiPhaseObject) DeepCopyInto(out *MultiPhaseObject) {
 	in.Spec.DeepCopyInto(&out.Spec)
 	in.Status.DeepCopyInto(&out.Status)
 }
+
 func (in *MultiPhaseObject) DeepCopy() *MultiPhaseObject {
 	if in == nil {
 		return nil
@@ -59,15 +60,18 @@ func (in *MultiPhaseObject) DeepCopy() *MultiPhaseObject {
 	in.DeepCopyInto(out)
 	return out
 }
+
 func (in *MultiPhaseObject) DeepCopyObject() runtime.Object {
 	if c := in.DeepCopy(); c != nil {
 		return c
 	}
 	return nil
 }
+
 func (in *MultiPhaseObjectSpec) DeepCopyInto(out *MultiPhaseObjectSpec) {
 	*out = *in
 }
+
 func (in *MultiPhaseObjectSpec) DeepCopy() *MultiPhaseObjectSpec {
 	if in == nil {
 		return nil
@@ -76,10 +80,12 @@ func (in *MultiPhaseObjectSpec) DeepCopy() *MultiPhaseObjectSpec {
 	in.DeepCopyInto(out)
 	return out
 }
+
 func (in *MultiPhaseObjectStatus) DeepCopyInto(out *MultiPhaseObjectStatus) {
 	*out = *in
 	in.DefaultMultiPhaseObjectStatus.DeepCopyInto(&out.DefaultMultiPhaseObjectStatus)
 }
+
 func (in *MultiPhaseObjectStatus) DeepCopy() *MultiPhaseObjectStatus {
 	if in == nil {
 		return nil
@@ -101,6 +107,7 @@ func (in *MultiPhaseObjectList) DeepCopyInto(out *MultiPhaseObjectList) {
 		}
 	}
 }
+
 func (in *MultiPhaseObjectList) DeepCopy() *MultiPhaseObjectList {
 	if in == nil {
 		return nil
@@ -109,6 +116,7 @@ func (in *MultiPhaseObjectList) DeepCopy() *MultiPhaseObjectList {
 	in.DeepCopyInto(out)
 	return out
 }
+
 func (in *MultiPhaseObjectList) DeepCopyObject() runtime.Object {
 	if c := in.DeepCopy(); c != nil {
 		return c

@@ -19,13 +19,12 @@ type DefaultReconcilerAction struct {
 	conditionName shared.ConditionName
 }
 
-func(h *DefaultReconcilerAction) Condition() shared.ConditionName {
+func (h *DefaultReconcilerAction) Condition() shared.ConditionName {
 	return h.conditionName
 }
 
 // NewReconcilerAction return the default implementation of ReconcilerAction
 func NewReconcilerAction(client client.Client, recorder record.EventRecorder, conditionName shared.ConditionName) ReconcilerAction {
-
 	if conditionName == "" {
 		panic("Condition name must be provided")
 	}

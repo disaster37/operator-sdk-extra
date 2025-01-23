@@ -35,7 +35,6 @@ func NewMultiPhaseStepReconciler[k8sObject object.MultiPhaseObject, k8sStepObjec
 
 // Reconcile permit to reconcile the step (one K8s resource)
 func (h *DefaultMultiPhaseStepReconciler[k8sObject, k8sStepObject]) Reconcile(ctx context.Context, req reconcile.Request, o k8sObject, data map[string]interface{}, reconcilerAction MultiPhaseStepReconcilerAction[k8sObject, k8sStepObject], logger *logrus.Entry, ignoresDiff ...patch.CalculateOption) (res reconcile.Result, err error) {
-
 	var (
 		diff MultiPhaseDiff[k8sStepObject]
 		read MultiPhaseRead[k8sStepObject]
@@ -68,7 +67,7 @@ func (h *DefaultMultiPhaseStepReconciler[k8sObject, k8sStepObject]) Reconcile(ct
 		return res, nil
 	}
 
-	//Check if diff exist
+	// Check if diff exist
 	diff, res, err = reconcilerAction.Diff(ctx, o, read, data, logger, ignoresDiff...)
 	if err != nil {
 		logger.Errorf("Error when call 'diff' from step reconciler: %s", err.Error())

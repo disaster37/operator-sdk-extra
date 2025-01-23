@@ -11,7 +11,6 @@ import (
 // SentinelRead is the interface to store the result of read from sentinel reconciler
 // objectType is the key if you need to handle some type of object to not shuffle them
 type SentinelRead interface {
-
 	// GetAllCurrentObjects premit to get the map of current objects, mapped by type
 	GetReads() map[string]multiphase.MultiPhaseRead[client.Object]
 
@@ -63,7 +62,6 @@ func (h *DefaultSentinelRead) AddCurrentObject(o client.Object) {
 	}
 
 	h.reads[t].AddCurrentObject(o)
-
 }
 
 func (h *DefaultSentinelRead) SetExpectedObjects(objects []client.Object) {

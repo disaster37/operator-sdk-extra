@@ -124,7 +124,7 @@ func doCreateRemoteObjectStep() test.TestStep[*RemoteObject] {
 		Do: func(c client.Client, key types.NamespacedName, o *RemoteObject, data map[string]any) (err error) {
 			logrus.Infof("=== Add new ClientObject %s/%s ===\n\n", key.Namespace, key.Name)
 
-			o = &RemoteObject{
+			r := &RemoteObject{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      key.Name,
 					Namespace: key.Namespace,
@@ -133,7 +133,7 @@ func doCreateRemoteObjectStep() test.TestStep[*RemoteObject] {
 					Test: "test",
 				},
 			}
-			if err = c.Create(context.Background(), o); err != nil {
+			if err = c.Create(context.Background(), r); err != nil {
 				return err
 			}
 

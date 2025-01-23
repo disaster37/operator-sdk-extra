@@ -49,9 +49,7 @@ func GetObjectStatus(r client.Object) any {
 
 // MustInjectTypeMeta permit to inject the typeMeta from src to dst
 func MustInjectTypeMeta(src, dst client.Object) {
-	var (
-		rt reflect.Type
-	)
+	var rt reflect.Type
 
 	rt = reflect.TypeOf(src)
 	if rt.Kind() != reflect.Ptr {

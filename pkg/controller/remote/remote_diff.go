@@ -5,7 +5,6 @@ import (
 )
 
 type RemoteDiff[apiObject comparable] interface {
-
 	// NeedCreate is true when need to create K8s object
 	NeedCreate() bool
 
@@ -37,7 +36,6 @@ type RemoteDiff[apiObject comparable] interface {
 
 // DefaultRemoteDiff is the default implementation of RemoteDiff interface
 type DefaultRemoteDiff[apiObject comparable] struct {
-
 	// CreateObject is the  object to create
 	createObject apiObject
 

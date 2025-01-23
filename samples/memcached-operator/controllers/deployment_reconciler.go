@@ -29,7 +29,6 @@ type deploymentReconciler struct {
 }
 
 func newDeploymentReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseStepReconcilerAction *deploymentReconciler) {
-
 	return &deploymentReconciler{
 		MultiPhaseStepReconcilerAction: controller.NewBasicMultiPhaseStepReconcilerAction(
 			client,

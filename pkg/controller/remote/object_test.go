@@ -55,6 +55,7 @@ func (in *RemoteObject) DeepCopyInto(out *RemoteObject) {
 	in.Spec.DeepCopyInto(&out.Spec)
 	in.Status.DeepCopyInto(&out.Status)
 }
+
 func (in *RemoteObject) DeepCopy() *RemoteObject {
 	if in == nil {
 		return nil
@@ -63,15 +64,18 @@ func (in *RemoteObject) DeepCopy() *RemoteObject {
 	in.DeepCopyInto(out)
 	return out
 }
+
 func (in *RemoteObject) DeepCopyObject() runtime.Object {
 	if c := in.DeepCopy(); c != nil {
 		return c
 	}
 	return nil
 }
+
 func (in *RemoteObjectSpec) DeepCopyInto(out *RemoteObjectSpec) {
 	*out = *in
 }
+
 func (in *RemoteObjectSpec) DeepCopy() *RemoteObjectSpec {
 	if in == nil {
 		return nil
@@ -80,10 +84,12 @@ func (in *RemoteObjectSpec) DeepCopy() *RemoteObjectSpec {
 	in.DeepCopyInto(out)
 	return out
 }
+
 func (in *RemoteObjectStatus) DeepCopyInto(out *RemoteObjectStatus) {
 	*out = *in
 	in.DefaultRemoteObjectStatus.DeepCopyInto(&out.DefaultRemoteObjectStatus)
 }
+
 func (in *RemoteObjectStatus) DeepCopy() *RemoteObjectStatus {
 	if in == nil {
 		return nil
@@ -105,6 +111,7 @@ func (in *RemoteObjectList) DeepCopyInto(out *RemoteObjectList) {
 		}
 	}
 }
+
 func (in *RemoteObjectList) DeepCopy() *RemoteObjectList {
 	if in == nil {
 		return nil
@@ -113,6 +120,7 @@ func (in *RemoteObjectList) DeepCopy() *RemoteObjectList {
 	in.DeepCopyInto(out)
 	return out
 }
+
 func (in *RemoteObjectList) DeepCopyObject() runtime.Object {
 	if c := in.DeepCopy(); c != nil {
 		return c

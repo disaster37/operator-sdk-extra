@@ -33,5 +33,4 @@ func TestZipUnzip(t *testing.T) {
 	o2 = map[string]any{}
 	err = UnZipBase64Decode("", &o2)
 	assert.NoError(t, err)
-
 }

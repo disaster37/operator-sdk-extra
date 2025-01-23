@@ -9,7 +9,6 @@ import (
 )
 
 func TestBasicMultiPhaseDiffDiff(t *testing.T) {
-
 	// With default object
 	o := NewMultiPhaseDiff[*corev1.ConfigMap]()
 
@@ -20,11 +19,9 @@ func TestBasicMultiPhaseDiffDiff(t *testing.T) {
 	o.AddDiff("test")
 	assert.True(t, o.IsDiff())
 	assert.Contains(t, o.Diff(), "test")
-
 }
 
 func TestBasicMultiPhaseDiffCreate(t *testing.T) {
-
 	// With default object
 	o := NewMultiPhaseDiff[*corev1.ConfigMap]()
 
@@ -70,11 +67,9 @@ func TestBasicMultiPhaseDiffCreate(t *testing.T) {
 	o.AddObjectToCreate(cm)
 	assert.True(t, o.NeedCreate())
 	assert.Equal(t, objects, o.GetObjectsToCreate())
-
 }
 
 func TestBasicMultiPhaseDiffUpdate(t *testing.T) {
-
 	// With default object
 	o := NewMultiPhaseDiff[*corev1.ConfigMap]()
 
@@ -124,7 +119,6 @@ func TestBasicMultiPhaseDiffUpdate(t *testing.T) {
 }
 
 func TestBasicMultiPhaseDiffDelete(t *testing.T) {
-
 	// With default object
 	o := NewMultiPhaseDiff[*corev1.ConfigMap]()
 

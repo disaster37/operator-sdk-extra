@@ -65,7 +65,6 @@ type DefaultMultiPhaseStepReconcilerAction[k8sObject object.MultiPhaseObject, k8
 
 // NewMultiPhaseStepReconcilerAction is the default implementation of MultiPhaseStepReconcilerAction interface
 func NewMultiPhaseStepReconcilerAction[k8sObject object.MultiPhaseObject, k8sStepObject client.Object](client client.Client, phaseName shared.PhaseName, conditionName shared.ConditionName, recorder record.EventRecorder) (multiPhaseStepReconciler MultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) {
-
 	return &DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]{
 		ReconcilerAction: controller.NewReconcilerAction(
 			client,
@@ -97,12 +96,12 @@ func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Config
 
 	return res, nil
 }
+
 func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Read(ctx context.Context, o k8sObject, data map[string]any, logger *logrus.Entry) (read MultiPhaseRead[k8sStepObject], res reconcile.Result, err error) {
 	panic("You need implement it")
 }
 
 func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Create(ctx context.Context, o k8sObject, data map[string]any, objects []k8sStepObject, logger *logrus.Entry) (res reconcile.Result, err error) {
-
 	for _, oChild := range objects {
 
 		// Set owner
@@ -127,7 +126,6 @@ func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Create
 }
 
 func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Update(ctx context.Context, o k8sObject, data map[string]any, objects []k8sStepObject, logger *logrus.Entry) (res reconcile.Result, err error) {
-
 	for _, oChild := range objects {
 		if err = h.Client().Update(ctx, oChild); err != nil {
 			return res, errors.Wrapf(err, "Error when update object '%s'", oChild.GetName())
@@ -140,7 +138,6 @@ func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Update
 }
 
 func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Delete(ctx context.Context, o k8sObject, data map[string]any, objects []k8sStepObject, logger *logrus.Entry) (res reconcile.Result, err error) {
-
 	for _, oChild := range objects {
 		if err = h.Client().Delete(ctx, oChild); err != nil {
 			return res, errors.Wrapf(err, "Error when delete object '%s'", oChild.GetName())
@@ -164,7 +161,6 @@ func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) OnErro
 
 	h.Recorder().Event(o, corev1.EventTypeWarning, "ReconcilerStepActionError", k8sstrings.ShortenString(currentErr.Error(), controller.ShortenError))
 	return res, currentErr
-
 }
 
 func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) OnSuccess(ctx context.Context, o k8sObject, data map[string]any, diff MultiPhaseDiff[k8sStepObject], logger *logrus.Entry) (res reconcile.Result, err error) {
@@ -184,7 +180,6 @@ func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) OnSucc
 }
 
 func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Diff(ctx context.Context, o k8sObject, read MultiPhaseRead[k8sStepObject], data map[string]any, logger *logrus.Entry, ignoreDiff ...patch.CalculateOption) (diff MultiPhaseDiff[k8sStepObject], res reconcile.Result, err error) {
-
 	tmpCurrentObjects := make([]k8sStepObject, len(read.GetCurrentObjects()))
 	copy(tmpCurrentObjects, read.GetCurrentObjects())
 
@@ -272,6 +267,7 @@ func (h *ObjectMultiPhaseStepReconcilerAction[k8sObject, k8sStepObjectSrc, k8sSt
 func (h *ObjectMultiPhaseStepReconcilerAction[k8sObject, k8sStepObjectSrc, k8sStepObjectDst]) Configure(ctx context.Context, req reconcile.Request, o k8sObject, logger *logrus.Entry) (res reconcile.Result, err error) {
 	return h.in.Configure(ctx, req, o, logger)
 }
+
 func (h *ObjectMultiPhaseStepReconcilerAction[k8sObject, k8sStepObjectSrc, k8sStepObjectDst]) Read(ctx context.Context, o k8sObject, data map[string]any, logger *logrus.Entry) (read MultiPhaseRead[k8sStepObjectDst], res reconcile.Result, err error) {
 	readTmp, res, err := h.in.Read(ctx, o, data, logger)
 	return NewObjectMultiphaseRead[k8sStepObjectSrc, k8sStepObjectDst](readTmp), res, err

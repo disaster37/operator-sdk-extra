@@ -14,7 +14,6 @@ import (
 )
 
 func CleanCrd(c *cli.Context) error {
-
 	fileMatches, err := filepath.Glob(c.String("crd-file"))
 	if err != nil {
 		log.Fatal(err)
@@ -46,7 +45,7 @@ func CleanCrd(c *cli.Context) error {
 		if err != nil {
 			panic(err)
 		}
-		if err = os.WriteFile(file, b, 0644); err != nil {
+		if err = os.WriteFile(file, b, 0o644); err != nil {
 			panic(err)
 		}
 
@@ -55,7 +54,6 @@ func CleanCrd(c *cli.Context) error {
 	}
 
 	return nil
-
 }
 
 func recursiveCleanCrd(item apiv1.JSONSchemaProps) apiv1.JSONSchemaProps {

@@ -81,7 +81,6 @@ func doCreateMemcachedStep() test.TestStep {
 				}
 
 				return errors.New("Not yet created")
-
 			}, time.Second*30, time.Second*1)
 			if err != nil || isTimeout {
 				t.Fatalf("All Memcached step provisionning not finished: %s", err.Error())
@@ -159,7 +158,6 @@ func doUpdateMemcachedStep() test.TestStep {
 				}
 
 				return errors.New("Not yet updated")
-
 			}, time.Second*30, time.Second*1)
 			if err != nil || isTimeout {
 				t.Fatalf("All Memcached step upgrading not finished: %s", err.Error())
@@ -211,7 +209,6 @@ func doDeleteMemcachedStep() test.TestStep {
 			return nil
 		},
 		Check: func(t *testing.T, c client.Client, key types.NamespacedName, o client.Object, data map[string]any) (err error) {
-
 			return nil
 		},
 	}

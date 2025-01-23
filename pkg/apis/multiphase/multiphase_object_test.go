@@ -15,5 +15,4 @@ func TestDefaultMultiPhaseObjectStatusPhase(t *testing.T) {
 	// When phase is set
 	o.SetPhaseName("test")
 	assert.Equal(t, "test", o.GetPhaseName().String())
-
 }

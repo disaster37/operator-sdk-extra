@@ -39,7 +39,6 @@ type MemcachedReconciler struct {
 }
 
 func NewMemcachedReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseReconciler controller.Controller) {
-
 	return &MemcachedReconciler{
 		Controller: controller.NewBasicController(),
 		MultiPhaseReconcilerAction: controller.NewBasicMultiPhaseReconcilerAction(
@@ -101,7 +100,6 @@ func (r *MemcachedReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			r.Recorder,
 		),
 	)
-
 }
 
 // SetupWithManager sets up the controller with the Manager.

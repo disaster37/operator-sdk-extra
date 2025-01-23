@@ -42,7 +42,7 @@ func doCreateStep() test.TestStep[*MultiPhaseObject] {
 		Do: func(c client.Client, key types.NamespacedName, o *MultiPhaseObject, data map[string]any) (err error) {
 			logrus.Infof("=== Add new MultiphaseObject %s/%s ===\n\n", key.Namespace, key.Name)
 
-			o = &MultiPhaseObject{
+			m := &MultiPhaseObject{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      key.Name,
 					Namespace: key.Namespace,
@@ -52,7 +52,7 @@ func doCreateStep() test.TestStep[*MultiPhaseObject] {
 				},
 			}
 
-			if err = c.Create(context.Background(), o); err != nil {
+			if err = c.Create(context.Background(), m); err != nil {
 				return err
 			}
 
@@ -60,9 +60,7 @@ func doCreateStep() test.TestStep[*MultiPhaseObject] {
 		},
 		Check: func(t *testing.T, c client.Client, key types.NamespacedName, o *MultiPhaseObject, data map[string]any) (err error) {
 			o = &MultiPhaseObject{}
-			var (
-				cm *corev1.ConfigMap
-			)
+			var cm *corev1.ConfigMap
 
 			isTimeout, err := test.RunWithTimeout(func() error {
 				if err := c.Get(context.Background(), key, o); err != nil {
@@ -119,10 +117,7 @@ func doUpdateStep() test.TestStep[*MultiPhaseObject] {
 			return nil
 		},
 		Check: func(t *testing.T, c client.Client, key types.NamespacedName, o *MultiPhaseObject, data map[string]any) (err error) {
-
-			var (
-				cm *corev1.ConfigMap
-			)
+			var cm *corev1.ConfigMap
 
 			lastGeneration := data["lastGeneration"].(int64)
 

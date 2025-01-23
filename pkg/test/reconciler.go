@@ -43,7 +43,6 @@ func NewTestCase[k8sObject client.Object](t *testing.T, c client.Client, key typ
 }
 
 func (h *TestCase[k8sObject]) Run() {
-
 	var (
 		err       error
 		o         k8sObject

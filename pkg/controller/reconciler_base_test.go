@@ -19,5 +19,4 @@ func (t *ControllerTestSuite) TestReconcilerBase() {
 	assert.Panics(t.T(), func() {
 		NewBaseReconciler(t.k8sClient, nil)
 	})
-
 }

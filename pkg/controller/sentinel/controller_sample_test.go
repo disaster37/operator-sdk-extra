@@ -143,5 +143,4 @@ func (h *templateAnnotationsReconciler[k8sObject]) Read(ctx context.Context, o k
 	read.AddCurrentObject(s)
 
 	return read, res, nil
-
 }

@@ -15,7 +15,6 @@ import (
 )
 
 func EqualFromYamlFile[k8sobject comparable](t *testing.T, expectedYamlFile string, actual client.Object, s runtime.ObjectTyper) {
-
 	if expectedYamlFile == "" {
 		panic("expectedYamlFile must be provided")
 	}
@@ -45,5 +44,4 @@ func EqualFromYamlFile[k8sobject comparable](t *testing.T, expectedYamlFile stri
 	if diff != "" {
 		assert.Fail(t, diff)
 	}
-
 }

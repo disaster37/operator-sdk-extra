@@ -15,16 +15,15 @@ func TestController(t *testing.T) {
 	c := NewController()
 
 	assert.Panics(t, func() {
-		c.SetupWithManager(nil)
+		_ = c.SetupWithManager(nil)
 	})
 
 	assert.Panics(t, func() {
-		c.Reconcile(context.Background(), reconcile.Request{})
+		_, _ = c.Reconcile(context.Background(), reconcile.Request{})
 	})
 }
 
 func (t *ControllerTestSuite) TestSetupIndexerWithManager() {
-
 	indexer := func(mgr ctrl.Manager) error {
 		if err := t.k8sManager.GetFieldIndexer().IndexField(context.Background(), &corev1.ConfigMap{}, "test.indexer", func(o client.Object) []string {
 			return []string{"test"}

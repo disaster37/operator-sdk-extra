@@ -43,7 +43,7 @@ func doCreateStep() test.TestStep[*corev1.Namespace] {
 		Do: func(c client.Client, key types.NamespacedName, o *corev1.Namespace, data map[string]any) (err error) {
 			logrus.Infof("=== Add new SentinelObject %s/%s ===\n\n", key.Namespace, key.Name)
 
-			o = &corev1.Namespace{
+			n := &corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: key.Name,
 					Annotations: map[string]string{
@@ -52,7 +52,7 @@ func doCreateStep() test.TestStep[*corev1.Namespace] {
 				},
 			}
 
-			if err = c.Create(context.Background(), o); err != nil {
+			if err = c.Create(context.Background(), n); err != nil {
 				return err
 			}
 
@@ -123,7 +123,6 @@ func doUpdateStep() test.TestStep[*corev1.Namespace] {
 			return nil
 		},
 		Check: func(t *testing.T, c client.Client, key types.NamespacedName, o *corev1.Namespace, data map[string]any) (err error) {
-
 			s := &corev1.Secret{}
 			cm := &corev1.ConfigMap{}
 
@@ -186,7 +185,6 @@ func doRemoveAnnotationStep() test.TestStep[*corev1.Namespace] {
 			return nil
 		},
 		Check: func(t *testing.T, c client.Client, key types.NamespacedName, o *corev1.Namespace, data map[string]any) (err error) {
-
 			s := &corev1.Secret{}
 			cm := &corev1.ConfigMap{}
 
@@ -240,7 +238,6 @@ func doDeleteStep() test.TestStep[*corev1.Namespace] {
 			return nil
 		},
 		Check: func(t *testing.T, c client.Client, key types.NamespacedName, o *corev1.Namespace, data map[string]any) (err error) {
-
 			// In envtest, no kubelet
 			// So the cascading children delation not works
 			// We can't test the deletion of Namespace

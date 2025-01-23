@@ -82,7 +82,6 @@ func (t *ControllerSentinelTestSuite) SetupSuite() {
 }
 
 func (t *ControllerSentinelTestSuite) TearDownSuite() {
-
 	// Teardown the test environment once controller is fnished.
 	// Otherwise from Kubernetes 1.21+, teardon timeouts waiting on
 	// kube-apiserver to return

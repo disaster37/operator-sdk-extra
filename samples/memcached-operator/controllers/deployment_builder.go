@@ -12,7 +12,6 @@ import (
 )
 
 func newDeploymentsBuilder(memcached *v1alpha1.Memcached) (deployments []appsv1.Deployment, err error) {
-
 	deployments = make([]appsv1.Deployment, 0, 1)
 	ls := labelsForMemcached(memcached.Name)
 	replicas := memcached.Spec.Size
@@ -138,7 +137,8 @@ func labelsForMemcached(name string) map[string]string {
 	if err == nil {
 		imageTag = strings.Split(image, ":")[1]
 	}
-	return map[string]string{"app.kubernetes.io/name": "Memcached",
+	return map[string]string{
+		"app.kubernetes.io/name":        "Memcached",
 		"app.kubernetes.io/instance":    name,
 		"app.kubernetes.io/version":     imageTag,
 		"app.kubernetes.io/part-of":     "memcached-operator",
@@ -151,7 +151,7 @@ func labelsForMemcached(name string) map[string]string {
 // imageForMemcached gets the Operand image which is managed by this controller
 // from the MEMCACHED_IMAGE environment variable defined in the config/manager/manager.yaml
 func imageForMemcached() (string, error) {
-	var imageEnvVar = "MEMCACHED_IMAGE"
+	imageEnvVar := "MEMCACHED_IMAGE"
 	image, found := os.LookupEnv(imageEnvVar)
 	if !found {
 		return "memcached:1.4.36-alpine", nil

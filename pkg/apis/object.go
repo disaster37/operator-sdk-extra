@@ -7,7 +7,6 @@ import (
 
 // DefaultObjectStatus is the default status for default Object
 type DefaultObjectStatus struct {
-
 	// IsOnError is true if controller is stuck on Error
 	// +operator-sdk:csv:customresourcedefinitions:type=status
 	IsOnError *bool `json:"isOnError,omitempty"`

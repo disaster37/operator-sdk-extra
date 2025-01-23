@@ -4,7 +4,6 @@ import "reflect"
 
 // RemoteRead is the interface to store the result of read on remote reconciler
 type RemoteRead[apiObject comparable] interface {
-
 	// GetCurrentObject permit to get the current object
 	GetCurrentObject() apiObject
 

@@ -16,6 +16,7 @@ package main
 
 import (
 	"context"
+
 	"dagger/operator-sdk-extra/internal/dagger"
 
 	"emperror.dev/errors"
@@ -43,7 +44,6 @@ type OperatorSdkExtra struct {
 
 	// +private
 	Golang *dagger.Golang
-
 }
 
 func New(
@@ -51,13 +51,11 @@ func New(
 	// +required
 	src *dagger.Directory,
 ) *OperatorSdkExtra {
-
 	cleanDir := src.WithoutDirectory("ci").WithoutDirectory("samples")
 	return &OperatorSdkExtra{
 		Src:         src,
 		OperatorSDK: dag.OperatorSDK(cleanDir),
 		Golang:      dag.Golang(cleanDir),
-
 	}
 }
 
@@ -174,8 +172,8 @@ func (h *OperatorSdkExtra) CI(
 			dir,
 			codeCoveToken,
 			dagger.CodecovUploadOpts{
-				Files:   []string{"coverage.out"},
-				Verbose: true,
+				Files:               []string{"coverage.out"},
+				Verbose:             true,
 				InjectCiEnvironment: true,
 			},
 		); err != nil {
