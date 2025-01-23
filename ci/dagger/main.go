@@ -121,9 +121,6 @@ func (h *OperatorSdkExtra) CI(
 	// +optional
 	gitToken *dagger.Secret,
 
-	// The codeCov token
-	// +optional
-	codeCoveToken *dagger.Secret,
 ) (*dagger.Directory, error) {
 	var dir *dagger.Directory
 	var err error
@@ -164,22 +161,6 @@ func (h *OperatorSdkExtra) CI(
 
 	if ci {
 
-		// Put ci folder to not lost it
-
-		// codecov
-		if _, err := dag.Codecov().Upload(
-			ctx,
-			dir,
-			codeCoveToken,
-			dagger.CodecovUploadOpts{
-				Files:               []string{"coverage.out"},
-				Verbose:             true,
-				InjectCiEnvironment: true,
-			},
-		); err != nil {
-			return nil, errors.Wrap(err, "Error when upload report on CodeCov")
-		}
-
 		// Commit / push
 		var branch string
 		git := dag.Git().
@@ -208,6 +189,12 @@ func (h *OperatorSdkExtra) CI(
 		} else {
 			git = git.SetRepo(h.Src.WithDirectory(".", dir), dagger.GitSetRepoOpts{Branch: branch})
 		}
+
+		// re add privous removed dir
+
+		dir = dir.
+			WithDirectory("ci", h.Src.Directory("ci")).
+			WithDirectory("samples", h.Src.Directory("samples"))
 		if _, err = git.CommitAndPush(ctx, "Commit from CI pipeline"); err != nil {
 			return nil, errors.Wrap(err, "Error when commit and push files change")
 		}
