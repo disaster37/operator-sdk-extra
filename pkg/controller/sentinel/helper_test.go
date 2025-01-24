@@ -10,7 +10,6 @@ import (
 )
 
 func TestGetItems(t *testing.T) {
-
 	objects := &corev1.ConfigMapList{
 		Items: []corev1.ConfigMap{
 			{
@@ -44,5 +43,4 @@ func TestGetItems(t *testing.T) {
 	assert.Panics(t, func() {
 		GetItems[client.ObjectList, *corev1.ConfigMap](test)
 	})
-
 }
