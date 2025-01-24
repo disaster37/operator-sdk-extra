@@ -165,6 +165,14 @@ func (h *OperatorSdkExtra) CI(
 
 	if ci {
 
+		if gitToken == nil {
+			return nil, errors.New("You must provide '--git-token'")
+		}
+
+		if codecovToken == nil {
+			return nil, errors.New("You must provide '--codecov-token'")
+		}
+
 		// Codecov
 		if _, err = dag.Codecov().Upload(
 			ctx,

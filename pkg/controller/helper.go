@@ -42,7 +42,7 @@ func GetObjectStatus(r client.Object) any {
 	rv := reflect.ValueOf(r).Elem()
 	om := rv.FieldByName("Status")
 	if !om.IsValid() {
-		return nil
+		panic("Resouce must have field Status")
 	}
 	return om.Interface()
 }
