@@ -6,6 +6,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 func TestGetObjectMeta(t *testing.T) {
@@ -23,6 +25,23 @@ func TestGetObjectMeta(t *testing.T) {
 	assert.Panics(t, func() {
 		GetObjectMeta(nil)
 	})
+
+	var test struct {
+		client.Object
+	}
+
+	assert.Panics(t, func() {
+		GetObjectMeta(test)
+	})
+
+	var test2 *struct {
+		client.Object
+	} = &struct{ client.Object }{}
+
+	assert.Panics(t, func() {
+		GetObjectMeta(test2)
+	})
+
 }
 
 func TestGetObjectStatus(t *testing.T) {
@@ -37,6 +56,22 @@ func TestGetObjectStatus(t *testing.T) {
 
 	assert.Panics(t, func() {
 		GetObjectStatus(nil)
+	})
+
+	var test struct {
+		client.Object
+	}
+
+	assert.Panics(t, func() {
+		GetObjectStatus(test)
+	})
+
+	var test2 *struct {
+		client.Object
+	} = &struct{ client.Object }{}
+
+	assert.Panics(t, func() {
+		GetObjectStatus(test2)
 	})
 }
 
@@ -56,4 +91,32 @@ func TestMustInjectTypeMeta(t *testing.T) {
 	assert.Panics(t, func() {
 		MustInjectTypeMeta(nil, nil)
 	})
+
+	var test struct {
+		client.Object
+	}
+
+	assert.Panics(t, func() {
+		MustInjectTypeMeta(test, dst)
+	})
+	assert.Panics(t, func() {
+		MustInjectTypeMeta(src, test)
+	})
+
+	var test2 *struct {
+		client.Object
+	} = &struct{ client.Object }{}
+
+	assert.Panics(t, func() {
+		MustInjectTypeMeta(test2, dst)
+	})
+	assert.Panics(t, func() {
+		MustInjectTypeMeta(src, test2)
+	})
+}
+
+func TestDefaultControllerRateLimiter(t *testing.T) {
+
+	rateLimiter := DefaultControllerRateLimiter[reconcile.Request]()
+	assert.NotNil(t, rateLimiter)
 }

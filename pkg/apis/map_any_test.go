@@ -14,6 +14,7 @@ func TestMapAny(t *testing.T) {
 		},
 	}
 
+	// Test Marshal / Unmarshall
 	expectedO := &MapAny{
 		Data: map[string]any{
 			"foo": "bar",
@@ -30,4 +31,11 @@ func TestMapAny(t *testing.T) {
 	}
 
 	assert.Equal(t, expectedO, o)
+
+	// Test clone
+	assert.Equal(t, o, o.DeepCopy())
+
+	o2 := &MapAny{}
+	o.DeepCopyInto(o2)
+	assert.Equal(t, o, o2)
 }

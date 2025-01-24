@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test
+  namespace: default
+  labels:
+    name: test
+    cache.example.com: "true"
+    "app.kubernetes.io/name": "Memcached"
+    "app.kubernetes.io/instance":    test
+    "app.kubernetes.io/version":     1.4.36-alpine
+    "app.kubernetes.io/part-of":     "memcached-operator"
+    "app.kubernetes.io/created-by":  "controller-manager"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      cache.example.com: "true"
+      "app.kubernetes.io/name": "Memcached"
+      "app.kubernetes.io/instance":    test
+      "app.kubernetes.io/version":     1.4.36-alpine
+      "app.kubernetes.io/part-of":     "memcached-operator"
+      "app.kubernetes.io/created-by":  "controller-manager"
+      name: test
+  template:
+    metadata:
+      labels:
+        cache.example.com: "true"
+        "app.kubernetes.io/name": "Memcached"
+        "app.kubernetes.io/instance":    test
+        "app.kubernetes.io/version":     1.4.36-alpine
+        "app.kubernetes.io/part-of":     "memcached-operator"
+        "app.kubernetes.io/created-by":  "controller-manager"
+        name: "test"
+    spec:
+      containers:
+      - name: memcached
+        image: memcached:1.4.36-alpine
+        imagePullPolicy: "IfNotPresent"
+        command:
+          - "-m=64"
+          - "-o"
+          - "-v"
+          - "memcached"
+          - "modern"
+        ports:
+        - containerPort: 8080
+          name: memcached
+        envFrom:
+        - configMapRef:
+            name: test
+        securityContext:
+          capabilities:
+            drop:
+            - ALL
+          runAsNonRoot: true
+          runAsUser: 1001
+          allowPrivilegeEscalation: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
