@@ -13,25 +13,25 @@ import (
 )
 
 // GetItems permit to get items contend from ObjectList interface
-func GetItems(o client.ObjectList) (items []client.Object) {
-	if o == nil || reflect.ValueOf(o).IsNil() {
+func GetItems[k8sObjectList client.ObjectList, k8sObject client.Object](o k8sObjectList) (items []k8sObject) {
+	if reflect.ValueOf(o).IsNil() {
 		panic("ressource can't be nil")
 	}
 
 	val := reflect.ValueOf(o).Elem()
 	valueField := val.FieldByName("Items")
 
-	items = make([]client.Object, valueField.Len())
+	items = make([]k8sObject, valueField.Len())
 	for i := range items {
-		items[i] = valueField.Index(i).Addr().Interface().(client.Object)
+		items[i] = valueField.Index(i).Addr().Interface().(k8sObject)
 	}
 
 	return items
 }
 
 // GetObjectWithMeta return current object with TypeMeta to kwons the object type
-func GetObjectWithMeta(o client.Object, s runtime.ObjectTyper) client.Object {
-	if o == nil {
+func GetObjectWithMeta[k8sObject client.Object](o k8sObject, s runtime.ObjectTyper) k8sObject {
+	if reflect.ValueOf(o).IsNil() {
 		panic("Object can't be nil")
 	}
 
