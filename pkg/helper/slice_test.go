@@ -10,12 +10,10 @@ import (
 )
 
 func TestStringToSlice(t *testing.T) {
-
 	assert.Equal(t, []string{"test"}, StringToSlice("test", ","))
 	assert.Equal(t, []string{}, StringToSlice("", ","))
 	assert.Equal(t, []string{"test", "test2"}, StringToSlice("test,test2", ","))
 	assert.Equal(t, []string{"test", "test2"}, StringToSlice("test, test2", ","))
-
 }
 
 func TestDeleteItemFromSlice(t *testing.T) {
@@ -59,11 +57,10 @@ func TestDeleteItemFromSlice(t *testing.T) {
 
 	// When slcie is nil
 	assert.Equal(t, nil, DeleteItemFromSlice(nil, 10))
-
 }
 
 func TestToSliceOfObject(t *testing.T) {
-	pods := []corev1.Pod{
+	pods := []*corev1.Pod{
 		{
 			ObjectMeta: v1.ObjectMeta{
 				Name:      "test",
@@ -73,8 +70,8 @@ func TestToSliceOfObject(t *testing.T) {
 	}
 
 	expected := []client.Object{
-		&pods[0],
+		pods[0],
 	}
 
-	assert.Equal(t, expected, ToSliceOfObject(pods))
+	assert.Equal(t, expected, ToSliceOfObject[*corev1.Pod, client.Object](pods))
 }

@@ -1,7 +1,7 @@
 package object
 
 import (
-	"github.com/disaster37/operator-sdk-extra/pkg/apis/shared"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/apis/shared"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 

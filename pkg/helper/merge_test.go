@@ -42,5 +42,4 @@ func TestMerge(t *testing.T) {
 	err = Merge(p2, p)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedP, p2)
-
 }

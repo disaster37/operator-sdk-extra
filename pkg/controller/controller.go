@@ -3,7 +3,6 @@ package controller
 import (
 	"context"
 
-	"emperror.dev/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -23,21 +22,21 @@ type Controller interface {
 	SetupWithManager(mgr ctrl.Manager) error
 }
 
-// BasicController is the default controller implementation
-type BasicController struct{}
+// DefaultController is the default controller implementation
+type DefaultController struct{}
 
-// NewBasicController is the default constructor for Controller
+// NewController is the default implementation of Controller
 // index can be nil
-func NewBasicController() Controller {
-	return &BasicController{}
+func NewController() Controller {
+	return &DefaultController{}
 }
 
-func (h *BasicController) SetupWithManager(mgr ctrl.Manager) error {
-	return errors.New("You need implement 'SetupWithManager'")
+func (h *DefaultController) SetupWithManager(mgr ctrl.Manager) error {
+	panic("You need implement it")
 }
 
-func (h *BasicController) Reconcile(context.Context, reconcile.Request) (res reconcile.Result, err error) {
-	return res, errors.New("You need implement 'Reconcil'")
+func (h *DefaultController) Reconcile(context.Context, reconcile.Request) (res reconcile.Result, err error) {
+	panic("You need implement it")
 }
 
 // SetupIndexerWithManager permit to registers indexers on manager

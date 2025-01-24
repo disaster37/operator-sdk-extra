@@ -2,51 +2,51 @@ package test
 
 import (
 	"context"
+	"reflect"
 	"testing"
 	"time"
 
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type TestCase struct {
+type TestCase[k8sObject client.Object] struct {
 	// Permit to lauch some preaction, like init mock
 	PreTest func(stepName *string, data map[string]any) error
-	Steps   []TestStep
+	Steps   []TestStep[k8sObject]
 
 	key    types.NamespacedName
 	wait   time.Duration
-	object client.Object
 	data   map[string]any
 	t      *testing.T
 	client client.Client
 }
 
-type TestStep struct {
+type TestStep[k8sObject client.Object] struct {
 	Name  string
 	Pre   func(c client.Client, data map[string]any) error
-	Do    func(c client.Client, key types.NamespacedName, o client.Object, data map[string]any) error
-	Check func(t *testing.T, c client.Client, key types.NamespacedName, o client.Object, data map[string]any) error
+	Do    func(c client.Client, key types.NamespacedName, o k8sObject, data map[string]any) error
+	Check func(t *testing.T, c client.Client, key types.NamespacedName, o k8sObject, data map[string]any) error
 }
 
-func NewTestCase(t *testing.T, c client.Client, key types.NamespacedName, o client.Object, wait time.Duration, data map[string]any) *TestCase {
-	return &TestCase{
+func NewTestCase[k8sObject client.Object](t *testing.T, c client.Client, key types.NamespacedName, wait time.Duration, data map[string]any) *TestCase[k8sObject] {
+	return &TestCase[k8sObject]{
 		t:       t,
 		client:  c,
-		object:  o,
 		wait:    wait,
 		key:     key,
 		data:    data,
 		PreTest: nil,
-		Steps:   make([]TestStep, 0),
+		Steps:   make([]TestStep[k8sObject], 0),
 	}
 }
 
-func (h *TestCase) Run() {
-
+func (h *TestCase[k8sObject]) Run() {
 	var (
-		err error
-		o   client.Object
+		err       error
+		o         k8sObject
+		nilObject k8sObject
 	)
 
 	stepName := new(string)
@@ -66,22 +66,31 @@ func (h *TestCase) Run() {
 			}
 		}
 
-		o = h.object
+		o = getNewObject(o)
 		if err = h.client.Get(context.Background(), h.key, o); err != nil {
-			o = nil
+			if !k8serrors.IsNotFound(err) {
+				h.t.Fatal(err)
+			}
+			o = nilObject
 		}
-
 		if err = step.Do(h.client, h.key, o, h.data); err != nil {
 			h.t.Fatal(err)
 		}
 
-		o = h.object
+		o = getNewObject(o)
 		if err = h.client.Get(context.Background(), h.key, o); err != nil {
-			o = nil
+			if !k8serrors.IsNotFound(err) {
+				h.t.Fatal(err)
+			}
+			o = nilObject
 		}
 		if err = step.Check(h.t, h.client, h.key, o, h.data); err != nil {
 			h.t.Fatal(err)
 		}
 		time.Sleep(h.wait)
 	}
+}
+
+func getNewObject[k8sObject client.Object](o k8sObject) k8sObject {
+	return reflect.New(reflect.TypeOf(o).Elem()).Interface().(k8sObject)
 }

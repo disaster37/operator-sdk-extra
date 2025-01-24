@@ -10,11 +10,12 @@ import (
 	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 )
 
-var version = "develop"
-var commit = ""
+var (
+	version = "develop"
+	commit  = ""
+)
 
 func run(args []string) error {
-
 	// Logger setting
 	log.SetOutput(os.Stdout)
 
@@ -47,7 +48,6 @@ func run(args []string) error {
 	}
 
 	app.Before = func(c *cli.Context) error {
-
 		if c.Bool("debug") {
 			log.SetLevel(log.DebugLevel)
 		}

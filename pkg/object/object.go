@@ -6,7 +6,6 @@ import (
 
 // ObjectStatus is the interface for object status
 type ObjectStatus interface {
-
 	// GetConditions permit to get conditions from Status
 	GetConditions() []metav1.Condition
 
