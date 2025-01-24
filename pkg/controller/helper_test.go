@@ -41,7 +41,6 @@ func TestGetObjectMeta(t *testing.T) {
 	assert.Panics(t, func() {
 		GetObjectMeta(test2)
 	})
-
 }
 
 func TestGetObjectStatus(t *testing.T) {
@@ -116,7 +115,6 @@ func TestMustInjectTypeMeta(t *testing.T) {
 }
 
 func TestDefaultControllerRateLimiter(t *testing.T) {
-
 	rateLimiter := DefaultControllerRateLimiter[reconcile.Request]()
 	assert.NotNil(t, rateLimiter)
 }
