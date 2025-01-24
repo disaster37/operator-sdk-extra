@@ -179,6 +179,7 @@ func (h *OperatorSdkExtra) CI(
 			dir,
 			codecovToken,
 			dagger.CodecovUploadOpts{
+				Name:  "disaster37/operator-sdk-extra",
 				Files: []string{"coverage.out"},
 			},
 		); err != nil {
