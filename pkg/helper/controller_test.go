@@ -9,7 +9,6 @@ import (
 )
 
 func TestDefaultControllerRateLimiter(t *testing.T) {
-
 	limiter := controller.DefaultControllerRateLimiter[reconcile.Request]()
 	assert.NotNil(t, limiter)
 }

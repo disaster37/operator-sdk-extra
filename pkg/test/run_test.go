@@ -9,7 +9,6 @@ import (
 )
 
 func TestRunWithTimeout(t *testing.T) {
-
 	var (
 		isTimeout bool
 		err       error
@@ -30,5 +29,4 @@ func TestRunWithTimeout(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.True(t, isTimeout)
-
 }
