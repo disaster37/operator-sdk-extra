@@ -96,8 +96,8 @@ func TestGetZapFormatterFromDev(t *testing.T) {
 			zExpected := zap.New(zapcore.NewCore(tt.expectedFormat, zapcore.AddSync(expectedBuff), zap.DebugLevel))
 			zActual.Info("test")
 			zExpected.Info("test")
-			zActual.Sync()
-			zExpected.Sync()
+			_ = zActual.Sync()
+			_ = zExpected.Sync()
 
 			if actualBuff.String() != expectedBuff.String() {
 				t.Errorf("GetZapFormatterFromDev() = %v, want %v", formatter, tt.expectedFormat)
