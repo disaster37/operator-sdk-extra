@@ -1,27 +1,29 @@
 {
   "name": "operator-sdk-extra",
-  "engineVersion": "v0.14.0",
-  "sdk": "go",
+  "engineVersion": "v0.16.1",
+  "sdk": {
+    "source": "go"
+  },
   "dependencies": [
     {
       "name": "codecov",
       "source": "github.com/disaster37/dagger-library-go/codecov",
-      "pin": "2d82e40da32a86e4c61690d3b29fb4027364a373"
+      "pin": "4662fcc8adbd17fb2131d51dd4f54642d038a90b"
     },
     {
       "name": "git",
       "source": "github.com/disaster37/dagger-library-go/git",
-      "pin": "dafee8e572906e29bfea24a9ebef6b89b04d83a8"
+      "pin": "4662fcc8adbd17fb2131d51dd4f54642d038a90b"
     },
     {
       "name": "golang",
       "source": "github.com/disaster37/dagger-library-go/golang",
-      "pin": "dafee8e572906e29bfea24a9ebef6b89b04d83a8"
+      "pin": "4662fcc8adbd17fb2131d51dd4f54642d038a90b"
     },
     {
       "name": "operator-sdk",
       "source": "github.com/disaster37/dagger-library-go/operator-sdk",
-      "pin": "dafee8e572906e29bfea24a9ebef6b89b04d83a8"
+      "pin": "4662fcc8adbd17fb2131d51dd4f54642d038a90b"
     }
   ],
   "source": "ci/dagger"

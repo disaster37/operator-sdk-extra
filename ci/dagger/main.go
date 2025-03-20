@@ -54,7 +54,7 @@ func New(
 	cleanDir := src.WithoutDirectory("ci").WithoutDirectory("samples")
 	return &OperatorSdkExtra{
 		Src:         src,
-		OperatorSDK: dag.OperatorSDK(cleanDir),
+		OperatorSDK: dag.OperatorSDK(cleanDir, "operator-sdk-extra"),
 		Golang:      dag.Golang(cleanDir),
 	}
 }
