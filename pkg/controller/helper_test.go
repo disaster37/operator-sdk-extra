@@ -34,7 +34,7 @@ func TestGetObjectMeta(t *testing.T) {
 		GetObjectMeta(test)
 	})
 
-	var test2 = &struct{ client.Object }{}
+	test2 := &struct{ client.Object }{}
 
 	assert.Panics(t, func() {
 		GetObjectMeta(test2)
@@ -63,7 +63,7 @@ func TestGetObjectStatus(t *testing.T) {
 		GetObjectStatus(test)
 	})
 
-	var test2 = &struct{ client.Object }{}
+	test2 := &struct{ client.Object }{}
 
 	assert.Panics(t, func() {
 		GetObjectStatus(test2)
@@ -98,7 +98,7 @@ func TestMustInjectTypeMeta(t *testing.T) {
 		MustInjectTypeMeta(src, test)
 	})
 
-	var test2 = &struct{ client.Object }{}
+	test2 := &struct{ client.Object }{}
 
 	assert.Panics(t, func() {
 		MustInjectTypeMeta(test2, dst)

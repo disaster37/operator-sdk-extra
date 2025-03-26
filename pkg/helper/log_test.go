@@ -88,8 +88,8 @@ func TestGetZapFormatterFromDev(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_ = os.Setenv("LOG_FORMATTER", tt.envValue)
-			defer func(){
-				_ =  os.Unsetenv("LOG_FORMATTER")
+			defer func() {
+				_ = os.Unsetenv("LOG_FORMATTER")
 			}()
 
 			formatter := GetZapFormatterFromDev()
