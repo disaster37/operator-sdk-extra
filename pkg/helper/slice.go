@@ -44,18 +44,11 @@ func StringToSlice(value, separator string) (result []string) {
 
 // ToSliceOfObject permit to convert any slice of object to slice of client.Object
 // Slice must not contain pointer
-func ToSliceOfObject(s any) []client.Object {
-	sValue := reflect.ValueOf(s)
-	sType := sValue.Type()
-
-	if sType.Kind() != reflect.Slice {
-		panic("s must be a slice")
+func ToSliceOfObject[srcType client.Object, dstType client.Object](sList []srcType) (res []dstType) {
+	res = make([]dstType, 0, len(sList))
+	for _, s := range sList {
+		res = append(res, reflect.ValueOf(s).Interface().(dstType))
 	}
 
-	result := make([]client.Object, sValue.Len())
-
-	for i := 0; i < sValue.Len(); i++ {
-		result[i] = sValue.Index(i).Addr().Interface().(client.Object)
-	}
-	return result
+	return res
 }

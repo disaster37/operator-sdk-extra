@@ -11,7 +11,7 @@
  ### Bootstrap new operator
 
 ```bash
-operator-sdk init --domain=example.com --repo=github.com/disaster37/operator-sdk-extra/testdata/elasticsearch-operator
+operator-sdk init --domain=example.com --repo=github.com/disaster37/operator-sdk-extra/v2/testdata/elasticsearch-operator
 
 operator-sdk create api --group elasticsearchapi --version v1alpha1 --kind Role --resource --controller
 ```
@@ -41,7 +41,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"github.com/disaster37/operator-sdk-extra/pkg/apis"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/apis"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -260,7 +260,7 @@ Some explains:
 ```golang
 package v1alpha1
 
-import "github.com/disaster37/operator-sdk-extra/pkg/object"
+import "github.com/disaster37/operator-sdk-extra/v2/pkg/object"
 
 // GetStatus return the status object
 func (o *Role) GetStatus() object.RemoteObjectStatus {
@@ -313,8 +313,8 @@ import (
 
 	eshandler "github.com/disaster37/es-handler/v8"
 	"github.com/disaster37/generic-objectmatcher/patch"
-	"github.com/disaster37/operator-sdk-extra/pkg/controller"
-	elasticsearchapicrd "github.com/disaster37/operator-sdk-extra/testdata/elasticsearch-operator/api/v1alpha1"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller"
+	elasticsearchapicrd "github.com/disaster37/operator-sdk-extra/v2/testdata/elasticsearch-operator/api/v1alpha1"
 )
 
 type roleApiClient struct {
@@ -434,9 +434,9 @@ import (
 	"time"
 
 	eshandler "github.com/disaster37/es-handler/v8"
-	"github.com/disaster37/operator-sdk-extra/pkg/controller"
-	"github.com/disaster37/operator-sdk-extra/pkg/object"
-	elasticsearchapicrd "github.com/disaster37/operator-sdk-extra/testdata/elasticsearch-operator/api/v1alpha1"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/object"
+	elasticsearchapicrd "github.com/disaster37/operator-sdk-extra/v2/testdata/elasticsearch-operator/api/v1alpha1"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -512,8 +512,8 @@ import (
 	"context"
 
 	eshandler "github.com/disaster37/es-handler/v8"
-	"github.com/disaster37/operator-sdk-extra/pkg/controller"
-	elasticsearchapicrd "github.com/disaster37/operator-sdk-extra/testdata/elasticsearch-operator/api/v1alpha1"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller"
+	elasticsearchapicrd "github.com/disaster37/operator-sdk-extra/v2/testdata/elasticsearch-operator/api/v1alpha1"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -636,8 +636,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	elasticsearchapiv1alpha1 "github.com/disaster37/operator-sdk-extra/testdata/elasticsearch-operator/api/v1alpha1"
-	"github.com/disaster37/operator-sdk-extra/testdata/elasticsearch-operator/controllers"
+	elasticsearchapiv1alpha1 "github.com/disaster37/operator-sdk-extra/v2/testdata/elasticsearch-operator/api/v1alpha1"
+	"github.com/disaster37/operator-sdk-extra/v2/testdata/elasticsearch-operator/controllers"
 	"github.com/sirupsen/logrus"
 	//+kubebuilder:scaffold:imports
 )

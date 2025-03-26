@@ -11,7 +11,6 @@ import (
 )
 
 func ZipAndBase64Encode(originalObject any) (string, error) {
-
 	original, err := json.Marshal(originalObject)
 	if err != nil {
 		return "", errors.Wrap(err, "Error when convert object to byte sequence")
@@ -42,7 +41,6 @@ func ZipAndBase64Encode(originalObject any) (string, error) {
 }
 
 func UnZipBase64Decode(original string, originalObject any) error {
-
 	if original == "" {
 		return nil
 	}
@@ -77,6 +75,6 @@ func readZipFile(zf *zip.File) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }() // ignore error on purpose
 	return io.ReadAll(f)
 }

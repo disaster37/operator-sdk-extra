@@ -111,7 +111,6 @@ func TestDiff(t *testing.T) {
 	}
 
 	assert.NotEmpty(t, Diff(expectedP, p))
-
 }
 
 func TestDiffMapString(t *testing.T) {
@@ -167,5 +166,4 @@ func TestDiffMapString(t *testing.T) {
 	}
 
 	assert.Empty(t, DiffMapString(expectedM, m, []string{"key3"}))
-
 }
