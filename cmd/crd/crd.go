@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	apiv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -21,7 +20,7 @@ func CleanCrd(c *cli.Context) error {
 
 	for _, file := range fileMatches {
 
-		logrus.Infof("Start to process file %s", file)
+		log.Infof("Start to process file %s", file)
 
 		// Read current CRD file
 		f, err := os.ReadFile(file)
@@ -49,7 +48,7 @@ func CleanCrd(c *cli.Context) error {
 			panic(err)
 		}
 
-		logrus.Infof("Successfully processed file %s", file)
+		log.Infof("Successfully processed file %s", file)
 
 	}
 
@@ -58,9 +57,9 @@ func CleanCrd(c *cli.Context) error {
 
 func recursiveCleanCrd(item apiv1.JSONSchemaProps) apiv1.JSONSchemaProps {
 	if strings.Contains(item.Description, "@clean") {
-		item.Description = strings.Replace(item.Description, "@clean", "", -1)
+		item.Description = strings.ReplaceAll(item.Description, "@clean", "")
 		item.Properties = nil
-		item.XPreserveUnknownFields = ptr.To[bool](true)
+		item.XPreserveUnknownFields = ptr.To(true)
 
 		if item.Type == "array" {
 			item.Items.Schema.Properties = nil

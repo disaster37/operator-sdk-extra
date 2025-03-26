@@ -49,8 +49,10 @@ func TestGetZapLogLevelFromEnv(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			os.Setenv("LOG_LEVEL", tt.envValue)
-			defer os.Unsetenv("LOG_LEVEL")
+			_ = os.Setenv("LOG_LEVEL", tt.envValue)
+			defer func() {
+				_ = os.Unsetenv("LOG_LEVEL")
+			}()
 
 			logLevel := GetZapLogLevelFromEnv()
 			if logLevel != tt.expectedLog {
@@ -85,8 +87,10 @@ func TestGetZapFormatterFromDev(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			os.Setenv("LOG_FORMATTER", tt.envValue)
-			defer os.Unsetenv("LOG_FORMATTER")
+			_ = os.Setenv("LOG_FORMATTER", tt.envValue)
+			defer func(){
+				_ =  os.Unsetenv("LOG_FORMATTER")
+			}()
 
 			formatter := GetZapFormatterFromDev()
 			actualBuff := bytes.NewBufferString("")
