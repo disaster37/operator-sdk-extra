@@ -18,7 +18,7 @@
     {
       "name": "golang",
       "source": "github.com/disaster37/dagger-library-go/golang@v2",
-      "pin": "d208545a899b710353aa5da42c82410c5b098855"
+      "pin": "7b4e20898ac9b3a0e834f2b35591d0b79137719c"
     },
     {
       "name": "operator-sdk",
