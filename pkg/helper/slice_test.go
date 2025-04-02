@@ -93,7 +93,6 @@ func TestToSlice(t *testing.T) {
 	dList = ToSlice(sList)
 	assert.Equal(t, 1, len(dList))
 	assert.Equal(t, *c, dList[0])
-
 }
 
 func TestToSlicePtr(t *testing.T) {
@@ -113,5 +112,4 @@ func TestToSlicePtr(t *testing.T) {
 	dList = ToSlicePtr(sList)
 	assert.Equal(t, 1, len(dList))
 	assert.Equal(t, c, dList[0])
-
 }
