@@ -52,3 +52,23 @@ func ToSliceOfObject[srcType client.Object, dstType client.Object](sList []srcTy
 
 	return res
 }
+
+// ToSlice convert slice of pointer object to slice of object
+func ToSlice[srcType any](sList []*srcType) (res []srcType) {
+	res = make([]srcType, 0, len(sList))
+	for _, item := range sList {
+		res = append(res, *item)
+	}
+
+	return res
+}
+
+// ToSlicePtr convert slice of object to slice of pointer object
+func ToSlicePtr[srcType any](sList []srcType) (res []*srcType) {
+	res = make([]*srcType, 0, len(sList))
+	for _, item := range sList {
+		res = append(res, &item)
+	}
+
+	return res
+}

@@ -75,3 +75,43 @@ func TestToSliceOfObject(t *testing.T) {
 
 	assert.Equal(t, expected, ToSliceOfObject[*corev1.Pod, client.Object](pods))
 }
+
+func TestToSlice(t *testing.T) {
+	var (
+		sList []*corev1.ConfigMap
+		dList []corev1.ConfigMap
+		c     *corev1.ConfigMap
+	)
+
+	c = &corev1.ConfigMap{
+		ObjectMeta: v1.ObjectMeta{
+			Name: "test",
+		},
+	}
+
+	sList = append(sList, c)
+	dList = ToSlice(sList)
+	assert.Equal(t, 1, len(dList))
+	assert.Equal(t, *c, dList[0])
+
+}
+
+func TestToSlicePtr(t *testing.T) {
+	var (
+		sList []corev1.ConfigMap
+		dList []*corev1.ConfigMap
+		c     *corev1.ConfigMap
+	)
+
+	c = &corev1.ConfigMap{
+		ObjectMeta: v1.ObjectMeta{
+			Name: "test",
+		},
+	}
+
+	sList = append(sList, *c)
+	dList = ToSlicePtr(sList)
+	assert.Equal(t, 1, len(dList))
+	assert.Equal(t, c, dList[0])
+
+}
