@@ -68,7 +68,7 @@ func (r *TestReconciler) Reconcile(ctx context.Context, req reconcile.Request) (
 		req,
 		o,
 		data,
-		r.MultiPhaseReconcilerAction,
+		r,
 		r.stepReconcilers...,
 	)
 }
@@ -84,6 +84,14 @@ func (h *TestReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			MaxConcurrentReconciles: 1,
 		}).
 		Complete(h)
+}
+
+func (h *TestReconciler) Client() client.Client {
+	return h.MultiPhaseReconcilerAction.Client()
+}
+
+func (h *TestReconciler) Recorder() record.EventRecorder {
+	return h.MultiPhaseReconcilerAction.Recorder()
 }
 
 /************

@@ -60,7 +60,7 @@ func TestDeleteItemFromSlice(t *testing.T) {
 }
 
 func TestToSliceOfObject(t *testing.T) {
-	pods := []*corev1.Pod{
+	pods := []corev1.Pod{
 		{
 			ObjectMeta: v1.ObjectMeta{
 				Name:      "test",
@@ -70,10 +70,10 @@ func TestToSliceOfObject(t *testing.T) {
 	}
 
 	expected := []client.Object{
-		pods[0],
+		&pods[0],
 	}
 
-	assert.Equal(t, expected, ToSliceOfObject[*corev1.Pod, client.Object](pods))
+	assert.Equal(t, expected, ToSliceOfObject[corev1.Pod, client.Object](pods))
 }
 
 func TestToSlice(t *testing.T) {
