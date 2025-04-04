@@ -55,8 +55,10 @@ func TestDeleteItemFromSlice(t *testing.T) {
 
 	assert.Equal(t, expected, DeleteItemFromSlice(s, 10))
 
-	// When slcie is nil
-	assert.Equal(t, nil, DeleteItemFromSlice(nil, 10))
+	// When slice is nil
+	s = nil
+	expected = nil
+	assert.Equal(t, expected, DeleteItemFromSlice(s, 10))
 }
 
 func TestToSliceOfObject(t *testing.T) {

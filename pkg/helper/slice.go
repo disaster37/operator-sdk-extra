@@ -8,25 +8,19 @@ import (
 )
 
 // DeleteItemFromSlice is a generic function to remove item from a slice
-func DeleteItemFromSlice(x any, index int) any {
-	if x == nil || reflect.ValueOf(x).IsNil() {
-		return x
-	}
-	xValue := reflect.ValueOf(x)
-	xType := xValue.Type()
-	if xType.Kind() != reflect.Slice {
-		panic("First parameter must be a slice")
+func DeleteItemFromSlice[t any](x []t, index int) []t {
+	if len(x) == 0 {
+		return nil
 	}
 
-	expectedSlice := reflect.MakeSlice(reflect.SliceOf(xType.Elem()), 0, xValue.Len()-1)
-
-	for i := 0; i < xValue.Len(); i++ {
+	res := make([]t, 0, len(x)-1)
+	for i := 0; i < len(x); i++ {
 		if i != index {
-			expectedSlice = reflect.Append(expectedSlice, xValue.Index(i))
+			res = append(res, x[i])
 		}
 	}
 
-	return expectedSlice.Interface()
+	return res
 }
 
 // StringToSlice permit to convert string with separator to slice
