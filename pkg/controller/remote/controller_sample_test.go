@@ -54,7 +54,7 @@ func (r *TestReconciler) Reconcile(ctx context.Context, req reconcile.Request) (
 		req,
 		o,
 		data,
-		r.RemoteReconcilerAction,
+		r,
 	)
 }
 
@@ -62,6 +62,14 @@ func (r *TestReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&RemoteObject{}).
 		Complete(r)
+}
+
+func (h *TestReconciler) Client() client.Client {
+	return h.RemoteReconcilerAction.Client()
+}
+
+func (h *TestReconciler) Recorder() record.EventRecorder {
+	return h.RemoteReconcilerAction.Recorder()
 }
 
 /************
