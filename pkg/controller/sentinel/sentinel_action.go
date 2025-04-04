@@ -173,7 +173,7 @@ func (h *DefaultSentinelAction[k8sObject]) Diff(ctx context.Context, o k8sObject
 					}
 
 					// Remove items found
-					tmpCurrentObjects = helper.DeleteItemFromSlice(tmpCurrentObjects, i).([]client.Object)
+					tmpCurrentObjects = helper.DeleteItemFromSlice(tmpCurrentObjects, i)
 
 					break
 				}

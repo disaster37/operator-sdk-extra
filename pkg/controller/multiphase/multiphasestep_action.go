@@ -212,7 +212,7 @@ func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Diff(c
 				}
 
 				// Remove items found
-				tmpCurrentObjects = helper.DeleteItemFromSlice(tmpCurrentObjects, i).([]k8sStepObject)
+				tmpCurrentObjects = helper.DeleteItemFromSlice(tmpCurrentObjects, i)
 
 				break
 			}
