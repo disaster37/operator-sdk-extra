@@ -8,7 +8,7 @@ require (
 	github.com/disaster37/es-handler/v8 v8.1.5
 	github.com/disaster37/generic-objectmatcher v1.0.2
 	github.com/disaster37/go-kibana-rest/v8 v8.5.0
-	github.com/disaster37/k8s-objectmatcher v1.8.2
+	github.com/disaster37/k8s-objectmatcher v1.8.3
 	github.com/go-logr/logr v1.4.2
 	github.com/google/go-cmp v0.6.0
 	github.com/json-iterator/go v1.1.12
