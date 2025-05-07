@@ -20,7 +20,6 @@ import (
 	"dagger/operator-sdk-extra/internal/dagger"
 
 	"emperror.dev/errors"
-	"github.com/disaster37/dagger-library-go/lib/helper"
 )
 
 const (
@@ -109,9 +108,10 @@ func (h *OperatorSdkExtra) CI(
 	// +optional
 	isPullRequest bool,
 
-	// Set the current branch name. It's needed because of CI overwrite the branch name by PR
+	// The git branch where you should to push
+	// You need to provide it when you are on PullRequest or on Tag
 	// +optional
-	branchName string,
+	gitBranch string,
 
 	// Set true to skip test
 	// +optional
@@ -192,35 +192,21 @@ func (h *OperatorSdkExtra) CI(
 			WithDirectory("samples", h.Src.Directory("samples"))
 
 		// Commit / push
-		var branch string
-		git := dag.Git().
-			SetConfig(gitUsername, gitEmail, dagger.GitSetConfigOpts{BaseRepoURL: "github.com", Token: gitToken})
-
-		if !isTag {
-			if branchName == "" {
-				return nil, errors.New("You need to provide the branch name")
-			}
-			branch = branchName
-		} else {
-			branch = defaultBranch
-		}
-
-		if isPullRequest {
-			git = git.With(func(r *dagger.Git) *dagger.Git {
-				ctr := r.BaseContainer().
-					WithDirectory("/project", dir).
-					WithWorkdir("/project").
-					WithExec(helper.ForgeCommand("git remote -v")).
-					WithExec(helper.ForgeCommandf("git fetch origin %s:%s", branch, branch)).
-					WithExec(helper.ForgeCommandf("git checkout %s", branch))
-
-				return r.WithCustomContainer(ctr)
+		git := dag.GitModule(dir, dagger.GitModuleOpts{Ci: "github"}).
+			SetConfig(dagger.GitModuleSetConfigOpts{
+				Username: gitUsername,
+				Email:    gitEmail,
 			})
-		} else {
-			git = git.SetRepo(h.Src.WithDirectory(".", dir), dagger.GitSetRepoOpts{Branch: branch})
-		}
 
-		if _, err = git.CommitAndPush(ctx, "Commit from CI pipeline"); err != nil {
+		if _, err = git.CommitAndPush(
+			ctx,
+			gitToken,
+			dagger.GitModuleCommitAndPushOpts{
+				BranchName: gitBranch,
+				GitRepoURL: "https://github.com/hm-it/opensearch-operator-k8s.git",
+				Message:    "Commit from CI",
+			},
+		); err != nil {
 			return nil, errors.Wrap(err, "Error when commit and push files change")
 		}
 	}
