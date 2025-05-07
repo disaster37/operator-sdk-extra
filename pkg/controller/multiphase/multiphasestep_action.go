@@ -16,7 +16,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	k8sstrings "k8s.io/utils/strings"
-	
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -187,8 +187,6 @@ func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Diff(c
 
 	for _, expectedObject := range read.GetExpectedObjects() {
 		isFound := false
-
-		
 
 		for i, currentObject := range tmpCurrentObjects {
 			// Need compare same object
