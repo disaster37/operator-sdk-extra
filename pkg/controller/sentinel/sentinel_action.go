@@ -79,12 +79,6 @@ func (h *DefaultSentinelAction[k8sObject]) Read(ctx context.Context, o k8sObject
 func (h *DefaultSentinelAction[k8sObject]) Create(ctx context.Context, o k8sObject, data map[string]any, objects []client.Object, logger *logrus.Entry) (res reconcile.Result, err error) {
 	for _, oChild := range objects {
 
-		// Set owner
-		err = ctrl.SetControllerReference(o, oChild, h.Client().Scheme())
-		if err != nil {
-			return res, errors.Wrapf(err, "Error when set owner reference on object '%s'", oChild.GetName())
-		}
-
 		// Set diff 3-way annotations
 		if err := patch.DefaultAnnotator.SetLastAppliedAnnotation(oChild); err != nil {
 			return res, errors.Wrapf(err, "Error when set annotation for 3-way diff on  object '%s'", oChild.GetName())
@@ -104,13 +98,6 @@ func (h *DefaultSentinelAction[k8sObject]) Create(ctx context.Context, o k8sObje
 // It only add some log / events
 func (h *DefaultSentinelAction[k8sObject]) Update(ctx context.Context, o k8sObject, data map[string]any, objects []client.Object, logger *logrus.Entry) (res reconcile.Result, err error) {
 	for _, oChild := range objects {
-
-		// Set owner
-		// We need update it when API version change
-		err = ctrl.SetControllerReference(o, oChild, h.Client().Scheme())
-		if err != nil {
-			return res, errors.Wrapf(err, "Error when set owner reference on object '%s'", oChild.GetName())
-		}
 
 		if err = h.Client().Update(ctx, oChild); err != nil {
 			return res, errors.Wrapf(err, "Error when update object '%s'", oChild.GetName())
@@ -162,6 +149,12 @@ func (h *DefaultSentinelAction[k8sObject]) Diff(ctx context.Context, o k8sObject
 
 		for _, expectedObject := range reader.GetExpectedObjects() {
 			isFound := false
+
+			// Set ownerReferences on expected object before to diff them
+			err = ctrl.SetControllerReference(o, expectedObject, h.Client().Scheme())
+			if err != nil {
+				return diff, res, errors.Wrapf(err, "Error when set owner reference on object '%s'", expectedObject.GetName())
+			}
 
 			for i, currentObject := range tmpCurrentObjects {
 				// Need compare same object

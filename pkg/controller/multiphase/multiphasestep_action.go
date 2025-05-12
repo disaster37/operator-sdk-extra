@@ -105,12 +105,6 @@ func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Read(c
 func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Create(ctx context.Context, o k8sObject, data map[string]any, objects []k8sStepObject, logger *logrus.Entry) (res reconcile.Result, err error) {
 	for _, oChild := range objects {
 
-		// Set owner
-		err = ctrl.SetControllerReference(o, oChild, h.Client().Scheme())
-		if err != nil {
-			return res, errors.Wrapf(err, "Error when set owner reference on object '%s'", oChild.GetName())
-		}
-
 		// Set diff 3-way annotations
 		if err := patch.DefaultAnnotator.SetLastAppliedAnnotation(oChild); err != nil {
 			return res, errors.Wrapf(err, "Error when set annotation for 3-way diff on  object '%s'", oChild.GetName())
@@ -128,13 +122,6 @@ func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Create
 
 func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Update(ctx context.Context, o k8sObject, data map[string]any, objects []k8sStepObject, logger *logrus.Entry) (res reconcile.Result, err error) {
 	for _, oChild := range objects {
-
-		// Set owner
-		// We need update it when API version change
-		err = ctrl.SetControllerReference(o, oChild, h.Client().Scheme())
-		if err != nil {
-			return res, errors.Wrapf(err, "Error when set owner reference on object '%s'", oChild.GetName())
-		}
 
 		if err = h.Client().Update(ctx, oChild); err != nil {
 			return res, errors.Wrapf(err, "Error when update object '%s'", oChild.GetName())
@@ -202,6 +189,12 @@ func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Diff(c
 
 	for _, expectedObject := range read.GetExpectedObjects() {
 		isFound := false
+
+		// Set ownerReferences on expected object before to diff them
+		err = ctrl.SetControllerReference(o, expectedObject, h.Client().Scheme())
+		if err != nil {
+			return diff, res, errors.Wrapf(err, "Error when set owner reference on object '%s'", expectedObject.GetName())
+		}
 
 		for i, currentObject := range tmpCurrentObjects {
 			// Need compare same object
