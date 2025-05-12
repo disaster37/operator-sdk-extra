@@ -17,6 +17,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	k8sstrings "k8s.io/utils/strings"
 
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -104,6 +105,12 @@ func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Read(c
 func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Create(ctx context.Context, o k8sObject, data map[string]any, objects []k8sStepObject, logger *logrus.Entry) (res reconcile.Result, err error) {
 	for _, oChild := range objects {
 
+		// Set owner
+		err = ctrl.SetControllerReference(o, oChild, h.Client().Scheme())
+		if err != nil {
+			return res, errors.Wrapf(err, "Error when set owner reference on object '%s'", oChild.GetName())
+		}
+
 		// Set diff 3-way annotations
 		if err := patch.DefaultAnnotator.SetLastAppliedAnnotation(oChild); err != nil {
 			return res, errors.Wrapf(err, "Error when set annotation for 3-way diff on  object '%s'", oChild.GetName())
@@ -121,6 +128,14 @@ func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Create
 
 func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Update(ctx context.Context, o k8sObject, data map[string]any, objects []k8sStepObject, logger *logrus.Entry) (res reconcile.Result, err error) {
 	for _, oChild := range objects {
+
+		// Set owner
+		// We need update it when API version change
+		err = ctrl.SetControllerReference(o, oChild, h.Client().Scheme())
+		if err != nil {
+			return res, errors.Wrapf(err, "Error when set owner reference on object '%s'", oChild.GetName())
+		}
+
 		if err = h.Client().Update(ctx, oChild); err != nil {
 			return res, errors.Wrapf(err, "Error when update object '%s'", oChild.GetName())
 		}

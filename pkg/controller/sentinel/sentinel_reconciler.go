@@ -14,9 +14,7 @@ import (
 	"github.com/sirupsen/logrus"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/record"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -122,20 +120,6 @@ func (h *DefaultSentinelReconciler[k8sObject]) Reconcile(ctx context.Context, re
 	logger.Debug("Call 'read' from reconciler successfully")
 	if res != (reconcile.Result{}) {
 		return res, nil
-	}
-
-	// Inject controllerReference if needed
-	for _, reader := range read.GetReads() {
-		for _, oStepExpected := range reader.GetExpectedObjects() {
-			if !controllerutil.HasControllerReference(oStepExpected) {
-				// Set ownerReferences on expected object before to diff them
-				err = ctrl.SetControllerReference(o, oStepExpected, h.Client().Scheme())
-				if err != nil {
-					return res, errors.Wrapf(err, "Error when set owner reference on object '%s'", oStepExpected.GetName())
-				}
-				logger.Debugf("Inject controllerReference on object '%s/%s'", oStepExpected.GetNamespace(), oStepExpected.GetName())
-			}
-		}
 	}
 
 	// Check if diff exist
