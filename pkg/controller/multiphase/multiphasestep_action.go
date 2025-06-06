@@ -176,6 +176,7 @@ func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) OnSucc
 }
 
 func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Diff(ctx context.Context, o k8sObject, read MultiPhaseRead[k8sStepObject], data map[string]any, logger *logrus.Entry, ignoreDiff ...patch.CalculateOption) (diff MultiPhaseDiff[k8sStepObject], res reconcile.Result, err error) {
+
 	tmpCurrentObjects := make([]k8sStepObject, len(read.GetCurrentObjects()))
 	copy(tmpCurrentObjects, read.GetCurrentObjects())
 
@@ -297,7 +298,7 @@ func (h *ObjectMultiPhaseStepReconcilerAction[k8sObject, k8sStepObjectSrc, k8sSt
 }
 
 func (h *ObjectMultiPhaseStepReconcilerAction[k8sObject, k8sStepObjectSrc, k8sStepObjectDst]) Diff(ctx context.Context, o k8sObject, read MultiPhaseRead[k8sStepObjectDst], data map[string]any, logger *logrus.Entry, ignoreDiff ...patch.CalculateOption) (diff MultiPhaseDiff[k8sStepObjectDst], res reconcile.Result, err error) {
-	diffTmp, res, err := h.in.Diff(ctx, o, NewObjectMultiphaseRead[k8sStepObjectDst, k8sStepObjectSrc](read), data, logger)
+	diffTmp, res, err := h.in.Diff(ctx, o, NewObjectMultiphaseRead[k8sStepObjectDst, k8sStepObjectSrc](read), data, logger, ignoreDiff...)
 	return NewObjectMultiphaseDiff[k8sStepObjectSrc, k8sStepObjectDst](diffTmp), res, err
 }
 
