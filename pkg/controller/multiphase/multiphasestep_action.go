@@ -176,7 +176,6 @@ func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) OnSucc
 }
 
 func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Diff(ctx context.Context, o k8sObject, read MultiPhaseRead[k8sStepObject], data map[string]any, logger *logrus.Entry, ignoreDiff ...patch.CalculateOption) (diff MultiPhaseDiff[k8sStepObject], res reconcile.Result, err error) {
-
 	tmpCurrentObjects := make([]k8sStepObject, len(read.GetCurrentObjects()))
 	copy(tmpCurrentObjects, read.GetCurrentObjects())
 
