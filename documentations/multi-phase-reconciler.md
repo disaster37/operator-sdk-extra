@@ -1,51 +1,75 @@
-# Multi phase reconciler
+# Multi-phase Reconciler
 
- > Use it when you need to handle some K8s resources from your own CRD (configmap, deployment, ingress, etc.)
+> Use it when you need to manage multiple K8s resources from your own CRD (ConfigMaps, Deployments, Services, etc.).
 
- In this scenario, we will deploy memcached from our custom CRD. It's the same sample like `operator-sdk`.
- Our CRD permit to set the number of replica and the port or memcached.
- The controller will create and handle one `configmap` and one `deployement` to illustrate the multi phase of reconcilation.
+## Overview
 
- The source code of the following sample is on `testdata/memcached-operator`. The sample is fully implemented compared to this documentation.
+The multi-phase reconciler orchestrates the lifecycle of multiple Kubernetes resources owned by a single CRD. Each managed resource type is handled by a dedicated **step reconciler** that reads the current state, diffs it against the expected state, and applies the necessary create/update/delete operations.
 
- ## How to do
-
- ### Bootstrap new operator
-
-```bash
-operator-sdk init --domain=example.com --repo=github.com/disaster37/operator-sdk-extra/v2/testdata/memcached-operator
-
-operator-sdk create api --group cache --version v1alpha1 --kind Memcached --resource --controller
+```
+Get CRD object
+    |
+    v
+Add Finalizer (if not present)
+    |
+    v
+Track status changes (deep-copy + deferred update)
+    |
+    v
+Check ignoreReconcile annotation
+    |
+    v
+Configure()  -- init conditions
+    |
+    v
+Read()       -- user logic (main action)
+    |
+    v
+Is deleting? -- yes --> Delete(), remove finalizer, return
+    |
+    no
+    v
+For each step reconciler:
+    Configure -> Read -> Diff -> Create/Update/Delete -> OnSuccess
+    |
+    v
+OnSuccess()  -- main action
 ```
 
-### Implement CRD
+## Sample: Memcached Operator
 
-You need to edit your memcached CRD to add the fields you need and to implement the interface  `object.MultiPhaseObject`
+This sample deploys Memcached via a CRD that manages one `ConfigMap` and one `Deployment`. The CRD exposes `size` (replica count) and `containerPort`.
 
-**api/v1alpha1/memcached_types.go**
-```golang
-// MemcachedSpec defines the desired state of Memcached
+Complete source code: `samples/memcached-operator/`
+
+---
+
+## 1. Define the CRD
+
+### `api/v1alpha1/memcached_types.go`
+
+```go
+package v1alpha1
+
+import (
+	multiphase "github.com/disaster37/operator-sdk-extra/v2/pkg/apis/multiphase"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+const (
+	MemcachedAnnotationKey = "cache.example.com"
+)
+
 type MemcachedSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
-	// The following markers will use OpenAPI v3 schema to validate the value
-	// More info: https://book.kubebuilder.io/reference/markers/crd-validation.html
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=3
 	// +kubebuilder:validation:ExclusiveMaximum=false
-
-	// Size defines the number of Memcached instances
-	// +operator-sdk:csv:customresourcedefinitions:type=spec
-	Size int32 `json:"size,omitempty"`
-
-	// Port defines the port that will be used to init the container with the image
-	// +operator-sdk:csv:customresourcedefinitions:type=spec
+	Size          int32 `json:"size,omitempty"`
 	ContainerPort int32 `json:"containerPort,omitempty"`
 }
 
 type MemcachedStatus struct {
-	apis.BasicMultiPhaseObjectStatus `json:",inline"`
+	multiphase.DefaultMultiPhaseObjectStatus `json:",inline"`
 }
 
 //+kubebuilder:object:root=true
@@ -56,7 +80,6 @@ type MemcachedStatus struct {
 // +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[?(@.type=='MemcachedReady')].status",description="Cluster health"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
-// Memcached is the Schema for the memcacheds API
 type Memcached struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -67,7 +90,6 @@ type Memcached struct {
 
 //+kubebuilder:object:root=true
 
-// MemcachedList contains a list of Memcached
 type MemcachedList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
@@ -79,13 +101,13 @@ func init() {
 }
 ```
 
-Some explains:
-- We expose for user 2 fields: size and containerPort
-- We use regular status defined by framework and needed by the standard reconciler `apis.BasicMultiPhaseObjectStatus`
-- We display some fields when you get memcached resource from kubectl with annotation `+kubebuilder:printcolumn:name`
+Key points:
+- `multiphase.DefaultMultiPhaseObjectStatus` (package `pkg/apis/multiphase/`) provides `PhaseName`, `Conditions`, `IsOnError`, `LastErrorMessage`, and `ObservedGeneration`.
+- Print columns expose phase, error flag, readiness condition, and age via `kubectl get`.
 
-**api/v1alpha1/memcached_func.go**
-```golang
+### `api/v1alpha1/memcached_func.go`
+
+```go
 package v1alpha1
 
 import "github.com/disaster37/operator-sdk-extra/v2/pkg/object"
@@ -93,32 +115,25 @@ import "github.com/disaster37/operator-sdk-extra/v2/pkg/object"
 func (h *Memcached) GetStatus() object.MultiPhaseObjectStatus {
 	return &h.Status
 }
-
 ```
 
-Some explains:
-- We implement the interface `object.MultiPhaseObject` to get our Status object.
+- Implements `object.MultiPhaseObject` by returning the status pointer.
+- The framework uses `GetStatus()` to read/write conditions, phase, and error state during reconciliation.
 
+---
 
-### Implement step reconcilers
+## 2. Build expected resources (builders)
 
-Like we say, our controller will handle one configmap and one deployment resources. So we need to create 2 steps reconcilers. One for each resource type.
+Builders are plain functions that produce the desired K8s objects from the CRD spec. No framework-specific interfaces required.
 
-The step reconciler is a standard reconciler. So there are already standard struct that implement the interface `controller.MultiPhaseStepReconcilerAction`. In major of situation, you just need to overwrite the `Read` method.
-It consist to read the existing K8s resource and to compute the expected K8s resources.
+### `controllers/configmap_builder.go`
 
-To have a clean code, we create resource builder to generate the expected resource.
-
-#### Configmap step reconciler
-
-We start to create the configMap builder to generate the expected configMap
-
-**controllers/configmap_builder.go**
-```golang
+```go
 package controllers
 
 import (
-	"github.com/disaster37/operator-sdk-extra/v2/testdata/memcached-operator/api/v1alpha1"
+	"github.com/disaster37/operator-sdk-extra/v2/samples/memcached-operator/api/v1alpha1"
+	"github.com/thoas/go-funk"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -130,10 +145,13 @@ func newConfigMapsBuilder(o *v1alpha1.Memcached) (configMaps []corev1.ConfigMap,
 		ObjectMeta: v1.ObjectMeta{
 			Name:      o.Name,
 			Namespace: o.Namespace,
-			Labels: map[string]string{
-				"name":                          o.GetName(),
-				v1alpha1.MemcachedAnnotationKey: "true",
-			},
+			Labels: funk.UnionStringMap(
+				map[string]string{
+					"name":                          o.GetName(),
+					v1alpha1.MemcachedAnnotationKey: "true",
+				},
+				o.Labels,
+			),
 		},
 		Data: map[string]string{
 			"INSTANCE_NAME": o.Name,
@@ -146,12 +164,17 @@ func newConfigMapsBuilder(o *v1alpha1.Memcached) (configMaps []corev1.ConfigMap,
 }
 ```
 
-> There are no specificity with the framework
+The deployment builder (`controllers/deployment_builder.go`) follows the same pattern, producing an `appsv1.Deployment` from the CRD spec.
 
-Then, we  create the configMap reconciler that implement the `Read` method.
+---
 
-**controllers/configmap_reconciler.go**
-```golang
+## 3. Implement step reconcilers
+
+Each step reconciler handles one resource type. In most cases you only need to override the `Read()` method; the default implementation already provides `Configure()`, `Diff()`, `Create()`, `Update()`, `Delete()`, `OnError()`, and `OnSuccess()`.
+
+### `controllers/configmap_reconciler.go`
+
+```go
 package controllers
 
 import (
@@ -160,16 +183,14 @@ import (
 
 	"emperror.dev/errors"
 	"github.com/disaster37/operator-sdk-extra/v2/pkg/apis/shared"
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller"
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/helper"
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/object"
-	"github.com/disaster37/operator-sdk-extra/v2/testdata/memcached-operator/api/v1alpha1"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller/multiphase"
+	cachecrd "github.com/disaster37/operator-sdk-extra/v2/samples/memcached-operator/api/v1alpha1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/record"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 const (
@@ -178,387 +199,119 @@ const (
 )
 
 type configMapReconciler struct {
-	controller.MultiPhaseStepReconcilerAction
-	controller.BaseReconciler
+	multiphase.MultiPhaseStepReconcilerAction[*cachecrd.Memcached, *corev1.ConfigMap]
 }
 
-func newConfigMapReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseStepReconcilerAction controller.MultiPhaseStepReconcilerAction) {
+func newConfigMapReconciler(c client.Client, recorder record.EventRecorder) multiphase.MultiPhaseStepReconcilerAction[*cachecrd.Memcached, *corev1.ConfigMap] {
 	return &configMapReconciler{
-		MultiPhaseStepReconcilerAction: controller.NewBasicMultiPhaseStepReconcilerAction(
-			client,
+		MultiPhaseStepReconcilerAction: multiphase.NewMultiPhaseStepReconcilerAction[*cachecrd.Memcached, *corev1.ConfigMap](
+			c,
 			ConfigmapPhase,
 			ConfigmapCondition,
-			logger,
 			recorder,
 		),
-		BaseReconciler: controller.BaseReconciler{
-			Client:   client,
-			Recorder: recorder,
-			Log:      logger,
-		},
 	}
 }
 
-func (r *configMapReconciler) Read(ctx context.Context, o object.MultiPhaseObject, data map[string]any) (read controller.MultiPhaseRead, res ctrl.Result, err error) {
-	mc := o.(*v1alpha1.Memcached)
+func (r *configMapReconciler) Read(ctx context.Context, o *cachecrd.Memcached, data map[string]any, logger *logrus.Entry) (read multiphase.MultiPhaseRead[*corev1.ConfigMap], res reconcile.Result, err error) {
 	cmList := &corev1.ConfigMapList{}
-	read = controller.NewBasicMultiPhaseRead()
+	read = multiphase.NewMultiPhaseRead[*corev1.ConfigMap]()
 
-	// Read current configmaps
-	labelSelectors, err := labels.Parse(fmt.Sprintf("name=%s,%s=true", o.GetName(), v1alpha1.MemcachedAnnotationKey))
+	labelSelectors, err := labels.Parse(fmt.Sprintf("name=%s,%s=true", o.GetName(), cachecrd.MemcachedAnnotationKey))
 	if err != nil {
 		return read, res, errors.Wrap(err, "Error when generate label selector")
 	}
-	if err = r.Client.List(ctx, cmList, &client.ListOptions{Namespace: o.GetNamespace(), LabelSelector: labelSelectors}); err != nil {
+	if err = r.Client().List(ctx, cmList, &client.ListOptions{Namespace: o.GetNamespace(), LabelSelector: labelSelectors}); err != nil {
 		return read, res, errors.Wrapf(err, "Error when read configmaps")
 	}
 
-	read.SetCurrentObjects(helper.ToSliceOfObject(cmList.Items))
+	for i := range cmList.Items {
+		read.AddCurrentObject(&cmList.Items[i])
+	}
 
-	// Generate expected configmaps
-	expectedCms, err := newConfigMapsBuilder(mc)
+	expectedCms, err := newConfigMapsBuilder(o)
 	if err != nil {
 		return read, res, errors.Wrap(err, "Error when generate expected configMaps")
 	}
-	read.SetExpectedObjects(helper.ToSliceOfObject(expectedCms))
+	for i := range expectedCms {
+		read.AddExpectedObject(&expectedCms[i])
+	}
 
 	return read, res, nil
 }
-
 ```
 
-Some explains:
-- The struct `configMapReconciler` need to implement the interface  `controller.MultiPhaseStepReconcilerAction`
-- We create constructor to construct this step reconciler `newConfigMapReconciler`. It will call from the main reconciler.
-- We use the standard step reconciler `controller.NewBasicMultiPhaseStepReconcilerAction()`.
-- We implement the methode `Read(ctx context.Context, o object.MultiPhaseObject, data map[string]any) (read controller.MultiPhaseRead, res ctrl.Result, err error)`. First, we read existing configMaps on K8s, then we generate expected configMaps.
+Key points:
+- `multiphase.MultiPhaseStepReconcilerAction[*Memcached, *ConfigMap]` -- generic, type-safe; no type assertions needed.
+- `Read()` receives `logger *logrus.Entry` as a parameter (not stored in a struct field).
+- `multiphase.NewMultiPhaseRead[*corev1.ConfigMap]()` replaces the old `controller.NewBasicMultiPhaseRead()`.
+- `read.AddCurrentObject()` / `read.AddExpectedObject()` work with the concrete type (`*corev1.ConfigMap`), no `helper.ToSliceOfObject()` needed.
 
-#### Deployment step reconciler
+### `controllers/deployment_reconciler.go`
 
-We start to create the deployment builder to generate the expected deployment
+Follows the same pattern with `*appv1.Deployment` instead of `*corev1.ConfigMap`. Uses phase `"Deployment"` and condition `"DeploymentReady"`.
 
-**controllers/deployment_builder.go**
-```golang
-package controllers
+---
 
-import (
-	"os"
-	"strings"
+## 4. Implement the main reconciler
 
-	"github.com/disaster37/operator-sdk-extra/v2/testdata/memcached-operator/api/v1alpha1"
-	"github.com/thoas/go-funk"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-)
+### `controllers/memcached_controller.go`
 
-func newDeploymentsBuilder(memcached *v1alpha1.Memcached) (deployments []appsv1.Deployment, err error) {
-
-	deployments = make([]appsv1.Deployment, 0, 1)
-	ls := labelsForMemcached(memcached.Name)
-	replicas := memcached.Spec.Size
-
-	// Get the Operand image
-	image, err := imageForMemcached()
-	if err != nil {
-		return nil, err
-	}
-
-	dep := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      memcached.Name,
-			Namespace: memcached.Namespace,
-			Labels: funk.UnionStringMap(
-				ls,
-				memcached.Labels,
-			),
-			Annotations: memcached.GetAnnotations(),
-		},
-		Spec: appsv1.DeploymentSpec{
-			Replicas: &replicas,
-			Selector: &metav1.LabelSelector{
-				MatchLabels: ls,
-			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: ls,
-				},
-				Spec: corev1.PodSpec{
-					// TODO(user): Uncomment the following code to configure the nodeAffinity expression
-					// according to the platforms which are supported by your solution. It is considered
-					// best practice to support multiple architectures. build your manager image using the
-					// makefile target docker-buildx. Also, you can use docker manifest inspect <image>
-					// to check what are the platforms supported.
-					// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#node-affinity
-					//Affinity: &corev1.Affinity{
-					//	NodeAffinity: &corev1.NodeAffinity{
-					//		RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
-					//			NodeSelectorTerms: []corev1.NodeSelectorTerm{
-					//				{
-					//					MatchExpressions: []corev1.NodeSelectorRequirement{
-					//						{
-					//							Key:      "kubernetes.io/arch",
-					//							Operator: "In",
-					//							Values:   []string{"amd64", "arm64", "ppc64le", "s390x"},
-					//						},
-					//						{
-					//							Key:      "kubernetes.io/os",
-					//							Operator: "In",
-					//							Values:   []string{"linux"},
-					//						},
-					//					},
-					//				},
-					//			},
-					//		},
-					//	},
-					//},
-					SecurityContext: &corev1.PodSecurityContext{
-						RunAsNonRoot: &[]bool{true}[0],
-						// IMPORTANT: seccomProfile was introduced with Kubernetes 1.19
-						// If you are looking for to produce solutions to be supported
-						// on lower versions you must remove this option.
-						SeccompProfile: &corev1.SeccompProfile{
-							Type: corev1.SeccompProfileTypeRuntimeDefault,
-						},
-					},
-					Containers: []corev1.Container{{
-						Image:           image,
-						Name:            "memcached",
-						ImagePullPolicy: corev1.PullIfNotPresent,
-						// Ensure restrictive context for the container
-						// More info: https://kubernetes.io/docs/concepts/security/pod-security-standards/#restricted
-						SecurityContext: &corev1.SecurityContext{
-							// WARNING: Ensure that the image used defines an UserID in the Dockerfile
-							// otherwise the Pod will not run and will fail with "container has runAsNonRoot and image has non-numeric user"".
-							// If you want your workloads admitted in namespaces enforced with the restricted mode in OpenShift/OKD vendors
-							// then, you MUST ensure that the Dockerfile defines a User ID OR you MUST leave the "RunAsNonRoot" and
-							// "RunAsUser" fields empty.
-							RunAsNonRoot: &[]bool{true}[0],
-							// The memcached image does not use a non-zero numeric user as the default user.
-							// Due to RunAsNonRoot field being set to true, we need to force the user in the
-							// container to a non-zero numeric user. We do this using the RunAsUser field.
-							// However, if you are looking to provide solution for K8s vendors like OpenShift
-							// be aware that you cannot run under its restricted-v2 SCC if you set this value.
-							RunAsUser:                &[]int64{1001}[0],
-							AllowPrivilegeEscalation: &[]bool{false}[0],
-							Capabilities: &corev1.Capabilities{
-								Drop: []corev1.Capability{
-									"ALL",
-								},
-							},
-						},
-						Ports: []corev1.ContainerPort{{
-							ContainerPort: memcached.Spec.ContainerPort,
-							Name:          "memcached",
-						}},
-						Command: []string{"memcached", "-m=64", "-o", "modern", "-v"},
-						EnvFrom: []corev1.EnvFromSource{
-							{
-								ConfigMapRef: &corev1.ConfigMapEnvSource{
-									LocalObjectReference: corev1.LocalObjectReference{
-										Name: memcached.Name,
-									},
-								},
-							},
-						},
-					}},
-				},
-			},
-		},
-	}
-
-	deployments = append(deployments, *dep)
-	return deployments, nil
-}
-
-// labelsForMemcached returns the labels for selecting the resources
-// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/
-func labelsForMemcached(name string) map[string]string {
-	var imageTag string
-	image, err := imageForMemcached()
-	if err == nil {
-		imageTag = strings.Split(image, ":")[1]
-	}
-	return map[string]string{"app.kubernetes.io/name": "Memcached",
-		"app.kubernetes.io/instance":    name,
-		"app.kubernetes.io/version":     imageTag,
-		"app.kubernetes.io/part-of":     "memcached-operator",
-		"app.kubernetes.io/created-by":  "controller-manager",
-		"name":                          name,
-		v1alpha1.MemcachedAnnotationKey: "true",
-	}
-}
-
-// imageForMemcached gets the Operand image which is managed by this controller
-// from the MEMCACHED_IMAGE environment variable defined in the config/manager/manager.yaml
-func imageForMemcached() (string, error) {
-	var imageEnvVar = "MEMCACHED_IMAGE"
-	image, found := os.LookupEnv(imageEnvVar)
-	if !found {
-		return "memcached:1.4.36-alpine", nil
-	}
-	return image, nil
-}
-
-```
-
-> There are no specificity with the framework
-
-Then, we  create the deployment reconciler that implement the `Read` method.
-
-**controllers/deployment_reconciler.go**
-```golang
+```go
 package controllers
 
 import (
 	"context"
-	"fmt"
 
-	"emperror.dev/errors"
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/apis/shared"
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller"
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/helper"
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/object"
-	"github.com/disaster37/operator-sdk-extra/v2/testdata/memcached-operator/api/v1alpha1"
-	"github.com/sirupsen/logrus"
 	appv1 "k8s.io/api/apps/v1"
-	"k8s.io/apimachinery/pkg/labels"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	k8scontroller "sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/apis/shared"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller/multiphase"
+	cachecrd "github.com/disaster37/operator-sdk-extra/v2/samples/memcached-operator/api/v1alpha1"
+	"github.com/sirupsen/logrus"
 )
 
 const (
-	DeploymentCondition shared.ConditionName = "DeploymentReady"
-	DeploymentPhase     shared.PhaseName     = "Deployment"
+	mainFinalizer shared.FinalizerName = "memcached.cache.example.com/finalizer"
 )
 
-type deploymentReconciler struct {
-	controller.MultiPhaseStepReconcilerAction
-	controller.BaseReconciler
-}
-
-func newDeploymentReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseStepReconcilerAction *deploymentReconciler) {
-
-	return &deploymentReconciler{
-		MultiPhaseStepReconcilerAction: controller.NewBasicMultiPhaseStepReconcilerAction(
-			client,
-			DeploymentPhase,
-			DeploymentCondition,
-			logger,
-			recorder,
-		),
-		BaseReconciler: controller.BaseReconciler{
-			Client:   client,
-			Recorder: recorder,
-			Log:      logger,
-		},
-	}
-}
-
-func (r *deploymentReconciler) Read(ctx context.Context, o object.MultiPhaseObject, data map[string]any) (read controller.MultiPhaseRead, res ctrl.Result, err error) {
-	mc := o.(*v1alpha1.Memcached)
-	deploymentList := &appv1.DeploymentList{}
-	read = controller.NewBasicMultiPhaseRead()
-
-	// Read current configmaps
-	labelSelectors, err := labels.Parse(fmt.Sprintf("name=%s,%s=true", o.GetName(), v1alpha1.MemcachedAnnotationKey))
-	if err != nil {
-		return read, res, errors.Wrap(err, "Error when generate label selector")
-	}
-	if err = r.Client.List(ctx, deploymentList, &client.ListOptions{Namespace: o.GetNamespace(), LabelSelector: labelSelectors}); err != nil {
-		return read, res, errors.Wrapf(err, "Error when read deployments")
-	}
-
-	read.SetCurrentObjects(helper.ToSliceOfObject(deploymentList.Items))
-
-	// Generate expected configmaps
-	expectedDeployments, err := newDeploymentsBuilder(mc)
-	if err != nil {
-		return read, res, errors.Wrap(err, "Error when generate expected deployments")
-	}
-	read.SetExpectedObjects(helper.ToSliceOfObject(expectedDeployments))
-
-	return read, res, nil
-}
-
-```
-
-Some explains:
-- The struct `DeploymentReconciler` need to implement the interface  `controller.MultiPhaseStepReconcilerAction`
-- We create constructor to construct this step reconciler `newDeploymentReconciler`. It will call from the main reconciler.
-- We use the standard step reconciler `controller.NewBasicMultiPhaseStepReconcilerAction()`.
-- We implement the methode `Read(ctx context.Context, o object.MultiPhaseObject, data map[string]any) (read controller.MultiPhaseRead, res ctrl.Result, err error)`. First, we read existing deployments on K8s, then we generate expected deployments.
-
-### Implement the main reconciler
-
-The goal of this reconciler is to get the object that wake up operator, maintain some standard status and call each step to reconcile resources.
-
-It need to implement the `controller.MultiPhaseReconcilerAction` and `controller.MultiPhaseReconciler` interface. You can use standard MultiPhaseReconciler constructor.
-
-**controllers/memcached_controller.go**:
-```golang
-/*
-Copyright 2023.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
-package controllers
-
-import (
-	"context"
-
-	appv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/record"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller"
-	cachecrd "github.com/disaster37/operator-sdk-extra/v2/testdata/memcached-operator/api/v1alpha1"
-	"github.com/sirupsen/logrus"
-)
-
-// MemcachedReconciler reconciles a Memcached object
 type MemcachedReconciler struct {
 	controller.Controller
-	controller.MultiPhaseReconcilerAction
-	controller.MultiPhaseReconciler
-	controller.BaseReconciler
+	multiphase.MultiPhaseReconciler[*cachecrd.Memcached]
+	multiphase.MultiPhaseReconcilerAction[*cachecrd.Memcached]
+	name            string
+	stepReconcilers []multiphase.MultiPhaseStepReconcilerAction[*cachecrd.Memcached, client.Object]
 }
 
-func NewMemcachedReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseReconciler controller.Controller) {
+func NewMemcachedReconciler(c client.Client, logger *logrus.Entry, recorder record.EventRecorder) controller.Controller {
+	configMapStep := newConfigMapReconciler(c, recorder)
+	deploymentStep := newDeploymentReconciler(c, recorder)
 
 	return &MemcachedReconciler{
-		Controller: controller.NewBasicController(),
-		MultiPhaseReconcilerAction: controller.NewBasicMultiPhaseReconcilerAction(
-			client,
-			controller.ReadyCondition,
-			logger,
-			recorder,
-		),
-		MultiPhaseReconciler: controller.NewBasicMultiPhaseReconciler(
-			client,
+		Controller: controller.NewController(),
+		MultiPhaseReconciler: multiphase.NewMultiPhaseReconciler[*cachecrd.Memcached](
+			c,
 			"memcached",
-			"memcached.cache.example.com/finalizer",
+			mainFinalizer,
 			logger,
 			recorder,
 		),
-		BaseReconciler: controller.BaseReconciler{
-			Client:   client,
-			Recorder: recorder,
-			Log:      logger,
+		MultiPhaseReconcilerAction: multiphase.NewMultiPhaseReconcilerAction[*cachecrd.Memcached](
+			c,
+			controller.ReadyCondition,
+			recorder,
+		),
+		name: "memcached",
+		stepReconcilers: []multiphase.MultiPhaseStepReconcilerAction[*cachecrd.Memcached, client.Object]{
+			multiphase.NewObjectMultiPhaseStepReconcilerAction[*cachecrd.Memcached, *corev1.ConfigMap, client.Object](configMapStep),
+			multiphase.NewObjectMultiPhaseStepReconcilerAction[*cachecrd.Memcached, *appv1.Deployment, client.Object](deploymentStep),
 		},
 	}
 }
@@ -571,85 +324,55 @@ func NewMemcachedReconciler(client client.Client, logger *logrus.Entry, recorder
 //+kubebuilder:rbac:groups="apps",resources=deployments,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
 
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the Memcached object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
-func (r *MemcachedReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
-	mc := &cachecrd.Memcached{}
-	data := map[string]any{}
-
-	return r.MultiPhaseReconciler.Reconcile(
-		ctx,
-		req,
-		mc,
-		data,
-		r,
-		newConfigMapReconciler(
-			r.Client,
-			r.Log,
-			r.Recorder,
-		),
-		newDeploymentReconciler(
-			r.Client,
-			r.Log,
-			r.Recorder,
-		),
-	)
-
+func (h *MemcachedReconciler) Client() client.Client {
+	return h.MultiPhaseReconcilerAction.Client()
 }
 
-// SetupWithManager sets up the controller with the Manager.
+func (h *MemcachedReconciler) Recorder() record.EventRecorder {
+	return h.MultiPhaseReconcilerAction.Recorder()
+}
+
+func (r *MemcachedReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
+	o := &cachecrd.Memcached{}
+	data := map[string]any{}
+
+	return r.MultiPhaseReconciler.Reconcile(ctx, req, o, data, r, r.stepReconcilers...)
+}
+
 func (r *MemcachedReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&cachecrd.Memcached{}).
 		Owns(&appv1.Deployment{}).
 		Owns(&corev1.ConfigMap{}).
+		WithOptions(k8scontroller.Options{
+			RateLimiter: controller.DefaultControllerRateLimiter[reconcile.Request](),
+		}).
 		Complete(r)
 }
-
-
 ```
 
-Some explain:
-- The struct `MemcachedReconciler` need to implement the interface `controller.MultiPhaseReconcilerAction` and `controller.MultiPhaseReconciler`. We use the standard implementation of this interface via `controller.NewBasicMultiPhaseReconcilerAction()` and `controller.NewBasicMultiPhaseReconciler`
--  We rewrite the main Reconcile methode to call the multi phase reconciler and use our custom step reconciler to reconcile configMap and Deployment.
+Key points:
+- `multiphase.MultiPhaseReconciler[*Memcached]` -- orchestrates finalizer, status tracking, and step execution.
+- `multiphase.MultiPhaseReconcilerAction[*Memcached]` -- provides default `Configure()`, `Read()`, `Delete()`, `OnError()`, `OnSuccess()`.
+- `controller.NewController()` -- replaces the old `controller.NewBasicController()`.
+- `multiphase.NewMultiPhaseReconciler[*Memcached](...)` -- replaces the old `controller.NewBasicMultiPhaseReconciler(...)`.
+- `multiphase.NewMultiPhaseReconcilerAction[*Memcached](...)` -- replaces the old `controller.NewBasicMultiPhaseReconcilerAction(...)`.
+- Step reconcilers use specific types (`*ConfigMap`, `*Deployment`) but are wrapped with `multiphase.NewObjectMultiPhaseStepReconcilerAction` to convert them to `client.Object` for the orchestrator.
+- Step reconcilers are created in the constructor and stored in the struct, not in the `Reconcile()` method.
+- `reconcile.Request` is used (from `sigs.k8s.io/controller-runtime/pkg/reconcile`), not `ctrl.Request`.
+- `controller.DefaultControllerRateLimiter[reconcile.Request]()` provides a default rate limiter for the controller options.
 
-### Call reconciler from main
+---
 
-We just need to create our custom main multiphase reconciler from the main and call the setup manager.
+## 5. Wire up in main.go
 
-**main.go**:
-```golang
-/*
-Copyright 2023.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
+```go
 package main
 
 import (
 	"flag"
 	"os"
 
-	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
-	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -661,10 +384,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	cachev1alpha1 "github.com/disaster37/operator-sdk-extra/v2/testdata/memcached-operator/api/v1alpha1"
-	"github.com/disaster37/operator-sdk-extra/v2/testdata/memcached-operator/controllers"
+	cachev1alpha1 "github.com/disaster37/operator-sdk-extra/v2/samples/memcached-operator/api/v1alpha1"
+	"github.com/disaster37/operator-sdk-extra/v2/samples/memcached-operator/controllers"
 	"github.com/sirupsen/logrus"
-	//+kubebuilder:scaffold:imports
 )
 
 var (
@@ -674,9 +396,7 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-
 	utilruntime.Must(cachev1alpha1.AddToScheme(scheme))
-	//+kubebuilder:scaffold:scheme
 }
 
 func main() {
@@ -688,9 +408,7 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
-	opts := zap.Options{
-		Development: true,
-	}
+	opts := zap.Options{Development: true}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
@@ -698,31 +416,17 @@ func main() {
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme: scheme,
-		Metrics: server.Options{
-			BindAddress: metricsAddr,
-		},
-		WebhookServer: webhook.NewServer(webhook.Options{
-			Port: 9443,
-		}),
+		Metrics: server.Options{BindAddress: metricsAddr},
+		WebhookServer:          webhook.NewServer(webhook.Options{Port: 9443}),
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "1858d68a.example.com",
-		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
-		// when the Manager ends. This requires the binary to immediately end when the
-		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
-		// speeds up voluntary leader transitions as the new leader don't have to wait
-		// LeaseDuration time first.
-		//
-		// In the default scaffold provided, the program ends immediately after
-		// the manager stops, so would be fine to enable this option. However,
-		// if you are doing or is intended to do any operation such as perform cleanups
-		// after the manager stops then its usage might be unsafe.
-		// LeaderElectionReleaseOnCancel: true,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
+
 	log := logrus.New()
 	log.SetLevel(logrus.DebugLevel)
 
@@ -735,8 +439,6 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Memcached")
 		os.Exit(1)
 	}
-
-	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")
@@ -753,5 +455,79 @@ func main() {
 		os.Exit(1)
 	}
 }
-
 ```
+
+- The reconciler constructor takes `client.Client`, `*logrus.Entry`, and `record.EventRecorder`.
+- `SetupWithManager()` registers the CRD as the primary resource and `Owns()` for each managed child type.
+
+---
+
+## Reconciliation flow
+
+The `DefaultMultiPhaseReconciler.Reconcile()` method (`pkg/controller/multiphase/multiphase_reconciler.go`) executes these steps in order:
+
+1. **Get** the CRD object from the K8s API. Return early if not found.
+2. **Add finalizer** if not already present. Requeue immediately after adding.
+3. **Track status** -- deep-copy the current status; defer a status update if it changed.
+4. **Check ignoreReconcile** annotation (`operator-sdk-extra.webcenter.fr/ignoreReconcile=true`). Skip reconciliation if set.
+5. **Configure()** on the main action -- initializes the ready condition.
+6. **Read()** on the main action -- optional user logic before step reconciliation.
+7. **Delete path** -- if `DeletionTimestamp` is set: call `Delete()`, remove finalizer, return.
+8. **For each step reconciler**: Configure -> Read -> Diff -> Create/Update/Delete -> OnSuccess. Each step sets the phase name on the status.
+9. **OnSuccess()** on the main action -- sets the ready condition to `True`, phase to `"running"`, clears error state, updates `ObservedGeneration`.
+
+If any step returns an error, `OnError()` is called to update the status condition and error message.
+
+---
+
+## Key interfaces
+
+| Interface | Package | Purpose |
+|---|---|---|
+| `multiphase.MultiPhaseReconciler[k8sObject]` | `pkg/controller/multiphase/` | Orchestrator: manages finalizer, status tracking, and step execution |
+| `multiphase.MultiPhaseReconcilerAction[k8sObject]` | same | User-facing hooks: `Configure`, `Read`, `Delete`, `OnError`, `OnSuccess` |
+| `multiphase.MultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]` | same | Per-resource step: `Read`, `Diff`, `Create`, `Update`, `Delete` |
+| `multiphase.MultiPhaseRead[k8sStepObject]` | same | Holds current and expected objects for a step |
+| `multiphase.MultiPhaseDiff[k8sStepObject]` | same | Holds create/update/delete lists produced by the diff |
+| `object.MultiPhaseObject` | `pkg/object/` | CRD must implement `GetStatus() MultiPhaseObjectStatus` |
+| `object.MultiPhaseObjectStatus` | `pkg/object/` | `GetConditions`, `SetConditions`, `GetPhaseName`, `SetPhaseName`, `GetIsOnError`, `SetIsOnError`, `GetLastErrorMessage`, `SetLastErrorMessage`, `GetObservedGeneration`, `SetObservedGeneration` |
+
+---
+
+## Constructors
+
+| Constructor | Description |
+|---|---|
+| `multiphase.NewMultiPhaseReconciler[k8sObject](client, name, finalizer, logger, recorder)` | Main orchestrator with finalizer and status tracking |
+| `multiphase.NewMultiPhaseReconcilerAction[k8sObject](client, conditionName, recorder)` | Default action: initializes ready condition, provides `OnError` / `OnSuccess` |
+| `multiphase.NewMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject](client, phaseName, conditionName, recorder)` | Default step action: provides `Diff`, `Create`, `Update`, `Delete`, `OnError`, `OnSuccess` |
+| `multiphase.NewObjectMultiPhaseStepReconcilerAction[k8sObject, src, dst](stepReconciler)` | Wraps a typed step reconciler to convert from a specific type (e.g. `*ConfigMap`) to `client.Object` |
+| `multiphase.NewMultiPhaseRead[k8sStepObject]()` | Creates an empty read result for collecting current and expected objects |
+| `controller.NewController()` | Base controller (no-op scaffolding) |
+
+---
+
+## 3-way Diff
+
+The diff engine uses `k8s-objectmatcher/patch` with 3-way merge. Default options applied to every diff:
+
+- `patch.CleanMetadata()` -- strips K8s management annotations before comparison.
+- `patch.IgnoreStatusFields()` -- ignores status subresource fields.
+
+Additional per-step ignore options can be provided via `GetIgnoresDiff()` or as variadic arguments to `Diff()`.
+
+The diff automatically produces `NeedCreate`, `NeedUpdate`, and `NeedDelete` lists. Owner references are set on expected objects before diffing.
+
+---
+
+## Status Tracking
+
+`multiphase.DefaultMultiPhaseObjectStatus` (package `pkg/apis/multiphase/`) embeds `apis.DefaultObjectStatus` and adds `PhaseName`. It provides:
+
+| Field | Type | Description |
+|---|---|---|
+| `PhaseName` | `shared.PhaseName` | Current phase (e.g. `"Configmap"`, `"Deployment"`, `"running"`) |
+| `Conditions` | `[]metav1.Condition` | Standard K8s conditions list |
+| `IsOnError` | `*bool` | Whether the reconciler is stuck on an error |
+| `LastErrorMessage` | `string` | Last error message (truncated to 5000 chars) |
+| `ObservedGeneration` | `int64` | Last successfully reconciled generation |

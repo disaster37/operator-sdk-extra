@@ -15,7 +15,6 @@ import (
 	condition "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
-	k8sstrings "k8s.io/utils/strings"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -152,10 +151,10 @@ func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) OnErro
 		Type:    h.Condition().String(),
 		Status:  metav1.ConditionFalse,
 		Reason:  "Failed",
-		Message: k8sstrings.ShortenString(currentErr.Error(), controller.ShortenError),
+		Message: controller.UserFacingError(currentErr, controller.MaxConditionMessage),
 	})
 
-	h.Recorder().Event(o, corev1.EventTypeWarning, "ReconcilerStepActionError", k8sstrings.ShortenString(currentErr.Error(), controller.ShortenError))
+	h.Recorder().Event(o, corev1.EventTypeWarning, "ReconcilerStepActionError", controller.UserFacingError(currentErr, controller.MaxEventMessage))
 	return res, currentErr
 }
 

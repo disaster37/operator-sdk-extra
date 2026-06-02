@@ -17,7 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/apis"
+	multiphase "github.com/disaster37/operator-sdk-extra/v2/pkg/apis/multiphase"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -49,7 +49,7 @@ type MemcachedSpec struct {
 }
 
 type MemcachedStatus struct {
-	apis.BasicMultiPhaseObjectStatus `json:",inline"`
+	multiphase.DefaultMultiPhaseObjectStatus `json:",inline"`
 }
 
 //+kubebuilder:object:root=true

@@ -12,7 +12,6 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
-	k8sstrings "k8s.io/utils/strings"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -123,7 +122,7 @@ func (h *DefaultSentinelAction[k8sObject]) Delete(ctx context.Context, o k8sObje
 }
 
 func (h *DefaultSentinelAction[k8sObject]) OnError(ctx context.Context, o k8sObject, data map[string]any, currentErr error, logger *logrus.Entry) (res reconcile.Result, err error) {
-	h.Recorder().Event(o, corev1.EventTypeWarning, "SentinelActionError", k8sstrings.ShortenString(currentErr.Error(), controller.ShortenError))
+	h.Recorder().Event(o, corev1.EventTypeWarning, "SentinelActionError", controller.UserFacingError(currentErr, controller.MaxEventMessage))
 	return res, currentErr
 }
 

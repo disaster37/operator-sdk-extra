@@ -17,7 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/apis"
+	remoteapis "github.com/disaster37/operator-sdk-extra/v2/pkg/apis/remote"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -153,7 +153,7 @@ type RoleStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	apis.BasicRemoteObjectStatus `json:",inline"`
+	remoteapis.DefaultRemoteObjectStatus `json:",inline"`
 }
 
 //+kubebuilder:object:root=true

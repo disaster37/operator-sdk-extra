@@ -3,14 +3,14 @@ package v1alpha1
 import (
 	"testing"
 
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/apis"
+	remoteapis "github.com/disaster37/operator-sdk-extra/v2/pkg/apis/remote"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestRoleGetStatus(t *testing.T) {
 	status := RoleStatus{
-		BasicRemoteObjectStatus: apis.BasicRemoteObjectStatus{
+		DefaultRemoteObjectStatus: remoteapis.DefaultRemoteObjectStatus{
 			LastAppliedConfiguration: "test",
 		},
 	}

@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/disaster37/operator-sdk-extra/v2/pkg/test"
-	cachecrd "github.com/disaster37/operator-sdk-extra/v2/testdata/memcached-operator/api/v1alpha1"
+	cachecrd "github.com/disaster37/operator-sdk-extra/v2/samples/memcached-operator/api/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	appv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

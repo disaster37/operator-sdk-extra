@@ -6,16 +6,14 @@ import (
 
 	"emperror.dev/errors"
 	"github.com/disaster37/operator-sdk-extra/v2/pkg/apis/shared"
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller"
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/helper"
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/object"
-	"github.com/disaster37/operator-sdk-extra/v2/testdata/memcached-operator/api/v1alpha1"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller/multiphase"
+	cachecrd "github.com/disaster37/operator-sdk-extra/v2/samples/memcached-operator/api/v1alpha1"
 	"github.com/sirupsen/logrus"
 	appv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/record"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 const (
@@ -24,49 +22,43 @@ const (
 )
 
 type deploymentReconciler struct {
-	controller.MultiPhaseStepReconcilerAction
-	controller.BaseReconciler
+	multiphase.MultiPhaseStepReconcilerAction[*cachecrd.Memcached, *appv1.Deployment]
 }
 
-func newDeploymentReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseStepReconcilerAction *deploymentReconciler) {
+func newDeploymentReconciler(c client.Client, recorder record.EventRecorder) multiphase.MultiPhaseStepReconcilerAction[*cachecrd.Memcached, *appv1.Deployment] {
 	return &deploymentReconciler{
-		MultiPhaseStepReconcilerAction: controller.NewBasicMultiPhaseStepReconcilerAction(
-			client,
+		MultiPhaseStepReconcilerAction: multiphase.NewMultiPhaseStepReconcilerAction[*cachecrd.Memcached, *appv1.Deployment](
+			c,
 			DeploymentPhase,
 			DeploymentCondition,
-			logger,
 			recorder,
 		),
-		BaseReconciler: controller.BaseReconciler{
-			Client:   client,
-			Recorder: recorder,
-			Log:      logger,
-		},
 	}
 }
 
-func (r *deploymentReconciler) Read(ctx context.Context, o object.MultiPhaseObject, data map[string]any) (read controller.MultiPhaseRead, res ctrl.Result, err error) {
-	mc := o.(*v1alpha1.Memcached)
+func (r *deploymentReconciler) Read(ctx context.Context, o *cachecrd.Memcached, data map[string]any, logger *logrus.Entry) (read multiphase.MultiPhaseRead[*appv1.Deployment], res reconcile.Result, err error) {
 	deploymentList := &appv1.DeploymentList{}
-	read = controller.NewBasicMultiPhaseRead()
+	read = multiphase.NewMultiPhaseRead[*appv1.Deployment]()
 
-	// Read current configmaps
-	labelSelectors, err := labels.Parse(fmt.Sprintf("name=%s,%s=true", o.GetName(), v1alpha1.MemcachedAnnotationKey))
+	labelSelectors, err := labels.Parse(fmt.Sprintf("name=%s,%s=true", o.GetName(), cachecrd.MemcachedAnnotationKey))
 	if err != nil {
 		return read, res, errors.Wrap(err, "Error when generate label selector")
 	}
-	if err = r.Client.List(ctx, deploymentList, &client.ListOptions{Namespace: o.GetNamespace(), LabelSelector: labelSelectors}); err != nil {
+	if err = r.Client().List(ctx, deploymentList, &client.ListOptions{Namespace: o.GetNamespace(), LabelSelector: labelSelectors}); err != nil {
 		return read, res, errors.Wrapf(err, "Error when read deployments")
 	}
 
-	read.SetCurrentObjects(helper.ToSliceOfObject(deploymentList.Items))
+	for i := range deploymentList.Items {
+		read.AddCurrentObject(&deploymentList.Items[i])
+	}
 
-	// Generate expected configmaps
-	expectedDeployments, err := newDeploymentsBuilder(mc)
+	expectedDeployments, err := newDeploymentsBuilder(o)
 	if err != nil {
 		return read, res, errors.Wrap(err, "Error when generate expected deployments")
 	}
-	read.SetExpectedObjects(helper.ToSliceOfObject(expectedDeployments))
+	for i := range expectedDeployments {
+		read.AddExpectedObject(&expectedDeployments[i])
+	}
 
 	return read, res, nil
 }

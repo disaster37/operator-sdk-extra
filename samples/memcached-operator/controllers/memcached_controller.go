@@ -24,40 +24,51 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	k8scontroller "sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/apis/shared"
 	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller"
-	cachecrd "github.com/disaster37/operator-sdk-extra/v2/testdata/memcached-operator/api/v1alpha1"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller/multiphase"
+	cachecrd "github.com/disaster37/operator-sdk-extra/v2/samples/memcached-operator/api/v1alpha1"
 	"github.com/sirupsen/logrus"
+)
+
+const (
+	mainFinalizer shared.FinalizerName = "memcached.cache.example.com/finalizer"
 )
 
 // MemcachedReconciler reconciles a Memcached object
 type MemcachedReconciler struct {
 	controller.Controller
-	controller.MultiPhaseReconcilerAction
-	controller.MultiPhaseReconciler
-	controller.BaseReconciler
+	multiphase.MultiPhaseReconciler[*cachecrd.Memcached]
+	multiphase.MultiPhaseReconcilerAction[*cachecrd.Memcached]
+	name            string
+	stepReconcilers []multiphase.MultiPhaseStepReconcilerAction[*cachecrd.Memcached, client.Object]
 }
 
-func NewMemcachedReconciler(client client.Client, logger *logrus.Entry, recorder record.EventRecorder) (multiPhaseReconciler controller.Controller) {
+func NewMemcachedReconciler(c client.Client, logger *logrus.Entry, recorder record.EventRecorder) controller.Controller {
+	configMapStep := newConfigMapReconciler(c, recorder)
+	deploymentStep := newDeploymentReconciler(c, recorder)
+
 	return &MemcachedReconciler{
-		Controller: controller.NewBasicController(),
-		MultiPhaseReconcilerAction: controller.NewBasicMultiPhaseReconcilerAction(
-			client,
-			controller.ReadyCondition,
-			logger,
-			recorder,
-		),
-		MultiPhaseReconciler: controller.NewBasicMultiPhaseReconciler(
-			client,
+		Controller: controller.NewController(),
+		MultiPhaseReconciler: multiphase.NewMultiPhaseReconciler[*cachecrd.Memcached](
+			c,
 			"memcached",
-			"memcached.cache.example.com/finalizer",
+			mainFinalizer,
 			logger,
 			recorder,
 		),
-		BaseReconciler: controller.BaseReconciler{
-			Client:   client,
-			Recorder: recorder,
-			Log:      logger,
+		MultiPhaseReconcilerAction: multiphase.NewMultiPhaseReconcilerAction[*cachecrd.Memcached](
+			c,
+			controller.ReadyCondition,
+			recorder,
+		),
+		name: "memcached",
+		stepReconcilers: []multiphase.MultiPhaseStepReconcilerAction[*cachecrd.Memcached, client.Object]{
+			multiphase.NewObjectMultiPhaseStepReconcilerAction[*cachecrd.Memcached, *corev1.ConfigMap, client.Object](configMapStep),
+			multiphase.NewObjectMultiPhaseStepReconcilerAction[*cachecrd.Memcached, *appv1.Deployment, client.Object](deploymentStep),
 		},
 	}
 }
@@ -70,43 +81,28 @@ func NewMemcachedReconciler(client client.Client, logger *logrus.Entry, recorder
 //+kubebuilder:rbac:groups="apps",resources=deployments,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
 
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the Memcached object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
-func (r *MemcachedReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
-	mc := &cachecrd.Memcached{}
-	data := map[string]any{}
-
-	return r.MultiPhaseReconciler.Reconcile(
-		ctx,
-		req,
-		mc,
-		data,
-		r,
-		newConfigMapReconciler(
-			r.Client,
-			r.Log,
-			r.Recorder,
-		),
-		newDeploymentReconciler(
-			r.Client,
-			r.Log,
-			r.Recorder,
-		),
-	)
+func (h *MemcachedReconciler) Client() client.Client {
+	return h.MultiPhaseReconcilerAction.Client()
 }
 
-// SetupWithManager sets up the controller with the Manager.
+func (h *MemcachedReconciler) Recorder() record.EventRecorder {
+	return h.MultiPhaseReconcilerAction.Recorder()
+}
+
+func (r *MemcachedReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
+	o := &cachecrd.Memcached{}
+	data := map[string]any{}
+
+	return r.MultiPhaseReconciler.Reconcile(ctx, req, o, data, r, r.stepReconcilers...)
+}
+
 func (r *MemcachedReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&cachecrd.Memcached{}).
 		Owns(&appv1.Deployment{}).
 		Owns(&corev1.ConfigMap{}).
+		WithOptions(k8scontroller.Options{
+			RateLimiter: controller.DefaultControllerRateLimiter[reconcile.Request](),
+		}).
 		Complete(r)
 }

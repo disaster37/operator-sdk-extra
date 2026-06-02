@@ -3,14 +3,14 @@ package v1alpha1
 import (
 	"testing"
 
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/apis"
+	multiphase "github.com/disaster37/operator-sdk-extra/v2/pkg/apis/multiphase"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestGetStatus(t *testing.T) {
 	status := MemcachedStatus{
-		BasicMultiPhaseObjectStatus: apis.BasicMultiPhaseObjectStatus{
+		DefaultMultiPhaseObjectStatus: multiphase.DefaultMultiPhaseObjectStatus{
 			PhaseName: "test",
 		},
 	}

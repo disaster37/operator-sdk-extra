@@ -26,8 +26,58 @@ const (
 	StartingPhase  shared.PhaseName     = "starting"
 	ReadyCondition shared.ConditionName = "Ready"
 	BaseAnnotation string               = "operator-sdk-extra.webcenter.fr"
-	ShortenError   int                  = 5000
+
+	// ShortenError is the historical max length used for truncating error messages.
+	// Deprecated: use MaxConditionMessage, MaxEventMessage or MaxStatusMessage instead,
+	// combined with UserFacingError to extract the root cause before truncating.
+	ShortenError int = 5000
+
+	// MaxConditionMessage is the recommended max length for a metav1.Condition.Message
+	// stored in a CRD status. The Kubernetes spec allows up to 32 KiB, but most
+	// controllers cap well below 1 KiB to keep `kubectl get` / `kubectl describe` readable.
+	MaxConditionMessage = 1024
+
+	// MaxEventMessage is the recommended max length for a corev1.Event message.
+	// The Kubernetes event recorder silently drops events whose total size exceeds
+	// the etcd object limit (~1.5 MiB), and messages above ~1 KiB are rarely useful
+	// when surfaced via `kubectl describe`.
+	MaxEventMessage = 512
+
+	// MaxStatusMessage is the recommended max length for the LastErrorMessage
+	// field stored in CRD status. Stored in etcd, so kept short to avoid document
+	// bloat across repeated failing reconcile loops.
+	MaxStatusMessage = 1024
 )
+
+// UserFacingError returns a short, human-useful error message from an error chain.
+//
+// It extracts the deepest (root) cause through errors.Cause — the one produced by
+// the underlying library or API — discarding the intermediate wrapping messages
+// added by errors.Wrap / errors.Wrapf up the call stack. Those wrapping messages
+// remain available via the logger.
+//
+// The result is truncated to maxLen bytes. When truncation occurs the string is
+// suffixed with "..." so the user can see the message was not complete.
+//
+// If the chain has no extractable cause, the top-level error message is used as-is.
+func UserFacingError(err error, maxLen int) string {
+	if err == nil {
+		return ""
+	}
+
+	msg := err.Error()
+	if cause := errors.Cause(err); cause != nil && cause != err {
+		msg = cause.Error()
+	}
+
+	if len(msg) <= maxLen {
+		return msg
+	}
+	if maxLen < 3 {
+		return msg[:maxLen]
+	}
+	return msg[:maxLen-3] + "..."
+}
 
 // GetObjectMeta permit to get the metata from client.Object
 func GetObjectMeta(r client.Object) metav1.ObjectMeta {

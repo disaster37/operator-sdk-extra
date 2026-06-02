@@ -14,7 +14,6 @@ import (
 	condition "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
-	k8sstrings "k8s.io/utils/strings"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -162,7 +161,7 @@ func (h *DefaultRemoteReconcilerAction[k8sObject, apiObject, apiClient]) Delete(
 
 func (h *DefaultRemoteReconcilerAction[k8sObject, apiObject, apiClient]) OnError(ctx context.Context, o k8sObject, data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject, apiClient], currentErr error, logger *logrus.Entry) (res reconcile.Result, err error) {
 	o.GetStatus().SetIsOnError(true)
-	o.GetStatus().SetLastErrorMessage(k8sstrings.ShortenString(currentErr.Error(), controller.ShortenError))
+	o.GetStatus().SetLastErrorMessage(controller.UserFacingError(currentErr, controller.MaxStatusMessage))
 	o.GetStatus().SetIsSync(false)
 
 	conditions := o.GetStatus().GetConditions()
@@ -171,10 +170,10 @@ func (h *DefaultRemoteReconcilerAction[k8sObject, apiObject, apiClient]) OnError
 		Type:    h.Condition().String(),
 		Status:  metav1.ConditionFalse,
 		Reason:  "Failed",
-		Message: k8sstrings.ShortenString(currentErr.Error(), controller.ShortenError),
+		Message: controller.UserFacingError(currentErr, controller.MaxConditionMessage),
 	})
 
-	h.Recorder().Event(o, corev1.EventTypeWarning, "ReconcilerActionError", k8sstrings.ShortenString(currentErr.Error(), controller.ShortenError))
+	h.Recorder().Event(o, corev1.EventTypeWarning, "ReconcilerActionError", controller.UserFacingError(currentErr, controller.MaxEventMessage))
 
 	return res, currentErr
 }

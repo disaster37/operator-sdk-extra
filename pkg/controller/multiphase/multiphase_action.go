@@ -11,7 +11,6 @@ import (
 	condition "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/utils/strings"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -74,14 +73,14 @@ func (h *BasicMultiPhaseReconcilerAction[k8sObject]) Delete(ctx context.Context,
 
 func (h *BasicMultiPhaseReconcilerAction[k8sObject]) OnError(ctx context.Context, o k8sObject, data map[string]any, currentErr error, logger *logrus.Entry) (res reconcile.Result, err error) {
 	o.GetStatus().SetIsOnError(true)
-	o.GetStatus().SetLastErrorMessage(strings.ShortenString(currentErr.Error(), controller.ShortenError))
+	o.GetStatus().SetLastErrorMessage(controller.UserFacingError(currentErr, controller.MaxStatusMessage))
 
 	conditions := o.GetStatus().GetConditions()
 	condition.SetStatusCondition(&conditions, metav1.Condition{
 		Type:    h.Condition().String(),
 		Status:  metav1.ConditionFalse,
 		Reason:  "Failed",
-		Message: strings.ShortenString(currentErr.Error(), controller.ShortenError),
+		Message: controller.UserFacingError(currentErr, controller.MaxConditionMessage),
 	})
 	o.GetStatus().SetConditions(conditions)
 

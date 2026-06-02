@@ -10,7 +10,7 @@ import (
 	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller"
 	"github.com/disaster37/operator-sdk-extra/v2/pkg/helper"
 	"github.com/disaster37/operator-sdk-extra/v2/pkg/test"
-	cachecrd "github.com/disaster37/operator-sdk-extra/v2/testdata/memcached-operator/api/v1alpha1"
+	cachecrd "github.com/disaster37/operator-sdk-extra/v2/samples/memcached-operator/api/v1alpha1"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	appv1 "k8s.io/api/apps/v1"
@@ -26,11 +26,10 @@ func (t *ControllerTestSuite) TestMemcachedController() {
 		Name:      "t-cb-" + helper.RandomString(10),
 		Namespace: "default",
 	}
-	mc := &cachecrd.Memcached{}
 	data := map[string]any{}
 
-	testCase := test.NewTestCase(t.T(), t.k8sClient, key, mc, 5*time.Second, data)
-	testCase.Steps = []test.TestStep{
+	testCase := test.NewTestCase[*cachecrd.Memcached](t.T(), t.k8sClient, key, 5*time.Second, data)
+	testCase.Steps = []test.TestStep[*cachecrd.Memcached]{
 		doCreateMemcachedStep(),
 		doUpdateMemcachedStep(),
 		doDeleteMemcachedStep(),
@@ -39,10 +38,10 @@ func (t *ControllerTestSuite) TestMemcachedController() {
 	testCase.Run()
 }
 
-func doCreateMemcachedStep() test.TestStep {
-	return test.TestStep{
+func doCreateMemcachedStep() test.TestStep[*cachecrd.Memcached] {
+	return test.TestStep[*cachecrd.Memcached]{
 		Name: "create",
-		Do: func(c client.Client, key types.NamespacedName, o client.Object, data map[string]any) (err error) {
+		Do: func(c client.Client, key types.NamespacedName, o *cachecrd.Memcached, data map[string]any) (err error) {
 			logrus.Infof("=== Add new Memcached %s/%s ===", key.Namespace, key.Name)
 
 			mc := &cachecrd.Memcached{
@@ -62,7 +61,7 @@ func doCreateMemcachedStep() test.TestStep {
 
 			return nil
 		},
-		Check: func(t *testing.T, c client.Client, key types.NamespacedName, o client.Object, data map[string]any) (err error) {
+		Check: func(t *testing.T, c client.Client, key types.NamespacedName, o *cachecrd.Memcached, data map[string]any) (err error) {
 			mc := &cachecrd.Memcached{}
 			var (
 				cm  *corev1.ConfigMap
@@ -111,16 +110,16 @@ func doCreateMemcachedStep() test.TestStep {
 	}
 }
 
-func doUpdateMemcachedStep() test.TestStep {
-	return test.TestStep{
+func doUpdateMemcachedStep() test.TestStep[*cachecrd.Memcached] {
+	return test.TestStep[*cachecrd.Memcached]{
 		Name: "update",
-		Do: func(c client.Client, key types.NamespacedName, o client.Object, data map[string]any) (err error) {
+		Do: func(c client.Client, key types.NamespacedName, o *cachecrd.Memcached, data map[string]any) (err error) {
 			logrus.Infof("=== Update Memcached %s/%s ===", key.Namespace, key.Name)
 
 			if o == nil {
 				return errors.New("Memcached is null")
 			}
-			mc := o.(*cachecrd.Memcached)
+			mc := o
 
 			// Add labels must force to update all resources
 			mc.Labels = map[string]string{
@@ -138,7 +137,7 @@ func doUpdateMemcachedStep() test.TestStep {
 
 			return nil
 		},
-		Check: func(t *testing.T, c client.Client, key types.NamespacedName, o client.Object, data map[string]any) (err error) {
+		Check: func(t *testing.T, c client.Client, key types.NamespacedName, o *cachecrd.Memcached, data map[string]any) (err error) {
 			mc := &cachecrd.Memcached{}
 
 			var (
@@ -190,16 +189,16 @@ func doUpdateMemcachedStep() test.TestStep {
 	}
 }
 
-func doDeleteMemcachedStep() test.TestStep {
-	return test.TestStep{
+func doDeleteMemcachedStep() test.TestStep[*cachecrd.Memcached] {
+	return test.TestStep[*cachecrd.Memcached]{
 		Name: "delete",
-		Do: func(c client.Client, key types.NamespacedName, o client.Object, data map[string]any) (err error) {
+		Do: func(c client.Client, key types.NamespacedName, o *cachecrd.Memcached, data map[string]any) (err error) {
 			logrus.Infof("=== Delete Memcached %s/%s ===", key.Namespace, key.Name)
 
 			if o == nil {
 				return errors.New("Memcached is null")
 			}
-			mc := o.(*cachecrd.Memcached)
+			mc := o
 
 			wait := int64(0)
 			if err = c.Delete(context.Background(), mc, &client.DeleteOptions{GracePeriodSeconds: &wait}); err != nil {
@@ -208,7 +207,7 @@ func doDeleteMemcachedStep() test.TestStep {
 
 			return nil
 		},
-		Check: func(t *testing.T, c client.Client, key types.NamespacedName, o client.Object, data map[string]any) (err error) {
+		Check: func(t *testing.T, c client.Client, key types.NamespacedName, o *cachecrd.Memcached, data map[string]any) (err error) {
 			return nil
 		},
 	}
