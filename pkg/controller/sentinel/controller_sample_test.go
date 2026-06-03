@@ -89,6 +89,7 @@ func newTemplateAnnotationsReconciler[k8sObject client.Object](c client.Client, 
 		SentinelReconcilerAction: sentinel.NewSentinelAction[k8sObject](
 			c,
 			recorder,
+			"test-sentinel-operator",
 		),
 	}
 }
@@ -103,6 +104,10 @@ func (h *templateAnnotationsReconciler[k8sObject]) Read(ctx context.Context, o k
 	if o.GetAnnotations() != nil && o.GetAnnotations()[annotation] != "" {
 		// Compute expecting objects
 		read.AddExpectedObject(&corev1.ConfigMap{
+			TypeMeta: v1.TypeMeta{
+				APIVersion: "v1",
+				Kind:       "ConfigMap",
+			},
 			ObjectMeta: v1.ObjectMeta{
 				Name:      o.GetName(),
 				Namespace: o.GetName(),
@@ -113,6 +118,10 @@ func (h *templateAnnotationsReconciler[k8sObject]) Read(ctx context.Context, o k
 		})
 
 		read.AddExpectedObject(&corev1.Secret{
+			TypeMeta: v1.TypeMeta{
+				APIVersion: "v1",
+				Kind:       "Secret",
+			},
 			ObjectMeta: v1.ObjectMeta{
 				Name:      o.GetName(),
 				Namespace: o.GetName(),

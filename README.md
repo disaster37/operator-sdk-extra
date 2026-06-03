@@ -16,7 +16,7 @@ After writing several operators, we identified 3 distinct use cases, each handle
 
 Use it when your CRD creates and orchestrates a sequence of Kubernetes resources (e.g. a ConfigMap, then a Deployment). Each resource type is handled by its own **step reconciler**, executed sequentially by a **main reconciler**.
 
-A 3-way merge patch engine powered by `k8s-objectmatcher` computes the diff between the current state, the expected state and the last applied configuration, producing create / update / delete operations automatically.
+A Server-Side Apply (SSA) engine delegates diff computation and conflict detection to the Kubernetes API server, producing apply / delete operations automatically.
 
 [Read the full documentation](documentations/multi-phase-reconciler.md)
 
@@ -104,7 +104,8 @@ annotations:
 
 - **Finalizer management**: automatic add / remove on create / delete
 - **Status tracking**: deep-copy + deferred-update only persists status when it actually changed
-- **3-way merge diff**: current vs. expected vs. last-applied-configuration to compute precise create / update / delete lists
+- **Server-Side Apply**: multiphase and sentinel patterns use SSA for precise apply / delete with native field ownership
+- **3-way merge diff** (remote pattern): current vs. expected vs. last-applied-configuration to compute precise create / update / delete lists
 - **Rate limiter**: less aggressive than the default (`1s` to `1000s` exponential backoff, 10 QPS bucket)
 - **Annotation-based reconciliation skip** via `operator-sdk-extra.webcenter.fr/ignoreReconcile`
 - **Sentinel pattern**: watch any K8s resource, derive children, rely on GC for cleanup

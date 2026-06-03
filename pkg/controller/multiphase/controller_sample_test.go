@@ -21,9 +21,10 @@ import (
 
 const (
 	name               string               = "test"
-	finalizer          shared.FinalizerName = "test.operator.webcenter.fr/finalizer"
-	ConfigmapCondition shared.ConditionName = "ConfigmapReady"
-	ConfigmapPhase     shared.PhaseName     = "Configmap"
+	finalizer          shared.FinalizerName  = "test.operator.webcenter.fr/finalizer"
+	ConfigmapCondition shared.ConditionName  = "ConfigmapReady"
+	ConfigmapPhase     shared.PhaseName      = "Configmap"
+	fieldManagerName   string                = "test-operator"
 )
 
 /*************
@@ -109,6 +110,7 @@ func newConfiMapReconciler(c client.Client, recorder record.EventRecorder) (mult
 			ConfigmapPhase,
 			ConfigmapCondition,
 			recorder,
+			fieldManagerName,
 		),
 	}
 }
@@ -128,6 +130,10 @@ func (r *configMapReconciler) Read(ctx context.Context, o *MultiPhaseObject, dat
 	}
 
 	read.AddExpectedObject(&corev1.ConfigMap{
+		TypeMeta: v1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "ConfigMap",
+		},
 		ObjectMeta: v1.ObjectMeta{
 			Name:      o.Name,
 			Namespace: o.Namespace,

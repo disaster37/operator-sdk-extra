@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/disaster37/k8s-objectmatcher/patch"
 	"github.com/disaster37/operator-sdk-extra/v2/pkg/helper"
 	"github.com/disaster37/operator-sdk-extra/v2/pkg/test"
 	"github.com/sirupsen/logrus"
@@ -83,7 +82,7 @@ func doCreateStep() test.TestStep[*MultiPhaseObject] {
 				t.Fatal(err)
 			}
 			assert.NotEmpty(t, cm.OwnerReferences)
-			assert.NotEmpty(t, cm.Annotations[patch.LastAppliedConfig])
+			assert.Equal(t, "bar", cm.Data["foo"])
 
 			return nil
 		},
@@ -136,13 +135,12 @@ func doUpdateStep() test.TestStep[*MultiPhaseObject] {
 				t.Fatalf("All MultiPhaseObject step upgrading not finished: %s", err.Error())
 			}
 
-			// ConfigMaps must exist
+			// ConfigMaps must exist with updated labels
 			cm = &corev1.ConfigMap{}
 			if err = c.Get(context.Background(), types.NamespacedName{Namespace: key.Namespace, Name: key.Name}, cm); err != nil {
 				t.Fatal(err)
 			}
 			assert.NotEmpty(t, cm.OwnerReferences)
-			assert.NotEmpty(t, cm.Annotations[patch.LastAppliedConfig])
 			assert.Equal(t, "fu", cm.Labels["test"])
 
 			return nil

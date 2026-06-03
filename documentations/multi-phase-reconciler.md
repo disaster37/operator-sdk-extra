@@ -500,23 +500,73 @@ If any step returns an error, `OnError()` is called to update the status conditi
 |---|---|
 | `multiphase.NewMultiPhaseReconciler[k8sObject](client, name, finalizer, logger, recorder)` | Main orchestrator with finalizer and status tracking |
 | `multiphase.NewMultiPhaseReconcilerAction[k8sObject](client, conditionName, recorder)` | Default action: initializes ready condition, provides `OnError` / `OnSuccess` |
-| `multiphase.NewMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject](client, phaseName, conditionName, recorder)` | Default step action: provides `Diff`, `Create`, `Update`, `Delete`, `OnError`, `OnSuccess` |
+| `multiphase.NewMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject](client, phaseName, conditionName, recorder, opts...)` | Default step action: provides `Diff`, `Create`, `Update`, `Delete`, `Apply`, `OnError`, `OnSuccess`. Pass `multiphase.WithSSA(fieldManager)` to enable SSA mode. |
 | `multiphase.NewObjectMultiPhaseStepReconcilerAction[k8sObject, src, dst](stepReconciler)` | Wraps a typed step reconciler to convert from a specific type (e.g. `*ConfigMap`) to `client.Object` |
 | `multiphase.NewMultiPhaseRead[k8sStepObject]()` | Creates an empty read result for collecting current and expected objects |
 | `controller.NewController()` | Base controller (no-op scaffolding) |
 
 ---
 
-## 3-way Diff
+## Server-Side Apply (SSA)
 
-The diff engine uses `k8s-objectmatcher/patch` with 3-way merge. Default options applied to every diff:
+The multi-phase reconciler uses **Server-Side Apply** exclusively. SSA delegates conflict detection and field ownership to the Kubernetes API server, eliminating client-side diff computation and the `kubectl.kubernetes.io/last-applied-configuration` annotation.
 
-- `patch.CleanMetadata()` -- strips K8s management annotations before comparison.
-- `patch.IgnoreStatusFields()` -- ignores status subresource fields.
+### Benefits
 
-Additional per-step ignore options can be provided via `GetIgnoresDiff()` or as variadic arguments to `Diff()`.
+- **No update loops**: the API server only persists changes when owned fields actually differ.
+- **Native conflict detection**: field ownership is tracked by the API server via managed fields.
+- **Simpler `Read()` implementation**: `currentObjects` is only needed for orphan detection, not for diff computation.
+- **Single API call for create and update**: `Apply` handles both cases.
 
-The diff automatically produces `NeedCreate`, `NeedUpdate`, and `NeedDelete` lists. Owner references are set on expected objects before diffing.
+### Reconciliation Flow
+
+```
+Configure -> Read -> Diff -> Apply/Delete -> OnSuccess
+```
+
+- **Diff()** detects orphans (current objects not in expected list). All expected objects go to the "apply" list.
+- **Apply()** uses `client.Patch(obj, client.Apply, client.FieldOwner(...), client.ForceOwnership)` for each object, handling both creation and updates in a single call.
+- **Delete()** removes orphaned objects (current objects that are no longer expected).
+
+### Constructor
+
+The `fieldManager` is a required parameter when constructing the step reconciler action:
+
+```go
+func newConfigMapReconciler(c client.Client, recorder record.EventRecorder) multiphase.MultiPhaseStepReconcilerAction[*Memcached, *corev1.ConfigMap] {
+    return &configMapReconciler{
+        MultiPhaseStepReconcilerAction: multiphase.NewMultiPhaseStepReconcilerAction[*Memcached, *corev1.ConfigMap](
+            c,
+            ConfigmapPhase,
+            ConfigmapCondition,
+            recorder,
+            "memcached-operator",  // fieldManager — required
+        ),
+    }
+}
+```
+
+### Requirements
+
+1. **Kubernetes 1.22+** — SSA is stable since this version.
+2. **TypeMeta must be set** on expected objects — SSA requires `apiVersion` and `kind`:
+
+```go
+read.AddExpectedObject(&corev1.ConfigMap{
+    TypeMeta: metav1.TypeMeta{
+        APIVersion: "v1",
+        Kind:       "ConfigMap",
+    },
+    ObjectMeta: metav1.ObjectMeta{
+        Name:      o.Name,
+        Namespace: o.Namespace,
+    },
+    Data: map[string]string{"key": "value"},
+})
+```
+
+3. **Deterministic names** — SSA does not support `generateName`. All expected objects must have a fixed `Name`.
+4. **No status fields** in expected objects — SSA apply objects should only contain spec-level fields owned by the operator.
 
 ---
 

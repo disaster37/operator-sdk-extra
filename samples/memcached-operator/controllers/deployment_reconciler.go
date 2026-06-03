@@ -32,6 +32,7 @@ func newDeploymentReconciler(c client.Client, recorder record.EventRecorder) mul
 			DeploymentPhase,
 			DeploymentCondition,
 			recorder,
+			"memcached-operator",
 		),
 	}
 }

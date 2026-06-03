@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/disaster37/k8s-objectmatcher/patch"
 	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller"
 	"github.com/disaster37/operator-sdk-extra/v2/pkg/helper"
 	"github.com/disaster37/operator-sdk-extra/v2/pkg/test"
@@ -91,7 +90,7 @@ func doCreateMemcachedStep() test.TestStep[*cachecrd.Memcached] {
 				t.Fatal(err)
 			}
 			assert.NotEmpty(t, cm.OwnerReferences)
-			assert.NotEmpty(t, cm.Annotations[patch.LastAppliedConfig])
+			assert.NotEmpty(t, cm.ManagedFields)
 
 			// Deployment musts exist
 			dpl = &appv1.Deployment{}
@@ -99,7 +98,7 @@ func doCreateMemcachedStep() test.TestStep[*cachecrd.Memcached] {
 				t.Fatal(err)
 			}
 			assert.NotEmpty(t, dpl.OwnerReferences)
-			assert.NotEmpty(t, dpl.Annotations[patch.LastAppliedConfig])
+			assert.NotEmpty(t, dpl.ManagedFields)
 
 			// Status must be update
 			assert.NotEmpty(t, mc.Status.PhaseName)
@@ -168,7 +167,7 @@ func doUpdateMemcachedStep() test.TestStep[*cachecrd.Memcached] {
 				t.Fatal(err)
 			}
 			assert.NotEmpty(t, cm.OwnerReferences)
-			assert.NotEmpty(t, cm.Annotations[patch.LastAppliedConfig])
+			assert.NotEmpty(t, cm.ManagedFields)
 			assert.Equal(t, "fu", cm.Labels["test"])
 
 			// Deployment musts exist
@@ -177,7 +176,7 @@ func doUpdateMemcachedStep() test.TestStep[*cachecrd.Memcached] {
 				t.Fatal(err)
 			}
 			assert.NotEmpty(t, dpl.OwnerReferences)
-			assert.NotEmpty(t, dpl.Annotations[patch.LastAppliedConfig])
+			assert.NotEmpty(t, dpl.ManagedFields)
 			assert.Equal(t, "fu", dpl.Labels["test"])
 
 			// Status must be update

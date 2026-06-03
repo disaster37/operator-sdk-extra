@@ -15,6 +15,7 @@ var (
 	ErrWhenCallDiffFromReconciler           = errors.Sentinel("Error when call 'diff' from reconciler")
 	ErrWhenCallCreateFromReconciler         = errors.Sentinel("Error when call 'create' from reconciler")
 	ErrWhenCallUpdateFromReconciler         = errors.Sentinel("Error when call 'update' from reconciler")
+	ErrWhenCallApplyFromReconciler          = errors.Sentinel("Error when call 'apply' from reconciler")
 	ErrWhenCallOnSuccessFromReconciler      = errors.Sentinel("Error when call 'onSuccess' from reconciler")
 	ErrWhenCallStepReconcilerFromReconciler = errors.Sentinel("Error when call 'reconcile' from step reconciler")
 	ErrWhenGetObjectFromReconciler          = errors.Sentinel("Error when get object from reconciler")

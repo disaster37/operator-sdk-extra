@@ -32,6 +32,7 @@ func newConfigMapReconciler(c client.Client, recorder record.EventRecorder) mult
 			ConfigmapPhase,
 			ConfigmapCondition,
 			recorder,
+			"memcached-operator",
 		),
 	}
 }

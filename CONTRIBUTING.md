@@ -10,9 +10,9 @@ When the PR is opened, the CI pipeline runs automatically. If it passes, the new
 
 **operator-sdk-extra** is a companion library to [controller-runtime](https://github.com/kubernetes-sigs/controller-runtime) (the foundation of operator-sdk). It provides higher-level reconciler patterns on top of controller-runtime:
 
-- **Multiphase reconciler** — orchestrates multiple "step" reconcilers to manage child Kubernetes resources with automatic 3-way diff/merge.
+- **Multiphase reconciler** — orchestrates multiple "step" reconcilers to manage child Kubernetes resources using Server-Side Apply (SSA).
 - **Remote reconciler** — manages external API resources (e.g., Elasticsearch indices, Cerebro roles) with 3-way merge via a last-applied-configuration stored in the CRD status.
-- **Sentinel reconciler** — watches and manages child Kubernetes objects with 3-way diff.
+- **Sentinel reconciler** — watches and manages child Kubernetes objects using Server-Side Apply (SSA).
 
 The library does **not** fork or replace operator-sdk; it extends the ecosystem with reusable reconciler patterns, status management, helper utilities, and a structured test framework.
 
@@ -28,7 +28,7 @@ pkg/
     remote/          Remote reconciler pattern (manages external API objects)
     sentinel/        Sentinel reconciler pattern (manages child K8s objects)
     reconciler.go    Base reconciler interface and shared logic
-    helper.go        Shared controller helpers (3-way diff wrappers)
+    helper.go        Shared controller helpers (network policy, misc utilities)
   helper/
     diff/            Generic struct diff utilities
     merge/           Mergo-based merge helpers
@@ -54,16 +54,17 @@ documentations/      Extended documentation (architecture, patterns)
 
 ---
 
-## 3-way diff / merge libraries
+## Diff / merge libraries
 
-This project relies on two 3-way diff libraries that implement kubectl-apply-style merge semantics (current state vs. expected state vs. last-applied-configuration):
+This project uses different diff strategies depending on the reconciler pattern:
 
-| Library | Usage |
-|---------|-------|
-| [`github.com/disaster37/k8s-objectmatcher`](https://github.com/disaster37/k8s-objectmatcher) | For native Kubernetes objects (used by multiphase and sentinel reconcilers) |
-| [`github.com/disaster37/generic-objectmatcher`](https://github.com/disaster37/generic-objectmatcher) | For generic/remote API objects (used by remote reconciler) |
+| Pattern | Strategy | Library |
+|---------|----------|---------|
+| Multiphase reconciler | Server-Side Apply (SSA) | Built-in controller-runtime `Patch` with `client.Apply` |
+| Sentinel reconciler | Server-Side Apply (SSA) | Built-in controller-runtime `Patch` with `client.Apply` |
+| Remote reconciler | Client-side 3-way merge | [`github.com/disaster37/generic-objectmatcher`](https://github.com/disaster37/generic-objectmatcher) |
 
-Both expose a `patch` sub-package that computes a 3-way diff and returns whether an update is needed and what the patched object should look like. This avoids unnecessary API calls when the desired state already matches the live state.
+The remote reconciler stores a last-applied-configuration in the CRD status and uses `generic-objectmatcher` to compute diffs. The multiphase and sentinel patterns delegate conflict detection and field ownership entirely to the Kubernetes API server via SSA.
 
 ---
 
@@ -73,7 +74,7 @@ This library is designed to be used **inside** operators scaffolded with operato
 
 1. Your CRD types implement the interfaces from `pkg/object/` (e.g., `MultiPhaseObject`, `RemoteObject`).
 2. Your controller embeds one of the reconciler patterns from `pkg/controller/`.
-3. The reconciler handles the full lifecycle: create, update (via 3-way diff), delete, status, conditions, finalizers.
+3. The reconciler handles the full lifecycle: apply (via SSA) or create/update (via 3-way diff for remote), delete, status, conditions, finalizers.
 4. You focus only on the business logic: what resources to create and how to build them.
 
 The `samples/` directory contains full working operators that demonstrate this integration.
@@ -216,7 +217,7 @@ This section helps AI coding agents (Copilot, Kilo, Cursor, etc.) contribute eff
 ### How to contribute code
 
 1. **Understand the pattern**: identify which reconciler pattern (multiphase, remote, sentinel) the change touches. Read the corresponding `documentations/*.md` file and the sample operator.
-2. **Follow existing conventions**: all reconcilers use an action-based pattern (`Create`, `Update`, `Delete`, `Read` actions). New logic should follow this structure.
+2. **Follow existing conventions**: all reconcilers use an action-based pattern (`Apply`, `Delete`, `Read` for multiphase/sentinel; `Create`, `Update`, `Delete` for remote). New multiphase/sentinel steps must use SSA with a `fieldManager` parameter.
 3. **Interfaces first**: if adding a new feature, define or extend the interface in `pkg/object/` before implementing.
 4. **Write tests alongside code**: never submit code without tests. Target 100% coverage on new code.
 5. **Use mocks for unit tests**: generate mocks with `go.uber.org/mock` and place them in `pkg/mock/`.
@@ -227,7 +228,7 @@ This section helps AI coding agents (Copilot, Kilo, Cursor, etc.) contribute eff
 When reviewing a PR on this project, verify:
 
 1. **Coverage**: does the PR maintain 100% coverage? Check that all new code paths are tested.
-2. **3-way diff correctness**: if the PR touches reconciler logic, verify that the 3-way merge (current/expected/last-applied) is correctly handled. Off-by-one in patch logic causes silent drift.
+2. **SSA correctness** (multiphase/sentinel): verify that all expected objects have TypeMeta set (apiVersion+kind), use deterministic names (no generateName), and the correct field manager is passed. For remote reconciler PRs, verify the 3-way merge (current/expected/last-applied) is correctly handled.
 3. **Interface compliance**: ensure CRD types still satisfy the interfaces in `pkg/object/`. Breaking changes must be caught.
 4. **Status management**: reconcilers must correctly set conditions, phase, and status. Verify `SetCondition`, `SetPhase` calls.
 5. **Error handling**: errors must be propagated correctly. Check that `ctrl.Result` and error returns follow the pattern (requeue on transient errors, don't requeue on permanent errors).
@@ -240,7 +241,7 @@ When reviewing a PR on this project, verify:
 | File | Why it matters |
 |------|---------------|
 | `pkg/controller/reconciler.go` | Base reconciler interface — all patterns implement this |
-| `pkg/controller/helper.go` | 3-way diff wrappers shared across patterns |
+| `pkg/controller/helper.go` | Shared controller helpers (network policy) |
 | `pkg/object/interfaces.go` | Core interfaces that CRD types must implement |
 | `pkg/apis/status.go` | Status types used by all reconcilers |
 | `pkg/test/` | Test framework — understand this to write good tests |

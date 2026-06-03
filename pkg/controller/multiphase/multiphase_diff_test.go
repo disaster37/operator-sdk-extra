@@ -21,12 +21,12 @@ func TestBasicMultiPhaseDiffDiff(t *testing.T) {
 	assert.Contains(t, o.Diff(), "test")
 }
 
-func TestBasicMultiPhaseDiffCreate(t *testing.T) {
+func TestBasicMultiPhaseDiffApply(t *testing.T) {
 	// With default object
 	o := NewMultiPhaseDiff[*corev1.ConfigMap]()
 
-	assert.False(t, o.NeedCreate())
-	assert.Empty(t, o.GetObjectsToCreate())
+	assert.False(t, o.NeedApply())
+	assert.Empty(t, o.GetObjectsToApply())
 
 	// When set a list of object when empty
 	o = NewMultiPhaseDiff[*corev1.ConfigMap]()
@@ -37,9 +37,9 @@ func TestBasicMultiPhaseDiffCreate(t *testing.T) {
 			},
 		},
 	}
-	o.SetObjectsToCreate(objects)
-	assert.True(t, o.NeedCreate())
-	assert.Equal(t, objects, o.GetObjectsToCreate())
+	o.SetObjectsToApply(objects)
+	assert.True(t, o.NeedApply())
+	assert.Equal(t, objects, o.GetObjectsToApply())
 
 	// When set a list not empty
 	o = NewMultiPhaseDiff[*corev1.ConfigMap]()
@@ -50,10 +50,10 @@ func TestBasicMultiPhaseDiffCreate(t *testing.T) {
 			},
 		},
 	}
-	o.SetObjectsToCreate(objects)
-	o.SetObjectsToCreate(objects)
-	assert.True(t, o.NeedCreate())
-	assert.Equal(t, 2, len(o.GetObjectsToCreate()))
+	o.SetObjectsToApply(objects)
+	o.SetObjectsToApply(objects)
+	assert.True(t, o.NeedApply())
+	assert.Equal(t, 2, len(o.GetObjectsToApply()))
 
 	// When add object
 	o = NewMultiPhaseDiff[*corev1.ConfigMap]()
@@ -64,58 +64,14 @@ func TestBasicMultiPhaseDiffCreate(t *testing.T) {
 	}
 	objects = []*corev1.ConfigMap{cm}
 
-	o.AddObjectToCreate(cm)
-	assert.True(t, o.NeedCreate())
-	assert.Equal(t, objects, o.GetObjectsToCreate())
-}
+	o.AddObjectToApply(cm)
+	assert.True(t, o.NeedApply())
+	assert.Equal(t, objects, o.GetObjectsToApply())
 
-func TestBasicMultiPhaseDiffUpdate(t *testing.T) {
-	// With default object
-	o := NewMultiPhaseDiff[*corev1.ConfigMap]()
-
-	assert.False(t, o.NeedUpdate())
-	assert.Empty(t, o.GetObjectsToUpdate())
-
-	// When set a list of object when empty
+	// When set empty list, should not change
 	o = NewMultiPhaseDiff[*corev1.ConfigMap]()
-	objects := []*corev1.ConfigMap{
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "test",
-			},
-		},
-	}
-
-	o.SetObjectsToUpdate(objects)
-	assert.True(t, o.NeedUpdate())
-	assert.Equal(t, objects, o.GetObjectsToUpdate())
-
-	// When set a list not empty
-	o = NewMultiPhaseDiff[*corev1.ConfigMap]()
-	objects = []*corev1.ConfigMap{
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "test",
-			},
-		},
-	}
-	o.SetObjectsToUpdate(objects)
-	o.SetObjectsToUpdate(objects)
-	assert.True(t, o.NeedUpdate())
-	assert.Equal(t, 2, len(o.GetObjectsToUpdate()))
-
-	// When add object
-	o = NewMultiPhaseDiff[*corev1.ConfigMap]()
-	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test",
-		},
-	}
-	objects = []*corev1.ConfigMap{cm}
-
-	o.AddObjectToUpdate(cm)
-	assert.True(t, o.NeedUpdate())
-	assert.Equal(t, objects, o.GetObjectsToUpdate())
+	o.SetObjectsToApply([]*corev1.ConfigMap{})
+	assert.False(t, o.NeedApply())
 }
 
 func TestBasicMultiPhaseDiffDelete(t *testing.T) {
@@ -164,4 +120,9 @@ func TestBasicMultiPhaseDiffDelete(t *testing.T) {
 	o.AddObjectToDelete(cm)
 	assert.True(t, o.NeedDelete())
 	assert.Equal(t, objects, o.GetObjectsToDelete())
+
+	// When set empty list, should not change
+	o = NewMultiPhaseDiff[*corev1.ConfigMap]()
+	o.SetObjectsToDelete([]*corev1.ConfigMap{})
+	assert.False(t, o.NeedDelete())
 }

@@ -19,7 +19,7 @@ import (
 )
 
 // SentinelReconciler must be used when you look resource that your operator is not the owner like ingress, secret, configMap, etc.
-// Some time you should to generate somme resource from labels or annotations ...
+// Some time you should to generate some resource from labels or annotations ...
 // It the use case of this controller
 type SentinelReconciler[k8sObject client.Object] interface {
 	controller.Reconciler
@@ -122,8 +122,8 @@ func (h *DefaultSentinelReconciler[k8sObject]) Reconcile(ctx context.Context, re
 		return res, nil
 	}
 
-	// Check if diff exist
-	diff, res, err = reconcilerAction.Diff(ctx, o, read, data, logger, reconcilerAction.GetIgnoresDiff()...)
+	// Compute diff (orphan detection + apply list)
+	diff, res, err = reconcilerAction.Diff(ctx, o, read, data, logger)
 	if err != nil {
 		logger.Errorf("Failed to call 'diff' from reconciler: %s", err.Error())
 		return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallDiffFromReconciler.Error()), logger)
@@ -133,35 +133,25 @@ func (h *DefaultSentinelReconciler[k8sObject]) Reconcile(ctx context.Context, re
 		return res, nil
 	}
 
-	if diff.NeedCreate() {
-		res, err = reconcilerAction.Create(ctx, o, data, diff.GetObjectsToCreate(), logger)
+	// Apply resources via SSA
+	if diff.NeedApply() {
+		res, err = reconcilerAction.Apply(ctx, o, data, diff.GetObjectsToApply(), logger)
 		if err != nil {
-			logger.Errorf("Failed to call 'create' from reconciler: %s", err.Error())
-			return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallCreateFromReconciler.Error()), logger)
+			logger.Errorf("Failed to call 'apply' from reconciler: %s", err.Error())
+			return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallApplyFromReconciler.Error()), logger)
 		}
-		logger.Debug("Call 'create' from reconciler successfully")
+		logger.Debug("Call 'apply' from reconciler successfully")
 		if res != (reconcile.Result{}) {
 			return res, nil
 		}
 	}
 
-	if diff.NeedUpdate() {
-		res, err = reconcilerAction.Update(ctx, o, data, diff.GetObjectsToUpdate(), logger)
-		if err != nil {
-			logger.Errorf("Failed to call 'update' from reconciler: %s", err.Error())
-			return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallUpdateFromReconciler.Error()), logger)
-		}
-		logger.Debug("Call 'update' from reconciler successfully")
-		if res != (reconcile.Result{}) {
-			return res, nil
-		}
-	}
-
+	// Delete orphans
 	if diff.NeedDelete() {
-		err = reconcilerAction.Delete(ctx, o, data, diff.GetObjectsToDelete(), logger)
+		res, err = reconcilerAction.Delete(ctx, o, data, diff.GetObjectsToDelete(), logger)
 		if err != nil {
 			logger.Errorf("Failed to call 'delete' from reconciler: %s", err.Error())
-			return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallUpdateFromReconciler.Error()), logger)
+			return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallDeleteFromReconciler.Error()), logger)
 		}
 		logger.Debug("Call 'delete' from reconciler successfully")
 		if res != (reconcile.Result{}) {

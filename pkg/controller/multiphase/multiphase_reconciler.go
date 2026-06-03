@@ -153,7 +153,7 @@ func (h *DefaultMultiPhaseReconciler[k8sObject]) Reconcile(ctx context.Context, 
 	for _, reconciler := range reconcilersStepAction {
 		logger.Infof("Run phase %s", reconciler.GetPhaseName().String())
 
-		res, err = h.reconcilerStep.Reconcile(ctx, req, o, data, reconciler, logger, reconciler.GetIgnoresDiff()...)
+		res, err = h.reconcilerStep.Reconcile(ctx, req, o, data, reconciler, logger)
 		if err != nil {
 			logger.Errorf("Error when call 'reconcile' from step reconciler %s", reconciler.GetPhaseName().String())
 			return reconciler.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallStepReconcilerFromReconciler.Error()), logger)

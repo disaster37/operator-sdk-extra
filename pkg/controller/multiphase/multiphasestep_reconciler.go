@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"emperror.dev/errors"
-	"github.com/disaster37/k8s-objectmatcher/patch"
 	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller"
 	"github.com/disaster37/operator-sdk-extra/v2/pkg/object"
 	"github.com/sirupsen/logrus"
@@ -18,7 +17,7 @@ type MultiPhaseStepReconciler[k8sObject object.MultiPhaseObject, k8sStepObject c
 	controller.BaseReconciler
 
 	// Reconcile permit to reconcile the step (one K8s resource)
-	Reconcile(ctx context.Context, req reconcile.Request, o k8sObject, data map[string]interface{}, reconciler MultiPhaseStepReconcilerAction[k8sObject, k8sStepObject], logger *logrus.Entry, ignoresDiff ...patch.CalculateOption) (res reconcile.Result, err error)
+	Reconcile(ctx context.Context, req reconcile.Request, o k8sObject, data map[string]interface{}, reconciler MultiPhaseStepReconcilerAction[k8sObject, k8sStepObject], logger *logrus.Entry) (res reconcile.Result, err error)
 }
 
 // DefaultMultiPhaseStepReconciler is the default implementation of MultiPhaseStepReconciler interface
@@ -33,8 +32,8 @@ func NewMultiPhaseStepReconciler[k8sObject object.MultiPhaseObject, k8sStepObjec
 	}
 }
 
-// Reconcile permit to reconcile the step (one K8s resource)
-func (h *DefaultMultiPhaseStepReconciler[k8sObject, k8sStepObject]) Reconcile(ctx context.Context, req reconcile.Request, o k8sObject, data map[string]interface{}, reconcilerAction MultiPhaseStepReconcilerAction[k8sObject, k8sStepObject], logger *logrus.Entry, ignoresDiff ...patch.CalculateOption) (res reconcile.Result, err error) {
+// Reconcile permit to reconcile the step (one K8s resource) using Server-Side Apply
+func (h *DefaultMultiPhaseStepReconciler[k8sObject, k8sStepObject]) Reconcile(ctx context.Context, req reconcile.Request, o k8sObject, data map[string]interface{}, reconcilerAction MultiPhaseStepReconcilerAction[k8sObject, k8sStepObject], logger *logrus.Entry) (res reconcile.Result, err error) {
 	var (
 		diff MultiPhaseDiff[k8sStepObject]
 		read MultiPhaseRead[k8sStepObject]
@@ -67,8 +66,8 @@ func (h *DefaultMultiPhaseStepReconciler[k8sObject, k8sStepObject]) Reconcile(ct
 		return res, nil
 	}
 
-	// Check if diff exist
-	diff, res, err = reconcilerAction.Diff(ctx, o, read, data, logger, ignoresDiff...)
+	// Compute diff (orphan detection + apply list)
+	diff, res, err = reconcilerAction.Diff(ctx, o, read, data, logger)
 	if err != nil {
 		logger.Errorf("Error when call 'diff' from step reconciler: %s", err.Error())
 		return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallDiffFromReconciler.Error()), logger)
@@ -81,35 +80,21 @@ func (h *DefaultMultiPhaseStepReconciler[k8sObject, k8sStepObject]) Reconcile(ct
 		return res, nil
 	}
 
-	// Need create resources
-	if diff.NeedCreate() {
-		logger.Debug("Call 'create' from step reconciler")
-		res, err = reconcilerAction.Create(ctx, o, data, diff.GetObjectsToCreate(), logger)
+	// Apply resources via SSA
+	if diff.NeedApply() {
+		logger.Debug("Call 'apply' from step reconciler")
+		res, err = reconcilerAction.Apply(ctx, o, data, diff.GetObjectsToApply(), logger)
 		if err != nil {
-			logger.Errorf("Error when call 'create' from step reconciler: %s", err.Error())
-			return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallCreateFromReconciler.Error()), logger)
+			logger.Errorf("Error when call 'apply' from step reconciler: %s", err.Error())
+			return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallApplyFromReconciler.Error()), logger)
 		}
-		logger.Debug("Call 'create' from step reconciler successfully")
+		logger.Debug("Call 'apply' from step reconciler successfully")
 		if res != (reconcile.Result{}) {
 			return res, nil
 		}
 	}
 
-	// Need update resources
-	if diff.NeedUpdate() {
-		logger.Debug("Call 'update' from step reconciler")
-		res, err = reconcilerAction.Update(ctx, o, data, diff.GetObjectsToUpdate(), logger)
-		if err != nil {
-			logger.Errorf("Error when call 'update' from step reconciler: %s", err.Error())
-			return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallUpdateFromReconciler.Error()), logger)
-		}
-		logger.Debug("Call 'update' from step reconciler successfully")
-		if res != (reconcile.Result{}) {
-			return res, nil
-		}
-	}
-
-	// Need Delete
+	// Delete orphans
 	if diff.NeedDelete() {
 		logger.Debug("Call 'delete' from step reconciler")
 		res, err = reconcilerAction.Delete(ctx, o, data, diff.GetObjectsToDelete(), logger)
