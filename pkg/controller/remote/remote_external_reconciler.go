@@ -1,8 +1,6 @@
 package remote
 
 import (
-	"reflect"
-
 	"emperror.dev/errors"
 	"github.com/disaster37/generic-objectmatcher/patch"
 	"github.com/disaster37/operator-sdk-extra/v2/pkg/object"
@@ -33,7 +31,8 @@ func NewRemoteExternalReconciler[k8sObject object.RemoteObject, apiObject compar
 }
 
 func (h *DefaultRemoteExternalReconciler[k8sObject, apiObject, apiClient]) Diff(currentOject apiObject, expectedObject apiObject, originalObject apiObject, o k8sObject, ignoresDiff ...patch.CalculateOption) (patchResult *patch.PatchResult, err error) {
-	if reflect.ValueOf(currentOject).IsNil() {
+	var nilObject apiObject
+	if any(currentOject) == any(nilObject) {
 		expected, err := jsonIterator.ConfigCompatibleWithStandardLibrary.Marshal(expectedObject)
 		if err != nil {
 			return nil, errors.Wrap(err, "Failed to convert expected object to byte sequence")

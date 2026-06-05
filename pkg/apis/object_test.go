@@ -4,47 +4,120 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
-func TestObjectStatusCondition(t *testing.T) {
-	o := &DefaultObjectStatus{}
-
-	assert.Empty(t, o.GetConditions())
-
-	condition := v1.Condition{
-		Type:    "test",
-		Message: "test",
+func TestDefaultObjectStatusGetConditions(t *testing.T) {
+	status := &DefaultObjectStatus{
+		Conditions: []metav1.Condition{
+			{Type: "Ready", Status: metav1.ConditionTrue},
+			{Type: "Progressing", Status: metav1.ConditionFalse},
+		},
 	}
 
-	o.SetConditions([]v1.Condition{condition})
-
-	assert.Equal(t, []v1.Condition{condition}, o.GetConditions())
+	conditions := status.GetConditions()
+	assert.NotNil(t, conditions)
+	assert.Equal(t, 2, len(conditions))
+	assert.Equal(t, metav1.ConditionTrue, conditions[0].Status)
 }
 
-func TestObjectStatusError(t *testing.T) {
-	o := &DefaultObjectStatus{}
+func TestDefaultObjectStatusSetConditions(t *testing.T) {
+	status := &DefaultObjectStatus{}
+	newConditions := []metav1.Condition{
+		{Type: "Ready", Status: metav1.ConditionTrue, Reason: "Success"},
+	}
 
-	assert.False(t, o.GetIsOnError())
-
-	o.SetIsOnError(true)
-	assert.True(t, o.GetIsOnError())
+	status.SetConditions(newConditions)
+	assert.Equal(t, newConditions, status.Conditions)
 }
 
-func TestObjectStatusErrorMessage(t *testing.T) {
-	o := &DefaultObjectStatus{}
+func TestDefaultObjectStatusGetIsOnErrorNil(t *testing.T) {
+	status := &DefaultObjectStatus{}
 
-	assert.Empty(t, o.GetLastErrorMessage())
-
-	o.SetLastErrorMessage("test")
-	assert.Equal(t, "test", o.GetLastErrorMessage())
+	result := status.GetIsOnError()
+	assert.False(t, result)
 }
 
-func TestObjectStatusObservedGeneration(t *testing.T) {
-	o := &DefaultObjectStatus{}
+func TestDefaultObjectStatusGetIsOnErrorFalse(t *testing.T) {
+	falseVal := ptr.To(false)
+	status := &DefaultObjectStatus{
+		IsOnError: falseVal,
+	}
 
-	assert.Equal(t, int64(0), o.GetObservedGeneration())
+	result := status.GetIsOnError()
+	assert.False(t, result)
+}
 
-	o.SetObservedGeneration(10)
-	assert.Equal(t, int64(10), o.GetObservedGeneration())
+func TestDefaultObjectStatusGetIsOnErrorTrue(t *testing.T) {
+	trueVal := ptr.To(true)
+	status := &DefaultObjectStatus{
+		IsOnError: trueVal,
+	}
+
+	result := status.GetIsOnError()
+	assert.True(t, result)
+}
+
+func TestDefaultObjectStatusSetIsOnErrorFalse(t *testing.T) {
+	status := &DefaultObjectStatus{}
+	status.SetIsOnError(false)
+	assert.NotNil(t, status.IsOnError)
+	assert.False(t, *status.IsOnError)
+}
+
+func TestDefaultObjectStatusSetIsOnErrorTrue(t *testing.T) {
+	status := &DefaultObjectStatus{}
+	status.SetIsOnError(true)
+	assert.NotNil(t, status.IsOnError)
+	assert.True(t, *status.IsOnError)
+}
+
+func TestDefaultObjectStatusGetLastErrorMessageEmpty(t *testing.T) {
+	status := &DefaultObjectStatus{
+		LastErrorMessage: "",
+	}
+
+	result := status.GetLastErrorMessage()
+	assert.Empty(t, result)
+}
+
+func TestDefaultObjectStatusGetLastErrorMessageWithValue(t *testing.T) {
+	expectedMessage := "something went wrong"
+	status := &DefaultObjectStatus{
+		LastErrorMessage: expectedMessage,
+	}
+
+	result := status.GetLastErrorMessage()
+	assert.Equal(t, expectedMessage, result)
+}
+
+func TestDefaultObjectStatusSetLastErrorMessage(t *testing.T) {
+	status := &DefaultObjectStatus{}
+	newMessage := "error occurred"
+
+	status.SetLastErrorMessage(newMessage)
+	assert.Equal(t, newMessage, status.LastErrorMessage)
+}
+
+func TestDefaultObjectStatusGetObservedGenerationZero(t *testing.T) {
+	status := &DefaultObjectStatus{}
+
+	result := status.GetObservedGeneration()
+	assert.Equal(t, int64(0), result)
+}
+
+func TestDefaultObjectStatusGetObservedGenerationWithValue(t *testing.T) {
+	status := &DefaultObjectStatus{
+		ObservedGeneration: 42,
+	}
+
+	result := status.GetObservedGeneration()
+	assert.Equal(t, int64(42), result)
+}
+
+func TestDefaultObjectStatusSetObservedGeneration(t *testing.T) {
+	status := &DefaultObjectStatus{}
+	status.SetObservedGeneration(100)
+	assert.Equal(t, int64(100), status.ObservedGeneration)
 }

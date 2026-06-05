@@ -18,6 +18,10 @@ func CleanCrd(c *cli.Context) error {
 		log.Fatal(err)
 	}
 
+	if len(fileMatches) == 0 {
+		panic("no files matching: " + c.String("crd-file"))
+	}
+
 	for _, file := range fileMatches {
 
 		log.Infof("Start to process file %s", file)

@@ -1,6 +1,11 @@
 package test
 
-import "time"
+import (
+	"errors"
+	"time"
+)
+
+var ErrEventuallyTimeout = errors.New("timed out waiting for condition")
 
 func RunWithTimeout(f func() error, timeout time.Duration, interval time.Duration) (isTimeout bool, err error) {
 	control := make(chan bool)

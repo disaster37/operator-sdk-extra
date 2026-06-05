@@ -132,8 +132,11 @@ dagger call -m golang --src . vulncheck
 ### Run tests (with envtest)
 
 ```bash
-# All tests
+# All tests (verbose)
 dagger call --src . test --withGotestsum
+
+# All tests (failures/errors only)
+dagger call --src . test --withGotestsum 2>&1 | grep -E "(FAIL|build failed|\.go:[0-9]+:|panic|--- FAIL)" | head -200
 
 # Run a specific test by name pattern
 dagger call --src . test --withGotestsum --run "TestMultiphaseReconciler"
@@ -181,7 +184,7 @@ make test
 go tool cover -func cover.out
 
 # Via Dagger (preferred)
-dagger call --src . test --withGotestsum
+dagger call --src . test --withGotestsum export --path cover.out
 ```
 
 ---

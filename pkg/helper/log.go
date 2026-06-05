@@ -45,10 +45,14 @@ func GetLogrusLogLevelFromEnv() logrus.Level {
 		return logrus.DebugLevel
 	case logrus.InfoLevel.String():
 		return logrus.InfoLevel
+	case "warn":
+		return logrus.WarnLevel
 	case logrus.WarnLevel.String():
 		return logrus.WarnLevel
 	case logrus.ErrorLevel.String():
 		return logrus.ErrorLevel
+	case logrus.FatalLevel.String():
+		return logrus.FatalLevel
 	case logrus.PanicLevel.String():
 		return logrus.PanicLevel
 	default:

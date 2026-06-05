@@ -56,6 +56,9 @@ func UnZipBase64Decode(original string, originalObject any) error {
 	}
 
 	// Read the file from zip archive
+	if len(zipReader.File) == 0 {
+		return errors.New("Error when unzip object: zip archive is empty")
+	}
 	zipFile := zipReader.File[0]
 	unzippedFileBytes, err := readZipFile(zipFile)
 	if err != nil {

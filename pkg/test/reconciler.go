@@ -91,6 +91,19 @@ func (h *TestCase[k8sObject]) Run() {
 	}
 }
 
+func (h *TestCase[k8sObject]) Eventually(fn func(c client.Client) error, timeout, interval time.Duration) error {
+	isTimeout, err := RunWithTimeout(func() error {
+		return fn(h.client)
+	}, timeout, interval)
+	if err != nil || isTimeout {
+		if err == nil {
+			return ErrEventuallyTimeout
+		}
+		return err
+	}
+	return nil
+}
+
 func getNewObject[k8sObject client.Object](o k8sObject) k8sObject {
 	return reflect.New(reflect.TypeOf(o).Elem()).Interface().(k8sObject)
 }

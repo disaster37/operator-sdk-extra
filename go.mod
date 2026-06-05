@@ -1,6 +1,6 @@
 module github.com/disaster37/operator-sdk-extra/v2
 
-go 1.24
+go 1.26
 
 require (
 	dario.cat/mergo v1.0.1
@@ -77,6 +77,7 @@ require (
 	github.com/rogpeppe/go-internal v1.12.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
+	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
