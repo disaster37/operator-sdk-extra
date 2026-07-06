@@ -2,7 +2,6 @@ package sentinel
 
 import (
 	"context"
-	"fmt"
 
 	"emperror.dev/errors"
 	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller"
@@ -41,8 +40,14 @@ type SentinelReconcilerAction[k8sObject client.Object] interface {
 	// It's the right way to set status condition when everything is good
 	OnSuccess(ctx context.Context, o k8sObject, data map[string]any, diff multiphase.MultiPhaseDiff[client.Object], logger *logrus.Entry) (res reconcile.Result, err error)
 
+	// OnDiff is called between Diff and Apply, after the diff has been computed.
+	// When dry-run diff detection is disabled, the default implementation returns ErrDiffDisabled.
+	// Controllers that need pre-apply tasks can check diff.NeedUpdate() / diff.GetObjectsToUpdate() here.
+	OnDiff(ctx context.Context, o k8sObject, data map[string]any, diff multiphase.MultiPhaseDiff[client.Object], logger *logrus.Entry) (res reconcile.Result, err error)
+
 	// Diff permit to compare the actual state and the expected state
-	// In SSA mode, all expected objects go to the apply list and orphans are detected for deletion.
+	// When dryRun is enabled, uses SSA dry-run to classify objects into create/update/delete.
+	// When dryRun is disabled, all expected objects go to the update list (legacy always-apply).
 	Diff(ctx context.Context, o k8sObject, read SentinelRead, data map[string]any, logger *logrus.Entry) (diff multiphase.MultiPhaseDiff[client.Object], res reconcile.Result, err error)
 
 	// GetFieldManager returns the field manager name for SSA
@@ -53,14 +58,17 @@ type SentinelReconcilerAction[k8sObject client.Object] interface {
 type DefaultSentinelAction[k8sObject client.Object] struct {
 	controller.ReconcilerAction
 	fieldManager string
+	dryRun       bool
 }
 
 // NewSentinelAction creates a new sentinel action using Server-Side Apply.
 // The fieldManager parameter identifies this controller as the owner of the fields it manages.
-func NewSentinelAction[k8sObject client.Object](client client.Client, recorder record.EventRecorder, fieldManager string) (sentinelReconciler SentinelReconcilerAction[k8sObject]) {
+// The dryRun parameter enables SSA dry-run diff detection (one extra API call per existing object).
+func NewSentinelAction[k8sObject client.Object](client client.Client, recorder record.EventRecorder, fieldManager string, dryRun bool) (sentinelReconciler SentinelReconcilerAction[k8sObject]) {
 	return &DefaultSentinelAction[k8sObject]{
 		ReconcilerAction: controller.NewReconcilerAction(client, recorder, controller.ReadyCondition),
 		fieldManager:     fieldManager,
+		dryRun:           dryRun,
 	}
 }
 
@@ -77,6 +85,8 @@ func (h *DefaultSentinelAction[k8sObject]) Read(ctx context.Context, o k8sObject
 }
 
 func (h *DefaultSentinelAction[k8sObject]) Apply(ctx context.Context, o k8sObject, data map[string]any, objects []client.Object, logger *logrus.Entry) (res reconcile.Result, err error) {
+	// Note: Apply mutates diff objects in-place (clears managedFields and resourceVersion).
+	// Callers must not reuse objects from GetObjectsToApply() after calling Apply.
 	for _, oChild := range objects {
 		// Set owner reference
 		if err = ctrl.SetControllerReference(o, oChild, h.Client().Scheme()); err != nil {
@@ -99,6 +109,8 @@ func (h *DefaultSentinelAction[k8sObject]) Apply(ctx context.Context, o k8sObjec
 
 // Delete deletes objects
 func (h *DefaultSentinelAction[k8sObject]) Delete(ctx context.Context, o k8sObject, data map[string]any, objects []client.Object, logger *logrus.Entry) (res reconcile.Result, err error) {
+	// Note: Apply mutates diff objects in-place (clears managedFields and resourceVersion).
+	// Callers must not reuse objects from GetObjectsToApply() after calling Apply.
 	for _, oChild := range objects {
 		if err = h.Client().Delete(ctx, oChild); err != nil {
 			return res, errors.Wrapf(err, "Error when delete object '%s'", oChild.GetName())
@@ -119,27 +131,24 @@ func (h *DefaultSentinelAction[k8sObject]) OnSuccess(ctx context.Context, o k8sO
 	return res, nil
 }
 
+func (h *DefaultSentinelAction[k8sObject]) OnDiff(ctx context.Context, o k8sObject, data map[string]any, diff multiphase.MultiPhaseDiff[client.Object], logger *logrus.Entry) (res reconcile.Result, err error) {
+	if !h.dryRun {
+		return res, controller.ErrDiffDisabled
+	}
+	return res, nil
+}
+
 func (h *DefaultSentinelAction[k8sObject]) Diff(ctx context.Context, o k8sObject, read SentinelRead, data map[string]any, logger *logrus.Entry) (diff multiphase.MultiPhaseDiff[client.Object], res reconcile.Result, err error) {
 	diff = multiphase.NewMultiPhaseDiff[client.Object]()
 
-	// Compare the expected and current objects type
 	for objectType, reader := range read.GetReads() {
 		logger.Debugf("Start process object type '%s'", objectType)
 
-		expectedNames := make(map[string]struct{})
-		for _, expectedObject := range reader.GetExpectedObjects() {
-			expectedNames[expectedObject.GetName()] = struct{}{}
-			diff.AddObjectToApply(expectedObject)
-			diff.AddDiff(fmt.Sprintf("Apply object '%s'", expectedObject.GetName()))
+		creates, updates, deletes, diffStrs, err := multiphase.ClassifyObjects(ctx, h.Client(), reader.GetExpectedObjects(), reader.GetCurrentObjects(), h.fieldManager, h.dryRun)
+		if err != nil {
+			return diff, res, err
 		}
-
-		// Detect orphans
-		for _, currentObject := range reader.GetCurrentObjects() {
-			if _, found := expectedNames[currentObject.GetName()]; !found {
-				diff.AddObjectToDelete(currentObject)
-				diff.AddDiff(fmt.Sprintf("Need delete object '%s'", currentObject.GetName()))
-			}
-		}
+		multiphase.PopulateDiff(diff, creates, updates, deletes, diffStrs)
 	}
 
 	return diff, res, nil

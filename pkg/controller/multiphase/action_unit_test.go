@@ -108,7 +108,7 @@ func TestNewMultiPhaseStepReconcilerAction(t *testing.T) {
 	client := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
 	recorder := &mockEventRecorder{}
 	
-	action := NewMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap](client, "phase", "condition", recorder, "fieldManager")
+	action := NewMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap](client, "phase", "condition", recorder, "fieldManager", false)
 	assert.NotNil(t, action)
 }
 
@@ -281,15 +281,22 @@ func TestObjectMultiPhaseDiff(t *testing.T) {
 		}
 		
 		// Test initial state
-		assert.False(t, wrapper.NeedApply())
+		assert.False(t, wrapper.NeedCreate())
+		assert.False(t, wrapper.NeedUpdate())
 		assert.False(t, wrapper.NeedDelete())
 		assert.False(t, wrapper.IsDiff())
 		assert.Empty(t, wrapper.Diff())
 		
-		// Test AddObjectToApply
-		wrapper.AddObjectToApply(cm)
-		assert.True(t, wrapper.NeedApply())
+		// Test AddObjectToCreate
+		wrapper.AddObjectToCreate(cm)
+		assert.True(t, wrapper.NeedCreate())
+		assert.Len(t, wrapper.GetObjectsToCreate(), 1)
 		assert.Len(t, wrapper.GetObjectsToApply(), 1)
+		
+		// Test AddObjectToUpdate
+		wrapper.AddObjectToUpdate(cm)
+		assert.True(t, wrapper.NeedUpdate())
+		assert.Len(t, wrapper.GetObjectsToUpdate(), 1)
 		
 		// Test AddObjectToDelete
 		wrapper.AddObjectToDelete(cm)
@@ -303,8 +310,11 @@ func TestObjectMultiPhaseDiff(t *testing.T) {
 		
 		// Test Set methods
 		newObjs := []client.Object{cm}
-		wrapper.SetObjectsToApply(newObjs)
-		assert.Len(t, wrapper.GetObjectsToApply(), 2) // already had 1, now adding 1 more
+		wrapper.SetObjectsToCreate(newObjs)
+		assert.Len(t, wrapper.GetObjectsToCreate(), 2) // already had 1, now adding 1 more
+		
+		wrapper.SetObjectsToUpdate(newObjs)
+		assert.Len(t, wrapper.GetObjectsToUpdate(), 2) // already had 1, now adding 1 more
 		
 		wrapper.SetObjectsToDelete(newObjs)
 		assert.Len(t, wrapper.GetObjectsToDelete(), 2) // already had 1, now adding 1 more
@@ -333,11 +343,13 @@ func TestObjectMultiPhaseDiffEmptySliceHandling(t *testing.T) {
 
 	// Set with empty slice should not panic and not change state
 	var emptySlice []client.Object
-	wrapper.SetObjectsToApply(emptySlice)
+	wrapper.SetObjectsToCreate(emptySlice)
+	wrapper.SetObjectsToUpdate(emptySlice)
 	wrapper.SetObjectsToDelete(emptySlice)
 
 	// Should not change state
-	assert.False(t, wrapper.NeedApply())
+	assert.False(t, wrapper.NeedCreate())
+	assert.False(t, wrapper.NeedUpdate())
 	assert.False(t, wrapper.NeedDelete())
 }
 
@@ -346,7 +358,7 @@ func TestMultiPhaseStepReconcilerAction(t *testing.T) {
 	client := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
 	recorder := &mockEventRecorder{}
 	
-	action := NewMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap](client, "phase", "condition", recorder, "fieldManager")
+	action := NewMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap](client, "phase", "condition", recorder, "fieldManager", false)
 	
 	// Test GetPhaseName
 	phaseName := action.GetPhaseName()
@@ -358,7 +370,7 @@ func TestNewObjectMultiPhaseStepReconcilerAction(t *testing.T) {
 	client := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
 	recorder := &mockEventRecorder{}
 	
-	innerAction := NewMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap](client, "phase", "condition", recorder, "fieldManager")
+	innerAction := NewMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap](client, "phase", "condition", recorder, "fieldManager", false)
 	objectAction := NewObjectMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap, *corev1.Secret](innerAction)
 	
 	assert.NotNil(t, objectAction)
@@ -373,7 +385,7 @@ func TestMultiPhaseStepReconcilerActionImplementations(t *testing.T) {
 	client := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
 	recorder := &mockEventRecorder{}
 	
-	action := NewMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap](client, "phase", "condition", recorder, "fieldManager")
+	action := NewMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap](client, "phase", "condition", recorder, "fieldManager", false)
 	logger := logrus.NewEntry(logrus.StandardLogger())
 
 	// Create a mock object
@@ -432,7 +444,7 @@ func TestMultiPhaseStepReconcilerActionImplementations(t *testing.T) {
 	diffResult, res, err := action.Diff(context.Background(), mockObj, read, map[string]any{}, logger)
 	assert.NoError(t, err)
 	assert.Equal(t, reconcile.Result{}, res)
-	assert.True(t, diffResult.NeedApply())
+	assert.True(t, diffResult.NeedCreate())
 	assert.True(t, diffResult.IsDiff())
 	assert.Len(t, diffResult.GetObjectsToApply(), 1)
 	assert.Len(t, diffResult.GetObjectsToDelete(), 1)
@@ -443,7 +455,7 @@ func TestObjectMultiPhaseStepReconcilerActionImplementations(t *testing.T) {
 	client := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
 	recorder := &mockEventRecorder{}
 	
-	innerAction := NewMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap](client, "phase", "condition", recorder, "fieldManager")
+	innerAction := NewMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap](client, "phase", "condition", recorder, "fieldManager", false)
 	objectAction := NewObjectMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap, *corev1.Secret](innerAction)
 	logger := logrus.NewEntry(logrus.StandardLogger())
 

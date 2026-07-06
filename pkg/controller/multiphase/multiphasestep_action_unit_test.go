@@ -114,6 +114,7 @@ func TestDefaultMultiPhaseStepReconcilerAction_Configure(t *testing.T) {
 		"Ready",
 		recorder,
 		"test-controller",
+		false,
 	)
 
 	t.Run("configure initializes condition and phase", func(t *testing.T) {
@@ -150,6 +151,7 @@ func TestDefaultMultiPhaseStepReconcilerAction_Read(t *testing.T) {
 		"Ready",
 		recorder,
 		"test-controller",
+		false,
 	)
 
 	t.Run("Read panics when not implemented", func(t *testing.T) {
@@ -189,6 +191,7 @@ func TestDefaultMultiPhaseStepReconcilerAction_OnError(t *testing.T) {
 		"Ready",
 		recorder,
 		"test-controller",
+		false,
 	)
 
 	t.Run("on error updates condition and records event", func(t *testing.T) {
@@ -228,6 +231,7 @@ func TestDefaultMultiPhaseStepReconcilerAction_OnSuccess(t *testing.T) {
 		"Ready",
 		recorder,
 		"test-controller",
+		false,
 	)
 
 	t.Run("on success updates condition", func(t *testing.T) {
@@ -280,6 +284,7 @@ func TestDefaultMultiPhaseStepReconcilerAction_GetPhaseName(t *testing.T) {
 		"Ready",
 		recorder,
 		"test-controller",
+		false,
 	)
 
 	t.Run("get phase name returns correct phase", func(t *testing.T) {

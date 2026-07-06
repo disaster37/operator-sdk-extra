@@ -111,6 +111,7 @@ func newConfiMapReconciler(c client.Client, recorder record.EventRecorder) (mult
 			ConfigmapCondition,
 			recorder,
 			fieldManagerName,
+			false,
 		),
 	}
 }

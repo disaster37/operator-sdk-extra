@@ -488,7 +488,7 @@ If any step returns an error, `OnError()` is called to update the status conditi
 | `multiphase.MultiPhaseReconcilerAction[k8sObject]` | same | User-facing hooks: `Configure`, `Read`, `Delete`, `OnError`, `OnSuccess` |
 | `multiphase.MultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]` | same | Per-resource step: `Read`, `Diff`, `Create`, `Update`, `Delete` |
 | `multiphase.MultiPhaseRead[k8sStepObject]` | same | Holds current and expected objects for a step |
-| `multiphase.MultiPhaseDiff[k8sStepObject]` | same | Holds create/update/delete lists produced by the diff |
+| `multiphase.MultiPhaseDiff[k8sStepObject]` | same | Holds create/update/delete lists produced by the diff; `GetObjectsToApply()` returns the union of create + update |
 | `object.MultiPhaseObject` | `pkg/object/` | CRD must implement `GetStatus() MultiPhaseObjectStatus` |
 | `object.MultiPhaseObjectStatus` | `pkg/object/` | `GetConditions`, `SetConditions`, `GetPhaseName`, `SetPhaseName`, `GetIsOnError`, `SetIsOnError`, `GetLastErrorMessage`, `SetLastErrorMessage`, `GetObservedGeneration`, `SetObservedGeneration` |
 
@@ -500,7 +500,7 @@ If any step returns an error, `OnError()` is called to update the status conditi
 |---|---|
 | `multiphase.NewMultiPhaseReconciler[k8sObject](client, name, finalizer, logger, recorder)` | Main orchestrator with finalizer and status tracking |
 | `multiphase.NewMultiPhaseReconcilerAction[k8sObject](client, conditionName, recorder)` | Default action: initializes ready condition, provides `OnError` / `OnSuccess` |
-| `multiphase.NewMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject](client, phaseName, conditionName, recorder, opts...)` | Default step action: provides `Diff`, `Create`, `Update`, `Delete`, `Apply`, `OnError`, `OnSuccess`. Pass `multiphase.WithSSA(fieldManager)` to enable SSA mode. |
+| `multiphase.NewMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject](client, phaseName, conditionName, recorder, fieldManager, dryRun)` | Default step action: provides `Configure`, `Read`, `Diff`, `Apply`, `Delete`, `OnError`, `OnSuccess`, `OnDiff`. `fieldManager` identifies this controller for SSA. `dryRun` enables SSA dry-run diff detection (opt-in). |
 | `multiphase.NewObjectMultiPhaseStepReconcilerAction[k8sObject, src, dst](stepReconciler)` | Wraps a typed step reconciler to convert from a specific type (e.g. `*ConfigMap`) to `client.Object` |
 | `multiphase.NewMultiPhaseRead[k8sStepObject]()` | Creates an empty read result for collecting current and expected objects |
 | `controller.NewController()` | Base controller (no-op scaffolding) |
@@ -521,16 +521,17 @@ The multi-phase reconciler uses **Server-Side Apply** exclusively. SSA delegates
 ### Reconciliation Flow
 
 ```
-Configure -> Read -> Diff -> Apply/Delete -> OnSuccess
+Configure -> Read -> Diff -> OnDiff -> Apply/Delete -> OnSuccess
 ```
 
-- **Diff()** detects orphans (current objects not in expected list). All expected objects go to the "apply" list.
+- **Diff()** classifies objects into create, update, and delete lists. When `dryRun=true`, uses SSA dry-run to detect actual changes. When `dryRun=false`, all expected objects with current counterparts go to the update list (legacy always-apply).
+- **OnDiff()** is a pre-apply hook called between Diff and Apply. Use it for pre-tasks like draining nodes before a StatefulSet update.
 - **Apply()** uses `client.Patch(obj, client.Apply, client.FieldOwner(...), client.ForceOwnership)` for each object, handling both creation and updates in a single call.
 - **Delete()** removes orphaned objects (current objects that are no longer expected).
 
 ### Constructor
 
-The `fieldManager` is a required parameter when constructing the step reconciler action:
+The `fieldManager` and `dryRun` are required parameters when constructing the step reconciler action:
 
 ```go
 func newConfigMapReconciler(c client.Client, recorder record.EventRecorder) multiphase.MultiPhaseStepReconcilerAction[*Memcached, *corev1.ConfigMap] {
@@ -541,10 +542,42 @@ func newConfigMapReconciler(c client.Client, recorder record.EventRecorder) mult
             ConfigmapCondition,
             recorder,
             "memcached-operator",  // fieldManager — required
+            false,                  // dryRun — false means all objects always-applied
         ),
     }
 }
 ```
+
+### Detecting changes with SSA (dry-run diff)
+
+When `dryRun=true`, the Diff() step performs an SSA dry-run (`client.Apply` + `client.DryRunAll`) for each existing object to predict what the API server would produce. It normalizes both the predicted and current object (stripping `resourceVersion`, `generation`, `managedFields`, `status`, etc.) and compares them. Objects are then classified:
+
+- **Create**: no current counterpart exists
+- **Update**: current counterpart exists and the normalized diff is non-empty
+- **Unchanged**: current counterpart exists and the normalized diff is empty — **skipped** (no API call)
+- **Delete**: current object with no expected counterpart (orphan)
+
+**How to enable**: pass `dryRun=true` to `NewMultiPhaseStepReconcilerAction`. Note this adds one extra dry-run API call per existing object.
+
+**OnDiff pre-task pattern**: override `OnDiff` to run logic before Apply, keyed on `diff.NeedUpdate()` / `diff.GetObjectsToUpdate()`:
+
+```go
+func (r *deploymentReconciler) OnDiff(ctx context.Context, o *Memcached, data map[string]any, diff multiphase.MultiPhaseDiff[*appv1.Deployment], logger *logrus.Entry) (reconcile.Result, error) {
+    if diff.NeedUpdate() {
+        logger.Infof("Deployment update detected for %d object(s)", len(diff.GetObjectsToUpdate()))
+        // Drain nodes, scale down, or other pre-update tasks here
+    }
+    return reconcile.Result{}, nil
+}
+```
+
+**Disabled-diff contract**: when `dryRun=false`, the default `OnDiff` returns `controller.ErrDiffDisabled`. Controllers that do not need pre-tasks must either:
+- Enable diff with `dryRun=true`, or
+- Override `OnDiff` to return `reconcile.Result{}, nil` (safe no-op)
+
+This ensures no accidental silent no-op when pre-tasks are configured but diff detection is left disabled.
+
+**Caveat**: mutating webhooks may modify objects during dry-run apply, causing false-positive updates (predicted differs from live despite identical input). Webhook-noise filtering is documented for a future enhancement.
 
 ### Requirements
 

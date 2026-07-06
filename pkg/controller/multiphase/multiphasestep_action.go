@@ -2,7 +2,6 @@ package multiphase
 
 import (
 	"context"
-	"fmt"
 
 	"emperror.dev/errors"
 	"github.com/disaster37/operator-sdk-extra/v2/pkg/apis/shared"
@@ -45,8 +44,15 @@ type MultiPhaseStepReconcilerAction[k8sObject object.MultiPhaseObject, k8sStepOb
 	// It's the right way to set status condition when everything is good
 	OnSuccess(ctx context.Context, o k8sObject, data map[string]any, diff MultiPhaseDiff[k8sStepObject], logger *logrus.Entry) (res reconcile.Result, err error)
 
+	// OnDiff is called between Diff and Apply, after the diff has been computed.
+	// When dry-run diff detection is disabled, the default implementation returns ErrDiffDisabled.
+	// Controllers that need pre-apply tasks (e.g. drain before StatefulSet update) can check
+	// diff.NeedUpdate() / diff.GetObjectsToUpdate() here.
+	OnDiff(ctx context.Context, o k8sObject, data map[string]any, diff MultiPhaseDiff[k8sStepObject], logger *logrus.Entry) (res reconcile.Result, err error)
+
 	// Diff permit to compare the actual state and the expected state
-	// In SSA mode, it populates the apply list with all expected objects and detects orphans for deletion.
+	// When dryRun is enabled, uses SSA dry-run to classify objects into create/update/delete.
+	// When dryRun is disabled, all expected objects go to the update list (legacy always-apply).
 	Diff(ctx context.Context, o k8sObject, read MultiPhaseRead[k8sStepObject], data map[string]any, logger *logrus.Entry) (diff MultiPhaseDiff[k8sStepObject], res reconcile.Result, err error)
 
 	// GetPhaseName permit to get the phase name
@@ -58,11 +64,13 @@ type DefaultMultiPhaseStepReconcilerAction[k8sObject object.MultiPhaseObject, k8
 	controller.ReconcilerAction
 	phaseName    shared.PhaseName
 	fieldManager string
+	dryRun       bool
 }
 
 // NewMultiPhaseStepReconcilerAction creates a new step reconciler action using Server-Side Apply.
 // The fieldManager parameter identifies this controller as the owner of the fields it manages.
-func NewMultiPhaseStepReconcilerAction[k8sObject object.MultiPhaseObject, k8sStepObject client.Object](client client.Client, phaseName shared.PhaseName, conditionName shared.ConditionName, recorder record.EventRecorder, fieldManager string) (multiPhaseStepReconciler MultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) {
+// The dryRun parameter enables SSA dry-run diff detection (one extra API call per existing object).
+func NewMultiPhaseStepReconcilerAction[k8sObject object.MultiPhaseObject, k8sStepObject client.Object](client client.Client, phaseName shared.PhaseName, conditionName shared.ConditionName, recorder record.EventRecorder, fieldManager string, dryRun bool) (multiPhaseStepReconciler MultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) {
 	return &DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]{
 		ReconcilerAction: controller.NewReconcilerAction(
 			client,
@@ -71,6 +79,7 @@ func NewMultiPhaseStepReconcilerAction[k8sObject object.MultiPhaseObject, k8sSte
 		),
 		phaseName:    phaseName,
 		fieldManager: fieldManager,
+		dryRun:       dryRun,
 	}
 }
 
@@ -97,6 +106,8 @@ func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Read(c
 }
 
 func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Apply(ctx context.Context, o k8sObject, data map[string]any, objects []k8sStepObject, logger *logrus.Entry) (res reconcile.Result, err error) {
+	// Note: Apply mutates diff objects in-place (clears managedFields and resourceVersion).
+	// Callers must not reuse objects from GetObjectsToApply() after calling Apply.
 	for _, oChild := range objects {
 		// Set owner reference
 		if err = ctrl.SetControllerReference(o, oChild, h.Client().Scheme()); err != nil {
@@ -118,6 +129,8 @@ func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Apply(
 }
 
 func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Delete(ctx context.Context, o k8sObject, data map[string]any, objects []k8sStepObject, logger *logrus.Entry) (res reconcile.Result, err error) {
+	// Note: Apply mutates diff objects in-place (clears managedFields and resourceVersion).
+	// Callers must not reuse objects from GetObjectsToApply() after calling Apply.
 	for _, oChild := range objects {
 		if err = h.Client().Delete(ctx, oChild); err != nil {
 			return res, errors.Wrapf(err, "Error when delete object '%s'", oChild.GetName())
@@ -159,24 +172,21 @@ func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) OnSucc
 	return res, nil
 }
 
+func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) OnDiff(ctx context.Context, o k8sObject, data map[string]any, diff MultiPhaseDiff[k8sStepObject], logger *logrus.Entry) (res reconcile.Result, err error) {
+	if !h.dryRun {
+		return res, controller.ErrDiffDisabled
+	}
+	return res, nil
+}
+
 func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Diff(ctx context.Context, o k8sObject, read MultiPhaseRead[k8sStepObject], data map[string]any, logger *logrus.Entry) (diff MultiPhaseDiff[k8sStepObject], res reconcile.Result, err error) {
 	diff = NewMultiPhaseDiff[k8sStepObject]()
 
-	// All expected objects go to the apply list
-	expectedNames := make(map[string]struct{})
-	for _, expectedObject := range read.GetExpectedObjects() {
-		expectedNames[expectedObject.GetName()] = struct{}{}
-		diff.AddObjectToApply(expectedObject)
-		diff.AddDiff(fmt.Sprintf("Apply object '%s'", expectedObject.GetName()))
+	creates, updates, deletes, diffStrs, err := ClassifyObjects(ctx, h.Client(), read.GetExpectedObjects(), read.GetCurrentObjects(), h.fieldManager, h.dryRun)
+	if err != nil {
+		return diff, res, err
 	}
-
-	// Detect orphans: current objects not in expected
-	for _, currentObject := range read.GetCurrentObjects() {
-		if _, found := expectedNames[currentObject.GetName()]; !found {
-			diff.AddObjectToDelete(currentObject)
-			diff.AddDiff(fmt.Sprintf("Need delete object '%s'", currentObject.GetName()))
-		}
-	}
+	PopulateDiff(diff, creates, updates, deletes, diffStrs)
 
 	return diff, res, nil
 }
@@ -226,6 +236,10 @@ func (h *ObjectMultiPhaseStepReconcilerAction[k8sObject, k8sStepObjectSrc, k8sSt
 
 func (h *ObjectMultiPhaseStepReconcilerAction[k8sObject, k8sStepObjectSrc, k8sStepObjectDst]) OnSuccess(ctx context.Context, o k8sObject, data map[string]any, diff MultiPhaseDiff[k8sStepObjectDst], logger *logrus.Entry) (res reconcile.Result, err error) {
 	return h.in.OnSuccess(ctx, o, data, NewObjectMultiphaseDiff[k8sStepObjectDst, k8sStepObjectSrc](diff), logger)
+}
+
+func (h *ObjectMultiPhaseStepReconcilerAction[k8sObject, k8sStepObjectSrc, k8sStepObjectDst]) OnDiff(ctx context.Context, o k8sObject, data map[string]any, diff MultiPhaseDiff[k8sStepObjectDst], logger *logrus.Entry) (res reconcile.Result, err error) {
+	return h.in.OnDiff(ctx, o, data, NewObjectMultiphaseDiff[k8sStepObjectDst, k8sStepObjectSrc](diff), logger)
 }
 
 func (h *ObjectMultiPhaseStepReconcilerAction[k8sObject, k8sStepObjectSrc, k8sStepObjectDst]) Diff(ctx context.Context, o k8sObject, read MultiPhaseRead[k8sStepObjectDst], data map[string]any, logger *logrus.Entry) (diff MultiPhaseDiff[k8sStepObjectDst], res reconcile.Result, err error) {

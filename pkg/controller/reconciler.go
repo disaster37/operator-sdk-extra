@@ -17,11 +17,13 @@ var (
 	ErrWhenCallUpdateFromReconciler         = errors.Sentinel("Error when call 'update' from reconciler")
 	ErrWhenCallApplyFromReconciler          = errors.Sentinel("Error when call 'apply' from reconciler")
 	ErrWhenCallOnSuccessFromReconciler      = errors.Sentinel("Error when call 'onSuccess' from reconciler")
+	ErrWhenCallOnDiffFromReconciler         = errors.Sentinel("Error when call 'onDiff' from reconciler")
 	ErrWhenCallStepReconcilerFromReconciler = errors.Sentinel("Error when call 'reconcile' from step reconciler")
 	ErrWhenGetObjectFromReconciler          = errors.Sentinel("Error when get object from reconciler")
 	ErrWhenAddFinalizer                     = errors.Sentinel("Error when add finalizer")
 	ErrWhenDeleteFinalizer                  = errors.Sentinel("Error when delete finalizer")
 	ErrWhenGetObjectStatus                  = errors.Sentinel("Error when get object status")
+	ErrDiffDisabled                         = errors.Sentinel("Dry-run diff detection is disabled. Either enable it with dryRun=true or override OnDiff to return nil")
 )
 
 type Reconciler interface {

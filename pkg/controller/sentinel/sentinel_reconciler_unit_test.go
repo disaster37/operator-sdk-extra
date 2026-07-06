@@ -63,6 +63,10 @@ func (m *mockSentinelReconcilerAction) OnSuccess(ctx context.Context, o *corev1.
 	return m.onSuccessRes, m.onSuccessErr
 }
 
+func (m *mockSentinelReconcilerAction) OnDiff(ctx context.Context, o *corev1.Pod, data map[string]any, diff multiphase.MultiPhaseDiff[client.Object], logger *logrus.Entry) (reconcile.Result, error) {
+	return reconcile.Result{}, nil
+}
+
 func (m *mockSentinelReconcilerAction) Diff(ctx context.Context, o *corev1.Pod, read SentinelRead, data map[string]any, logger *logrus.Entry) (multiphase.MultiPhaseDiff[client.Object], reconcile.Result, error) {
 	return m.diffObj, m.diffRes, m.diffErr
 }
@@ -213,7 +217,7 @@ func TestDefaultSentinelReconciler_Reconcile(t *testing.T) {
 
 		read := NewSentinelRead(scheme)
 		diff := multiphase.NewMultiPhaseDiff[client.Object]()
-		diff.AddObjectToApply(mockObj)
+		diff.AddObjectToCreate(mockObj)
 		diff.AddObjectToDelete(mockObj)
 
 		mockAction := &mockSentinelReconcilerAction{
@@ -236,7 +240,7 @@ func TestDefaultSentinelReconciler_Reconcile(t *testing.T) {
 
 		read := NewSentinelRead(scheme)
 		diff := multiphase.NewMultiPhaseDiff[client.Object]()
-		diff.AddObjectToApply(mockObj)
+		diff.AddObjectToCreate(mockObj)
 
 		mockAction := &mockSentinelReconcilerAction{
 			readObj:    read,

@@ -68,7 +68,7 @@ func TestDefaultSentinelAction_GetFieldManager(t *testing.T) {
 	recorder := record.NewFakeRecorder(10)
 
 	fieldManager := "test-field-manager"
-	action := NewSentinelAction[*mockK8sObject](fakeClient, recorder, fieldManager)
+	action := NewSentinelAction[*mockK8sObject](fakeClient, recorder, fieldManager, false)
 
 	t.Run("get field manager returns correct value", func(t *testing.T) {
 		result := action.GetFieldManager()
@@ -84,7 +84,7 @@ func TestDefaultSentinelAction_Configure(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 	recorder := record.NewFakeRecorder(10)
 
-	action := NewSentinelAction[*mockK8sObject](fakeClient, recorder, "test-field-manager")
+	action := NewSentinelAction[*mockK8sObject](fakeClient, recorder, "test-field-manager", false)
 
 	t.Run("configure returns empty result", func(t *testing.T) {
 		ctx := context.Background()
@@ -112,7 +112,7 @@ func TestDefaultSentinelAction_Read(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 	recorder := record.NewFakeRecorder(10)
 
-	action := NewSentinelAction[*mockK8sObject](fakeClient, recorder, "test-field-manager")
+	action := NewSentinelAction[*mockK8sObject](fakeClient, recorder, "test-field-manager", false)
 
 	t.Run("read panics when not implemented", func(t *testing.T) {
 		ctx := context.Background()
@@ -143,7 +143,7 @@ func TestDefaultSentinelAction_Delete(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(child1, child2).Build()
 	recorder := record.NewFakeRecorder(10)
 
-	action := NewSentinelAction[*corev1.ConfigMap](fakeClient, recorder, "test-field-manager")
+	action := NewSentinelAction[*corev1.ConfigMap](fakeClient, recorder, "test-field-manager", false)
 
 	t.Run("delete objects successfully", func(t *testing.T) {
 		ctx := context.Background()
@@ -174,7 +174,7 @@ func TestDefaultSentinelAction_OnError(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 	recorder := record.NewFakeRecorder(10)
 
-	action := NewSentinelAction[*mockK8sObject](fakeClient, recorder, "test-field-manager")
+	action := NewSentinelAction[*mockK8sObject](fakeClient, recorder, "test-field-manager", false)
 
 	t.Run("on error records event and returns error", func(t *testing.T) {
 		ctx := context.Background()
@@ -207,7 +207,7 @@ func TestDefaultSentinelAction_OnSuccess(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 	recorder := record.NewFakeRecorder(10)
 
-	action := NewSentinelAction[*mockK8sObject](fakeClient, recorder, "test-field-manager")
+	action := NewSentinelAction[*mockK8sObject](fakeClient, recorder, "test-field-manager", false)
 
 	t.Run("on success returns empty result", func(t *testing.T) {
 		ctx := context.Background()
@@ -233,7 +233,7 @@ func TestDefaultSentinelAction_Diff(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 	recorder := record.NewFakeRecorder(10)
 
-	action := NewSentinelAction[*mockK8sObject](fakeClient, recorder, "test-field-manager")
+	action := NewSentinelAction[*mockK8sObject](fakeClient, recorder, "test-field-manager", false)
 
 	t.Run("diff computes apply and delete lists", func(t *testing.T) {
 		ctx := context.Background()
@@ -277,16 +277,19 @@ func TestDefaultSentinelAction_Diff(t *testing.T) {
 		diffStr := diff.Diff()
 
 		assert.Len(t, applyList, 3)
-		assert.Equal(t, "existing1", applyList[0].GetName())
-		assert.Equal(t, "existing2", applyList[1].GetName())
-		assert.Equal(t, "newObject", applyList[2].GetName())
+		assert.True(t, diff.NeedCreate())
+		assert.True(t, diff.NeedUpdate())
+		assert.True(t, diff.NeedDelete())
+		assert.Equal(t, "newObject", applyList[0].GetName())
+		assert.Equal(t, "existing1", applyList[1].GetName())
+		assert.Equal(t, "existing2", applyList[2].GetName())
 
 		assert.Len(t, deleteList, 1)
 		assert.Equal(t, "toBeDeleted", deleteList[0].GetName())
 
 		assert.Contains(t, diffStr, "Apply object 'existing1'")
 		assert.Contains(t, diffStr, "Apply object 'existing2'")
-		assert.Contains(t, diffStr, "Apply object 'newObject'")
+		assert.Contains(t, diffStr, "Create object 'newObject'")
 		assert.Contains(t, diffStr, "Need delete object 'toBeDeleted'")
 	})
 }

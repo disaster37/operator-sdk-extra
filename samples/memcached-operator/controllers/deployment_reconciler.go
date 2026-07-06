@@ -33,6 +33,7 @@ func newDeploymentReconciler(c client.Client, recorder record.EventRecorder) mul
 			DeploymentCondition,
 			recorder,
 			"memcached-operator",
+			true,
 		),
 	}
 }
@@ -62,4 +63,17 @@ func (r *deploymentReconciler) Read(ctx context.Context, o *cachecrd.Memcached, 
 	}
 
 	return read, res, nil
+}
+
+// OnDiff demonstrates the pre-update hook pattern.
+// In a real operator, you would perform pre-tasks here (e.g. drain nodes,
+// scale down, pause traffic) before SSA apply runs.
+func (r *deploymentReconciler) OnDiff(ctx context.Context, o *cachecrd.Memcached, data map[string]any, diff multiphase.MultiPhaseDiff[*appv1.Deployment], logger *logrus.Entry) (res reconcile.Result, err error) {
+	if diff.NeedUpdate() {
+		logger.Infof("Pre-update task: deployment change detected for %d object(s)", len(diff.GetObjectsToUpdate()))
+		for _, dpl := range diff.GetObjectsToUpdate() {
+			logger.Debugf("Deployment '%s' will be updated", dpl.GetName())
+		}
+	}
+	return reconcile.Result{}, nil
 }

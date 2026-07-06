@@ -66,7 +66,7 @@ func (h *DefaultMultiPhaseStepReconciler[k8sObject, k8sStepObject]) Reconcile(ct
 		return res, nil
 	}
 
-	// Compute diff (orphan detection + apply list)
+	// Compute diff (orphan detection + classified create/update/delete)
 	diff, res, err = reconcilerAction.Diff(ctx, o, read, data, logger)
 	if err != nil {
 		logger.Errorf("Error when call 'diff' from step reconciler: %s", err.Error())
@@ -80,8 +80,18 @@ func (h *DefaultMultiPhaseStepReconciler[k8sObject, k8sStepObject]) Reconcile(ct
 		return res, nil
 	}
 
+	// OnDiff: pre-apply hook for pre-tasks (drain, etc.)
+	res, err = reconcilerAction.OnDiff(ctx, o, data, diff, logger)
+	if err != nil {
+		logger.Errorf("Error when call 'onDiff' from step reconciler: %s", err.Error())
+		return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallOnDiffFromReconciler.Error()), logger)
+	}
+	if res != (reconcile.Result{}) {
+		return res, nil
+	}
+
 	// Apply resources via SSA
-	if diff.NeedApply() {
+	if diff.NeedCreate() || diff.NeedUpdate() {
 		logger.Debug("Call 'apply' from step reconciler")
 		res, err = reconcilerAction.Apply(ctx, o, data, diff.GetObjectsToApply(), logger)
 		if err != nil {

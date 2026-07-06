@@ -69,7 +69,7 @@ type ingressSentinelAction[k8sObject client.Object] struct {
 
 func newIngressSentinelAction[k8sObject client.Object](c client.Client, recorder record.EventRecorder) sentinel.SentinelReconcilerAction[k8sObject] {
 	return &ingressSentinelAction[k8sObject]{
-		SentinelReconcilerAction: sentinel.NewSentinelAction[k8sObject](c, recorder, "ingress-sentinel-operator"),
+		SentinelReconcilerAction: sentinel.NewSentinelAction[k8sObject](c, recorder, "ingress-sentinel-operator", false),
 	}
 }
 

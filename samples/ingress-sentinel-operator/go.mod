@@ -1,6 +1,6 @@
 module github.com/disaster37/operator-sdk-extra/v2/samples/ingress-sentinel-operator
 
-go 1.24
+go 1.26
 
 replace github.com/disaster37/operator-sdk-extra/v2 => ../../
 

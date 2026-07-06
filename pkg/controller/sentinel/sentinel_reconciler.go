@@ -122,7 +122,7 @@ func (h *DefaultSentinelReconciler[k8sObject]) Reconcile(ctx context.Context, re
 		return res, nil
 	}
 
-	// Compute diff (orphan detection + apply list)
+	// Compute diff (orphan detection + classified create/update/delete)
 	diff, res, err = reconcilerAction.Diff(ctx, o, read, data, logger)
 	if err != nil {
 		logger.Errorf("Failed to call 'diff' from reconciler: %s", err.Error())
@@ -133,8 +133,18 @@ func (h *DefaultSentinelReconciler[k8sObject]) Reconcile(ctx context.Context, re
 		return res, nil
 	}
 
+	// OnDiff: pre-apply hook
+	res, err = reconcilerAction.OnDiff(ctx, o, data, diff, logger)
+	if err != nil {
+		logger.Errorf("Failed to call 'onDiff' from reconciler: %s", err.Error())
+		return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallOnDiffFromReconciler.Error()), logger)
+	}
+	if res != (reconcile.Result{}) {
+		return res, nil
+	}
+
 	// Apply resources via SSA
-	if diff.NeedApply() {
+	if diff.NeedCreate() || diff.NeedUpdate() {
 		res, err = reconcilerAction.Apply(ctx, o, data, diff.GetObjectsToApply(), logger)
 		if err != nil {
 			logger.Errorf("Failed to call 'apply' from reconciler: %s", err.Error())
