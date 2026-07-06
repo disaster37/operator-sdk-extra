@@ -23,7 +23,9 @@ func GetItems[k8sObjectList client.ObjectList, k8sObject client.Object](o k8sObj
 
 	items = make([]k8sObject, valueField.Len())
 	for i := range items {
-		items[i] = valueField.Index(i).Addr().Interface().(k8sObject)
+		if item, setOk := valueField.Index(i).Addr().Interface().(k8sObject); setOk {
+			items[i] = item
+		}
 	}
 
 	return items
@@ -66,5 +68,5 @@ func CloneObject[objectType comparable](o objectType) objectType {
 		panic("Object can't be nill")
 	}
 
-	return reflect.New(reflect.TypeOf(o).Elem()).Interface().(objectType)
+	return reflect.New(reflect.TypeOf(o).Elem()).Interface().(objectType) //nolint:forcetypeassert // generics guarantee type safety
 }

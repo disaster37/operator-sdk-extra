@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/base64"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -18,11 +19,11 @@ type testData struct {
 func TestZipAndBase64Encode(t *testing.T) {
 	t.Run("nominal case - encode a simple struct", func(t *testing.T) {
 		obj := testData{Name: "test", Value: 42}
-		
+
 		encoded, err := ZipAndBase64Encode(obj)
 		assert.NoError(t, err)
 		assert.NotEmpty(t, encoded)
-		
+
 		// Verify it's actually base64 encoded
 		_, err = base64.StdEncoding.DecodeString(encoded)
 		assert.NoError(t, err)
@@ -39,7 +40,7 @@ func TestZipAndBase64Encode(t *testing.T) {
 				"num": 123,
 			},
 		}
-		
+
 		encoded, err := ZipAndBase64Encode(obj)
 		assert.NoError(t, err)
 		assert.NotEmpty(t, encoded)
@@ -54,7 +55,7 @@ func TestZipAndBase64Encode(t *testing.T) {
 			Name: "test",
 			Chan: make(chan int),
 		}
-		
+
 		_, err := ZipAndBase64Encode(obj)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "Error when convert object to byte sequence")
@@ -64,10 +65,10 @@ func TestZipAndBase64Encode(t *testing.T) {
 func TestUnZipBase64Decode(t *testing.T) {
 	t.Run("nominal case - decode an encoded object", func(t *testing.T) {
 		original := testData{Name: "test", Value: 42}
-		
+
 		encoded, err := ZipAndBase64Encode(original)
 		assert.NoError(t, err)
-		
+
 		var decoded testData
 		err = UnZipBase64Decode(encoded, &decoded)
 		assert.NoError(t, err)
@@ -93,7 +94,7 @@ func TestUnZipBase64Decode(t *testing.T) {
 	t.Run("valid base64 but invalid zip content", func(t *testing.T) {
 		// Create a valid base64 string that is not a zip
 		invalidZip := base64.StdEncoding.EncodeToString([]byte("not a zip file"))
-		
+
 		var decoded testData
 		err := UnZipBase64Decode(invalidZip, &decoded)
 		assert.Error(t, err)
@@ -104,7 +105,7 @@ func TestUnZipBase64Decode(t *testing.T) {
 		// Create a valid base64 encoding of incomplete zip data
 		corruptedZipData := []byte{0x50, 0x4B, 0x03, 0x04} // Valid zip header
 		encoded := base64.StdEncoding.EncodeToString(corruptedZipData)
-		
+
 		var decoded testData
 		err := UnZipBase64Decode(encoded, &decoded)
 		assert.Error(t, err)
@@ -117,9 +118,9 @@ func TestUnZipBase64Decode(t *testing.T) {
 		w := zip.NewWriter(buf)
 		err := w.Close()
 		assert.NoError(t, err)
-		
+
 		encoded := base64.StdEncoding.EncodeToString(buf.Bytes())
-		
+
 		var decoded testData
 		err = UnZipBase64Decode(encoded, &decoded)
 		assert.Error(t, err)
@@ -130,17 +131,17 @@ func TestUnZipBase64Decode(t *testing.T) {
 		// Create a zip with invalid JSON content
 		buf := new(bytes.Buffer)
 		w := zip.NewWriter(buf)
-		
+
 		f, err := w.Create("original")
 		assert.NoError(t, err)
 		_, err = f.Write([]byte("invalid json content"))
 		assert.NoError(t, err)
-		
+
 		err = w.Close()
 		assert.NoError(t, err)
-		
+
 		encoded := base64.StdEncoding.EncodeToString(buf.Bytes())
-		
+
 		var decoded testData
 		err = UnZipBase64Decode(encoded, &decoded)
 		assert.Error(t, err)
@@ -149,10 +150,10 @@ func TestUnZipBase64Decode(t *testing.T) {
 
 	t.Run("valid zip with valid JSON but wrong type", func(t *testing.T) {
 		original := "just a string"
-		
+
 		encoded, err := ZipAndBase64Encode(original)
 		assert.NoError(t, err)
-		
+
 		var decoded testData // expecting struct, getting string
 		err = UnZipBase64Decode(encoded, &decoded)
 		// This might succeed or fail depending on json unmarshaling behavior
@@ -166,28 +167,28 @@ func TestUnZipBase64Decode(t *testing.T) {
 func TestReadZipFile(t *testing.T) {
 	t.Run("read a valid zip file", func(t *testing.T) {
 		content := "test content"
-		
+
 		buf := new(bytes.Buffer)
 		w := zip.NewWriter(buf)
-		
+
 		f, err := w.Create("test.txt")
 		assert.NoError(t, err)
 		_, err = f.Write([]byte(content))
 		assert.NoError(t, err)
-		
+
 		err = w.Close()
 		assert.NoError(t, err)
-		
+
 		zipReader, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
 		assert.NoError(t, err)
-		
+
 		zipFile := zipReader.File[0]
 		data, err := readZipFile(zipFile)
 		assert.NoError(t, err)
 		assert.Equal(t, content, string(data))
 	})
 
-t.Run("error opening zip file (e.g. corrupt file)", func(t *testing.T) {
+	t.Run("error opening zip file (e.g. corrupt file)", func(t *testing.T) {
 		buf := new(bytes.Buffer)
 		w := zip.NewWriter(buf)
 
@@ -211,5 +212,26 @@ t.Run("error opening zip file (e.g. corrupt file)", func(t *testing.T) {
 		zipFile := zipReader.File[0]
 		_, err = readZipFile(zipFile)
 		assert.Error(t, err)
+	})
+
+	t.Run("oversized decompression", func(t *testing.T) {
+		buf := new(bytes.Buffer)
+		w := zip.NewWriter(buf)
+
+		f, err := w.Create("large.txt")
+		assert.NoError(t, err)
+		_, err = f.Write([]byte(strings.Repeat("a", maxZipDecompressedSize+1)))
+		assert.NoError(t, err)
+
+		err = w.Close()
+		assert.NoError(t, err)
+
+		zipReader, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
+		assert.NoError(t, err)
+
+		zipFile := zipReader.File[0]
+		_, err = readZipFile(zipFile)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "too large")
 	})
 }

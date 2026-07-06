@@ -14,6 +14,7 @@ import (
 	"github.com/disaster37/operator-sdk-extra/v2/pkg/test"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	condition "k8s.io/apimachinery/pkg/api/meta"
@@ -148,7 +149,9 @@ func doCreateRemoteObjectStep() test.TestStep[*RemoteObject] {
 					t.Fatal(err)
 				}
 				if b, ok := data["isCreated"]; ok {
-					isCreated = b.(bool)
+					bVal, ok := b.(bool)
+					require.True(t, ok, "isCreated is not bool")
+					isCreated = bVal
 				}
 				if !isCreated || o.GetStatus().GetObservedGeneration() == 0 {
 					return errors.New("Not yet created")
@@ -197,7 +200,9 @@ func doUpdateRemoteObjectStep() test.TestStep[*RemoteObject] {
 					t.Fatal(err)
 				}
 				if b, ok := data["isUpdated"]; ok {
-					isUpdated = b.(bool)
+					bVal, ok := b.(bool)
+					require.True(t, ok, "isUpdated is not bool")
+					isUpdated = bVal
 				}
 				if !isUpdated || lastGeneration == o.GetStatus().GetObservedGeneration() {
 					return errors.New("Not yet updated")

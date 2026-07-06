@@ -10,6 +10,7 @@ import (
 	"github.com/disaster37/operator-sdk-extra/v2/pkg/test"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -118,7 +119,10 @@ func doUpdateStep() test.TestStep[*MultiPhaseObject] {
 		Check: func(t *testing.T, c client.Client, key types.NamespacedName, o *MultiPhaseObject, data map[string]any) (err error) {
 			var cm *corev1.ConfigMap
 
-			lastGeneration := data["lastGeneration"].(int64)
+			generationRaw, ok := data["lastGeneration"]
+			require.True(t, ok, "lastGeneration not found in data")
+			lastGeneration, ok := generationRaw.(int64)
+			require.True(t, ok, "lastGeneration is not int64")
 
 			isTimeout, err := test.RunWithTimeout(func() error {
 				if err := c.Get(context.Background(), key, o); err != nil {

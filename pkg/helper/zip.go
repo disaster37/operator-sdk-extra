@@ -4,11 +4,14 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/base64"
+	"fmt"
 	"io"
 
 	"emperror.dev/errors"
 	json "github.com/json-iterator/go"
 )
+
+const maxZipDecompressedSize = 10 * 1024 * 1024
 
 func ZipAndBase64Encode(originalObject any) (string, error) {
 	original, err := json.Marshal(originalObject)
@@ -79,5 +82,12 @@ func readZipFile(zf *zip.File) ([]byte, error) {
 		return nil, err
 	}
 	defer func() { _ = f.Close() }() // ignore error on purpose
-	return io.ReadAll(f)
+	content, err := io.ReadAll(io.LimitReader(f, maxZipDecompressedSize+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(content) > maxZipDecompressedSize {
+		return nil, fmt.Errorf("zip archive too large: exceeds maximum decompressed size of %d bytes", maxZipDecompressedSize)
+	}
+	return content, nil
 }

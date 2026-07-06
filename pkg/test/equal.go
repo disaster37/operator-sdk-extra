@@ -3,6 +3,7 @@ package test
 import (
 	"bytes"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/disaster37/operator-sdk-extra/v2/pkg/helper"
@@ -20,7 +21,7 @@ func EqualFromYamlFile[k8sobject comparable](t *testing.T, expectedYamlFile stri
 	}
 
 	// Read file
-	f, err := os.ReadFile(expectedYamlFile)
+	f, err := os.ReadFile(filepath.Clean(expectedYamlFile))
 	if err != nil {
 		panic(err)
 	}

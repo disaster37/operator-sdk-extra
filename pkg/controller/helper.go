@@ -90,7 +90,7 @@ func GetObjectMeta(r client.Object) metav1.ObjectMeta {
 	if !om.IsValid() {
 		panic("Resouce must have field ObjectMeta")
 	}
-	return om.Interface().(metav1.ObjectMeta)
+	return om.Interface().(metav1.ObjectMeta) //nolint:forcetypeassert // field existence validated above
 }
 
 // GetObjectStatus permit to get the status from client.Object
@@ -143,7 +143,7 @@ func DefaultControllerRateLimiter[T comparable]() workqueue.TypedRateLimiter[T] 
 }
 
 // EnsureNetworkPolicyForWebhook permit to create / update NetworkPolicy for webhook
-func EnsureNetworkPolicyForWebhook(c client.Client, logger *logrus.Entry, namespace string, labels map[string]string, podSelecetors map[string]string) error {
+func EnsureNetworkPolicyForWebhook(ctx context.Context, c client.Client, logger *logrus.Entry, namespace string, labels map[string]string, podSelecetors map[string]string) error {
 	networkPolicy := &networkv1.NetworkPolicy{}
 	expectedNetworkPolicy := &networkv1.NetworkPolicy{
 		ObjectMeta: metav1.ObjectMeta{
@@ -169,14 +169,14 @@ func EnsureNetworkPolicyForWebhook(c client.Client, logger *logrus.Entry, namesp
 		},
 	}
 
-	if err := c.Get(context.Background(), types.NamespacedName{Namespace: expectedNetworkPolicy.GetNamespace(), Name: expectedNetworkPolicy.GetName()}, networkPolicy); err != nil {
+	if err := c.Get(ctx, types.NamespacedName{Namespace: expectedNetworkPolicy.GetNamespace(), Name: expectedNetworkPolicy.GetName()}, networkPolicy); err != nil {
 		// Create
 		if k8serrors.IsNotFound(err) {
 			// Set diff 3-way annotations
 			if err := patch.DefaultAnnotator.SetLastAppliedAnnotation(networkPolicy); err != nil {
 				return errors.Wrap(err, "Error when set annotation for 3-way diff on NetworkPolicy for webhook")
 			}
-			if err = c.Create(context.Background(), expectedNetworkPolicy); err != nil {
+			if err = c.Create(ctx, expectedNetworkPolicy); err != nil {
 				return errors.Wrap(err, "Error when create NetworkPolicy for webhook")
 			}
 
@@ -195,8 +195,12 @@ func EnsureNetworkPolicyForWebhook(c client.Client, logger *logrus.Entry, namesp
 
 	// Update
 	if !patchResult.IsEmpty() {
-		networkPolicy = patchResult.Patched.(*networkv1.NetworkPolicy)
-		if err = c.Update(context.Background(), networkPolicy); err != nil {
+		patchedNP, ok := patchResult.Patched.(*networkv1.NetworkPolicy)
+		if !ok {
+			return errors.New("unexpected type in patch result: expected *networkv1.NetworkPolicy")
+		}
+		networkPolicy = patchedNP
+		if err = c.Update(ctx, networkPolicy); err != nil {
 			return errors.Wrap(err, "Error when update NetworkPolicy for webhook")
 		}
 		logger.Info("Successfully update networkPolicy for webhook")

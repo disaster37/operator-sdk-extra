@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"context"
+	"errors"
 
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -15,7 +16,11 @@ const lastAppliedConfigAnnotation = "kubectl.kubernetes.io/last-applied-configur
 // from the API server without persisting changes. The input obj is deep-copied
 // to avoid mutation.
 func DryRunApply(ctx context.Context, c client.Client, obj client.Object, fieldManager string) (*unstructured.Unstructured, error) {
-	copied := obj.DeepCopyObject().(client.Object)
+	copiedObj, ok := obj.DeepCopyObject().(client.Object)
+	if !ok {
+		return nil, errors.New("DeepCopyObject did not return a client.Object")
+	}
+	copied := copiedObj
 	u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(copied)
 	if err != nil {
 		return nil, err

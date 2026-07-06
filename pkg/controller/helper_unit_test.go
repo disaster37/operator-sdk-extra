@@ -27,7 +27,7 @@ func TestEnsureNetworkPolicyForWebhook(t *testing.T) {
 		c := fake.NewClientBuilder().WithScheme(scheme).Build()
 		logger := logrus.NewEntry(logrus.StandardLogger())
 
-		err := EnsureNetworkPolicyForWebhook(c, logger, "test-ns", labels, podSelectors)
+		err := EnsureNetworkPolicyForWebhook(context.Background(), c, logger, "test-ns", labels, podSelectors)
 		assert.NoError(t, err)
 
 		np := &networkv1.NetworkPolicy{}
@@ -54,7 +54,7 @@ func TestEnsureNetworkPolicyForWebhook(t *testing.T) {
 		c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(existingNP).Build()
 		logger := logrus.NewEntry(logrus.StandardLogger())
 
-		err := EnsureNetworkPolicyForWebhook(c, logger, "test-ns", labels, podSelectors)
+		err := EnsureNetworkPolicyForWebhook(context.Background(), c, logger, "test-ns", labels, podSelectors)
 		assert.NoError(t, err)
 	})
 }

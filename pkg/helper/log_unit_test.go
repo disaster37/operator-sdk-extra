@@ -31,7 +31,7 @@ func TestGetLogrusLogLevelFromEnv(t *testing.T) {
 			if tt.envValue != "" {
 				t.Setenv("LOG_LEVEL", tt.envValue)
 			} else {
-				os.Unsetenv("LOG_LEVEL")
+				_ = os.Unsetenv("LOG_LEVEL")
 			}
 
 			result := GetLogrusLogLevelFromEnv()
@@ -43,7 +43,7 @@ func TestGetLogrusLogLevelFromEnv(t *testing.T) {
 func TestGetLogrusFormatterFromEnv(t *testing.T) {
 	t.Run("json formatter", func(t *testing.T) {
 		t.Setenv("LOG_FORMATTER", "json")
-		
+
 		result := GetLogrusFormatterFromEnv()
 		_, isJSONFormatter := result.(*logrus.JSONFormatter)
 		assert.True(t, isJSONFormatter)
@@ -51,8 +51,8 @@ func TestGetLogrusFormatterFromEnv(t *testing.T) {
 
 	t.Run("text formatter (default)", func(t *testing.T) {
 		// Test with empty/missing env var
-		os.Unsetenv("LOG_FORMATTER")
-		
+		_ = os.Unsetenv("LOG_FORMATTER")
+
 		result := GetLogrusFormatterFromEnv()
 		_, isTextFormatter := result.(*logrus.TextFormatter)
 		assert.True(t, isTextFormatter)
@@ -60,7 +60,7 @@ func TestGetLogrusFormatterFromEnv(t *testing.T) {
 
 	t.Run("case insensitive json formatter", func(t *testing.T) {
 		t.Setenv("LOG_FORMATTER", "JSON")
-		
+
 		result := GetLogrusFormatterFromEnv()
 		_, isJSONFormatter := result.(*logrus.JSONFormatter)
 		assert.True(t, isJSONFormatter)

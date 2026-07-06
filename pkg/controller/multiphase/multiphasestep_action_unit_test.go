@@ -12,8 +12,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/tools/record"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -21,11 +21,11 @@ import (
 
 type mockMultiPhaseObject struct {
 	object.MultiPhaseObject
-	name             string
-	namespace        string
-	annotations      map[string]string
+	name              string
+	namespace         string
+	annotations       map[string]string
 	deletionTimestamp *metav1.Time
-	status           mockStatus
+	status            mockStatus
 }
 
 func (m *mockMultiPhaseObject) GetName() string {
@@ -42,9 +42,9 @@ func (m *mockMultiPhaseObject) GetAnnotations() map[string]string {
 
 func (m *mockMultiPhaseObject) GetObjectMeta() metav1.ObjectMeta {
 	return metav1.ObjectMeta{
-		Name:             m.name,
-		Namespace:        m.namespace,
-		Annotations:      m.annotations,
+		Name:              m.name,
+		Namespace:         m.namespace,
+		Annotations:       m.annotations,
 		DeletionTimestamp: m.deletionTimestamp,
 	}
 }
@@ -97,13 +97,9 @@ func (m *mockStepObject) DeepCopyObject() runtime.Object {
 	return m
 }
 
-type mockMultiPhaseRead struct {
-	MultiPhaseRead[*mockStepObject]
-}
-
 func TestDefaultMultiPhaseStepReconcilerAction_Configure(t *testing.T) {
 	scheme := runtime.NewScheme()
-	clientgoscheme.AddToScheme(scheme)
+	_ = clientgoscheme.AddToScheme(scheme)
 
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 	recorder := record.NewFakeRecorder(10)
@@ -140,7 +136,7 @@ func TestDefaultMultiPhaseStepReconcilerAction_Configure(t *testing.T) {
 
 func TestDefaultMultiPhaseStepReconcilerAction_Read(t *testing.T) {
 	scheme := runtime.NewScheme()
-	clientgoscheme.AddToScheme(scheme)
+	_ = clientgoscheme.AddToScheme(scheme)
 
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 	recorder := record.NewFakeRecorder(10)
@@ -180,7 +176,7 @@ func TestDefaultMultiPhaseStepReconcilerAction_Delete(t *testing.T) {
 
 func TestDefaultMultiPhaseStepReconcilerAction_OnError(t *testing.T) {
 	scheme := runtime.NewScheme()
-	clientgoscheme.AddToScheme(scheme)
+	_ = clientgoscheme.AddToScheme(scheme)
 
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 	recorder := record.NewFakeRecorder(10)
@@ -220,7 +216,7 @@ func TestDefaultMultiPhaseStepReconcilerAction_OnError(t *testing.T) {
 
 func TestDefaultMultiPhaseStepReconcilerAction_OnSuccess(t *testing.T) {
 	scheme := runtime.NewScheme()
-	clientgoscheme.AddToScheme(scheme)
+	_ = clientgoscheme.AddToScheme(scheme)
 
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 	recorder := record.NewFakeRecorder(10)
@@ -273,7 +269,7 @@ func TestDefaultMultiPhaseStepReconcilerAction_OnSuccess(t *testing.T) {
 
 func TestDefaultMultiPhaseStepReconcilerAction_GetPhaseName(t *testing.T) {
 	scheme := runtime.NewScheme()
-	clientgoscheme.AddToScheme(scheme)
+	_ = clientgoscheme.AddToScheme(scheme)
 
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 	recorder := record.NewFakeRecorder(10)
@@ -292,12 +288,3 @@ func TestDefaultMultiPhaseStepReconcilerAction_GetPhaseName(t *testing.T) {
 		assert.Equal(t, shared.PhaseName("test-phase"), phaseName)
 	})
 }
-
-type mockLogrusEntry struct{}
-
-func (m *mockLogrusEntry) Debug(args ...interface{}) {}
-func (m *mockLogrusEntry) Info(args ...interface{})  {}
-func (m *mockLogrusEntry) Error(args ...interface{}) {}
-func (m *mockLogrusEntry) Debugf(format string, args ...interface{}) {}
-func (m *mockLogrusEntry) Infof(format string, args ...interface{})  {}
-func (m *mockLogrusEntry) Errorf(format string, args ...interface{}) {}

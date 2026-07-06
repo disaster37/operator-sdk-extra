@@ -38,9 +38,9 @@ func (m *mockLogger) WithName(name string) logr.LogSink {
 
 func TestPrintVersion(t *testing.T) {
 	logger := &mockLogger{}
-	
+
 	PrintVersion(logr.New(logger), "metrics_addr", "probe_addr")
-	
+
 	// Check that logger received messages
 	assert.Len(t, logger.messages, 4)
 	assert.Contains(t, logger.messages, "Binary info ")
@@ -50,15 +50,15 @@ func TestPrintVersion(t *testing.T) {
 func TestGetWatchNamespaceFromEnvUnit(t *testing.T) {
 	t.Run("namespace is set", func(t *testing.T) {
 		t.Setenv("WATCH_NAMESPACES", "test-namespace")
-		
+
 		ns, err := GetWatchNamespaceFromEnv()
 		assert.NoError(t, err)
 		assert.Equal(t, "test-namespace", ns)
 	})
 
 	t.Run("namespace is not set", func(t *testing.T) {
-		os.Unsetenv("WATCH_NAMESPACES")
-		
+		_ = os.Unsetenv("WATCH_NAMESPACES")
+
 		_, err := GetWatchNamespaceFromEnv()
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "WATCH_NAMESPACES must be set")
@@ -68,15 +68,15 @@ func TestGetWatchNamespaceFromEnvUnit(t *testing.T) {
 func TestGetKubeClientTimeoutFromEnvUnit(t *testing.T) {
 	t.Run("timeout is set with valid duration", func(t *testing.T) {
 		t.Setenv("KUBE_CLIENT_TIMEOUT", "60s")
-		
+
 		timeout, err := GetKubeClientTimeoutFromEnv()
 		assert.NoError(t, err)
 		assert.Equal(t, 60*time.Second, timeout)
 	})
 
 	t.Run("timeout is not set - default value", func(t *testing.T) {
-		os.Unsetenv("KUBE_CLIENT_TIMEOUT")
-		
+		_ = os.Unsetenv("KUBE_CLIENT_TIMEOUT")
+
 		timeout, err := GetKubeClientTimeoutFromEnv()
 		assert.NoError(t, err)
 		assert.Equal(t, 30*time.Second, timeout)
@@ -84,7 +84,7 @@ func TestGetKubeClientTimeoutFromEnvUnit(t *testing.T) {
 
 	t.Run("timeout is set with invalid duration", func(t *testing.T) {
 		t.Setenv("KUBE_CLIENT_TIMEOUT", "invalid-duration")
-		
+
 		_, err := GetKubeClientTimeoutFromEnv()
 		assert.Error(t, err)
 	})

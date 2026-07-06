@@ -8,5 +8,5 @@ import (
 
 // ToObject permit to convert object type
 func ToObject[srcType client.Object, dstType client.Object](o srcType) (res dstType) {
-	return reflect.ValueOf(o).Interface().(dstType)
+	return reflect.ValueOf(o).Interface().(dstType) //nolint:forcetypeassert // generics guarantee type safety at call site
 }

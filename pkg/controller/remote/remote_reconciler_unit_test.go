@@ -39,10 +39,6 @@ type mockRemoteReconcilerAction2 struct {
 	diffRes                 reconcile.Result
 	diffErr                 error
 	diffObj                 RemoteDiff[mockAPIObject]
-	createRes               reconcile.Result
-	createErr               error
-	updateRes               reconcile.Result
-	updateErr               error
 }
 
 func (m *mockRemoteReconcilerAction2) GetRemoteHandler(ctx context.Context, req reconcile.Request, o *mockRemoteObject, logger *logrus.Entry) (RemoteExternalReconciler[*mockRemoteObject, mockAPIObject, mockAPIClient], reconcile.Result, error) {
@@ -96,8 +92,8 @@ func TestDefaultRemoteReconciler_Reconcile(t *testing.T) {
 	require.NoError(t, err)
 
 	obj := &mockRemoteObject{
-		name:      "test",
-		namespace: "default",
+		name:       "test",
+		namespace:  "default",
 		generation: 1,
 	}
 
