@@ -198,12 +198,8 @@ func (h *DefaultRemoteReconcilerAction[k8sObject, apiObject, apiClient]) OnSucce
 
 func (h *DefaultRemoteReconcilerAction[k8sObject, apiObject, apiClient]) Diff(ctx context.Context, o k8sObject, read RemoteRead[apiObject], data map[string]any, handler RemoteExternalReconciler[k8sObject, apiObject, apiClient], logger *logrus.Entry, ignoreDiff ...patch.CalculateOption) (diff RemoteDiff[apiObject], res reconcile.Result, err error) {
 	// Get the original object from status to use 3-way diff
-	var (
-		originalObject *apiObject
-		nilObject      apiObject
-	)
-
-	originalObject = new(apiObject)
+	var nilObject apiObject
+	originalObject := new(apiObject)
 	if o.GetStatus().GetLastAppliedConfiguration() != "" {
 		if err = helper.UnZipBase64Decode(o.GetStatus().GetLastAppliedConfiguration(), originalObject); err != nil {
 			return diff, res, errors.Wrap(err, "Error when create object from 'lastAppliedConfiguration'")

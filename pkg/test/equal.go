@@ -15,7 +15,7 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-func EqualFromYamlFile[k8sobject comparable](t *testing.T, expectedYamlFile string, actual client.Object, s runtime.ObjectTyper) {
+func EqualFromYamlFile[k8sobject any](t *testing.T, expectedYamlFile string, actual client.Object, s runtime.ObjectTyper) {
 	if expectedYamlFile == "" {
 		panic("expectedYamlFile must be provided")
 	}

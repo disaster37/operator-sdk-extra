@@ -51,17 +51,19 @@ func (h *DefaultSentinelRead) SetCurrentObjects(objects []client.Object) {
 	}
 }
 
+func (h *DefaultSentinelRead) getOrCreateRead(t string) multiphase.MultiPhaseRead[client.Object] {
+	if h.reads[t] == nil {
+		h.reads[t] = multiphase.NewMultiPhaseRead[client.Object]()
+	}
+	return h.reads[t]
+}
+
 func (h *DefaultSentinelRead) AddCurrentObject(o client.Object) {
 	if reflect.ValueOf(o).IsNil() {
 		return
 	}
 	o = GetObjectWithMeta(o, h.scheme)
-	t := GetObjectType(o.GetObjectKind())
-	if h.reads[t] == nil {
-		h.reads[t] = multiphase.NewMultiPhaseRead[client.Object]()
-	}
-
-	h.reads[t].AddCurrentObject(o)
+	h.getOrCreateRead(GetObjectType(o.GetObjectKind())).AddCurrentObject(o)
 }
 
 func (h *DefaultSentinelRead) SetExpectedObjects(objects []client.Object) {
@@ -75,10 +77,5 @@ func (h *DefaultSentinelRead) AddExpectedObject(o client.Object) {
 		return
 	}
 	o = GetObjectWithMeta(o, h.scheme)
-	t := GetObjectType(o.GetObjectKind())
-	if h.reads[t] == nil {
-		h.reads[t] = multiphase.NewMultiPhaseRead[client.Object]()
-	}
-
-	h.reads[t].AddExpectedObject(o)
+	h.getOrCreateRead(GetObjectType(o.GetObjectKind())).AddExpectedObject(o)
 }

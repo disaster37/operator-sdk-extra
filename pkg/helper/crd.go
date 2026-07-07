@@ -15,9 +15,5 @@ import (
 // Returns:
 // - bool: True if the server supports the given groupVersion, false otherwise.
 func HasCRD(kclient kubernetes.Interface, groupVersion schema.GroupVersion) bool {
-	if err := discovery.ServerSupportsVersion(kclient.Discovery(), groupVersion); err != nil {
-		return false
-	}
-
-	return true
+	return discovery.ServerSupportsVersion(kclient.Discovery(), groupVersion) == nil
 }

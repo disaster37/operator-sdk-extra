@@ -2,6 +2,7 @@ package helper
 
 import (
 	"fmt"
+	"maps"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -20,27 +21,11 @@ func Diff(expected, current any) string {
 
 // DiffMapString permit to diff map[string]string
 func DiffMapString(expected, current map[string]string, excludeKeys []string) string {
-	tmpExpected := map[string]string{}
-	tmpCurrent := map[string]string{}
-
-Loop:
-	for key, val := range expected {
-		for _, excludeKey := range excludeKeys {
-			if key == excludeKey {
-				continue Loop
-			}
-		}
-		tmpExpected[key] = val
-	}
-
-Loop2:
-	for key, val := range current {
-		for _, excludeKey := range excludeKeys {
-			if key == excludeKey {
-				continue Loop2
-			}
-		}
-		tmpCurrent[key] = val
+	tmpExpected := maps.Clone(expected)
+	tmpCurrent := maps.Clone(current)
+	for _, key := range excludeKeys {
+		delete(tmpExpected, key)
+		delete(tmpCurrent, key)
 	}
 
 	return cmp.Diff(tmpCurrent, tmpExpected)
@@ -55,12 +40,13 @@ func DiffOwnerReferences(owner client.Object, object client.Object) (diff string
 		if err != nil {
 			return "", err
 		}
-		if group.Group == owner.GetObjectKind().GroupVersionKind().Group && existing.Kind == owner.GetObjectKind().GroupVersionKind().Kind {
-			if group.Version != owner.GetObjectKind().GroupVersionKind().Version {
-				return fmt.Sprintf("Owner references differ: %s vs %s/%s", existing.APIVersion, owner.GetObjectKind().GroupVersionKind().Group, owner.GetObjectKind().GroupVersionKind().Version), nil
+		gvk := owner.GetObjectKind().GroupVersionKind()
+		if group.Group == gvk.Group && existing.Kind == gvk.Kind {
+			if group.Version != gvk.Version {
+				return fmt.Sprintf("Owner references differ: %s vs %s/%s", existing.APIVersion, gvk.Group, gvk.Version), nil
 			}
 		} else {
-			return fmt.Sprintf("Owner references differ: %s.%s vs %s.%s/%s", existing.Kind, existing.APIVersion, owner.GetObjectKind().GroupVersionKind().Kind, owner.GetObjectKind().GroupVersionKind().Group, owner.GetObjectKind().GroupVersionKind().Version), nil
+			return fmt.Sprintf("Owner references differ: %s.%s vs %s.%s/%s", existing.Kind, existing.APIVersion, gvk.Kind, gvk.Group, gvk.Version), nil
 		}
 
 	} else {

@@ -72,14 +72,7 @@ func (h *DefaultMultiPhaseDiff[k8sStepObject]) GetObjectsToCreate() []k8sStepObj
 }
 
 func (h *DefaultMultiPhaseDiff[k8sStepObject]) SetObjectsToCreate(objects []k8sStepObject) {
-	if len(objects) == 0 {
-		return
-	}
-	if len(h.createObjects) == 0 {
-		h.createObjects = objects
-	} else {
-		h.createObjects = append(h.createObjects, objects...)
-	}
+	h.createObjects = append(h.createObjects, objects...)
 }
 
 func (h *DefaultMultiPhaseDiff[k8sStepObject]) AddObjectToCreate(o k8sStepObject) {
@@ -91,14 +84,7 @@ func (h *DefaultMultiPhaseDiff[k8sStepObject]) GetObjectsToUpdate() []k8sStepObj
 }
 
 func (h *DefaultMultiPhaseDiff[k8sStepObject]) SetObjectsToUpdate(objects []k8sStepObject) {
-	if len(objects) == 0 {
-		return
-	}
-	if len(h.updateObjects) == 0 {
-		h.updateObjects = objects
-	} else {
-		h.updateObjects = append(h.updateObjects, objects...)
-	}
+	h.updateObjects = append(h.updateObjects, objects...)
 }
 
 func (h *DefaultMultiPhaseDiff[k8sStepObject]) AddObjectToUpdate(o k8sStepObject) {
@@ -110,14 +96,7 @@ func (h *DefaultMultiPhaseDiff[k8sStepObject]) GetObjectsToDelete() []k8sStepObj
 }
 
 func (h *DefaultMultiPhaseDiff[k8sStepObject]) SetObjectsToDelete(objects []k8sStepObject) {
-	if len(objects) == 0 {
-		return
-	}
-	if len(h.deleteObjects) == 0 {
-		h.deleteObjects = objects
-	} else {
-		h.deleteObjects = append(h.deleteObjects, objects...)
-	}
+	h.deleteObjects = append(h.deleteObjects, objects...)
 }
 
 func (h *DefaultMultiPhaseDiff[k8sStepObject]) AddObjectToDelete(o k8sStepObject) {
@@ -244,9 +223,7 @@ func ClassifyObjects[T client.Object](
 
 	for _, expected := range expectedObjects {
 		current, exists := unmatchedCurrent[expected.GetName()]
-		if exists {
-			delete(unmatchedCurrent, expected.GetName())
-		}
+		delete(unmatchedCurrent, expected.GetName())
 
 		if !exists {
 			creates = append(creates, expected)

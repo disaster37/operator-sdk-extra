@@ -33,15 +33,11 @@ func (h *DefaultObjectStatus) SetConditions(conditions []metav1.Condition) {
 }
 
 func (h *DefaultObjectStatus) GetIsOnError() bool {
-	if h.IsOnError == nil || !*h.IsOnError {
-		return false
-	}
-
-	return true
+	return h.IsOnError != nil && *h.IsOnError
 }
 
 func (h *DefaultObjectStatus) SetIsOnError(isError bool) {
-	h.IsOnError = ptr.To[bool](isError)
+	h.IsOnError = ptr.To(isError)
 }
 
 func (h *DefaultObjectStatus) GetLastErrorMessage() string {

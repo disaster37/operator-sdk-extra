@@ -90,7 +90,7 @@ func newTemplateAnnotationsReconciler[k8sObject client.Object](c client.Client, 
 			c,
 			recorder,
 			"test-sentinel-operator",
-			false,
+			true,
 		),
 	}
 }

@@ -44,9 +44,8 @@ func NewTestCase[k8sObject client.Object](t *testing.T, c client.Client, key typ
 
 func (h *TestCase[k8sObject]) Run() {
 	var (
-		err       error
-		o         k8sObject
-		nilObject k8sObject
+		err error
+		o   k8sObject
 	)
 
 	stepName := new(string)
@@ -66,29 +65,33 @@ func (h *TestCase[k8sObject]) Run() {
 			}
 		}
 
-		o = getNewObject(o)
-		if err = h.client.Get(context.Background(), h.key, o); err != nil {
-			if !k8serrors.IsNotFound(err) {
-				h.t.Fatal(err)
-			}
-			o = nilObject
-		}
+		o = h.getObjectOrNil(o)
 		if err = step.Do(h.client, h.key, o, h.data); err != nil {
 			h.t.Fatal(err)
 		}
 
-		o = getNewObject(o)
-		if err = h.client.Get(context.Background(), h.key, o); err != nil {
-			if !k8serrors.IsNotFound(err) {
+		o = h.getObjectOrNil(o)
+		if step.Check != nil {
+			if err = step.Check(h.t, h.client, h.key, o, h.data); err != nil {
 				h.t.Fatal(err)
 			}
-			o = nilObject
-		}
-		if err = step.Check(h.t, h.client, h.key, o, h.data); err != nil {
-			h.t.Fatal(err)
 		}
 		time.Sleep(h.wait)
 	}
+}
+
+// getObjectOrNil fetches the object at h.key into a fresh instance, returning the
+// zero value when the object does not exist.
+func (h *TestCase[k8sObject]) getObjectOrNil(o k8sObject) k8sObject {
+	var nilObject k8sObject
+	o = getNewObject(o)
+	if err := h.client.Get(context.Background(), h.key, o); err != nil {
+		if !k8serrors.IsNotFound(err) {
+			h.t.Fatal(err)
+		}
+		return nilObject
+	}
+	return o
 }
 
 func (h *TestCase[k8sObject]) Eventually(fn func(c client.Client) error, timeout, interval time.Duration) error {

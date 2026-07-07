@@ -20,8 +20,7 @@ func DryRunApply(ctx context.Context, c client.Client, obj client.Object, fieldM
 	if !ok {
 		return nil, errors.New("DeepCopyObject did not return a client.Object")
 	}
-	copied := copiedObj
-	u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(copied)
+	u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(copiedObj)
 	if err != nil {
 		return nil, err
 	}

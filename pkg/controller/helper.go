@@ -2,12 +2,15 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"time"
 
 	"emperror.dev/errors"
 	"github.com/disaster37/k8s-objectmatcher/patch"
 	"github.com/disaster37/operator-sdk-extra/v2/pkg/apis/shared"
+	"github.com/google/go-cmp/cmp"
+	"github.com/mitchellh/copystructure"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 	v1 "k8s.io/api/core/v1"
@@ -19,6 +22,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 const (
@@ -79,59 +83,32 @@ func UserFacingError(err error, maxLen int) string {
 	return msg[:maxLen-3] + "..."
 }
 
-// GetObjectMeta permit to get the metata from client.Object
-func GetObjectMeta(r client.Object) metav1.ObjectMeta {
-	rt := reflect.TypeOf(r)
-	if rt.Kind() != reflect.Ptr {
+// mustGetField returns the named field of a pointer to a struct client.Object.
+// It panics if the object is not a pointer or does not have the field.
+func mustGetField(r client.Object, name string) reflect.Value {
+	if reflect.TypeOf(r).Kind() != reflect.Ptr {
 		panic("Resource must be pointer")
 	}
-	rv := reflect.ValueOf(r).Elem()
-	om := rv.FieldByName("ObjectMeta")
-	if !om.IsValid() {
-		panic("Resouce must have field ObjectMeta")
+	f := reflect.ValueOf(r).Elem().FieldByName(name)
+	if !f.IsValid() {
+		panic("Resouce must have field " + name)
 	}
-	return om.Interface().(metav1.ObjectMeta) //nolint:forcetypeassert // field existence validated above
+	return f
+}
+
+// GetObjectMeta permit to get the metata from client.Object
+func GetObjectMeta(r client.Object) metav1.ObjectMeta {
+	return mustGetField(r, "ObjectMeta").Interface().(metav1.ObjectMeta) //nolint:forcetypeassert // field existence validated above
 }
 
 // GetObjectStatus permit to get the status from client.Object
 func GetObjectStatus(r client.Object) any {
-	rt := reflect.TypeOf(r)
-	if rt.Kind() != reflect.Ptr {
-		panic("Resource must be pointer")
-	}
-	rv := reflect.ValueOf(r).Elem()
-	om := rv.FieldByName("Status")
-	if !om.IsValid() {
-		panic("Resouce must have field Status")
-	}
-	return om.Interface()
+	return mustGetField(r, "Status").Interface()
 }
 
 // MustInjectTypeMeta permit to inject the typeMeta from src to dst
 func MustInjectTypeMeta(src, dst client.Object) {
-	var rt reflect.Type
-
-	rt = reflect.TypeOf(src)
-	if rt.Kind() != reflect.Ptr {
-		panic("Resource must be pointer")
-	}
-	rt = reflect.TypeOf(dst)
-	if rt.Kind() != reflect.Ptr {
-		panic("Resource must be pointer")
-	}
-
-	rvSrc := reflect.ValueOf(src).Elem()
-	omSrc := rvSrc.FieldByName("TypeMeta")
-	if !omSrc.IsValid() {
-		panic("src must have field TypeMeta")
-	}
-	rvDst := reflect.ValueOf(dst).Elem()
-	omDst := rvDst.FieldByName("TypeMeta")
-	if !omDst.IsValid() {
-		panic("dst must have field TypeMeta")
-	}
-
-	omDst.Set(omSrc)
+	mustGetField(dst, "TypeMeta").Set(mustGetField(src, "TypeMeta"))
 }
 
 // DefaultControllerRateLimiter set rate limiter that is lower agressive than the default
@@ -173,7 +150,7 @@ func EnsureNetworkPolicyForWebhook(ctx context.Context, c client.Client, logger 
 		// Create
 		if k8serrors.IsNotFound(err) {
 			// Set diff 3-way annotations
-			if err := patch.DefaultAnnotator.SetLastAppliedAnnotation(networkPolicy); err != nil {
+			if err := patch.DefaultAnnotator.SetLastAppliedAnnotation(expectedNetworkPolicy); err != nil {
 				return errors.Wrap(err, "Error when set annotation for 3-way diff on NetworkPolicy for webhook")
 			}
 			if err = c.Create(ctx, expectedNetworkPolicy); err != nil {
@@ -199,12 +176,58 @@ func EnsureNetworkPolicyForWebhook(ctx context.Context, c client.Client, logger 
 		if !ok {
 			return errors.New("unexpected type in patch result: expected *networkv1.NetworkPolicy")
 		}
-		networkPolicy = patchedNP
-		if err = c.Update(ctx, networkPolicy); err != nil {
+		if err = c.Update(ctx, patchedNP); err != nil {
 			return errors.Wrap(err, "Error when update NetworkPolicy for webhook")
 		}
 		logger.Info("Successfully update networkPolicy for webhook")
 	}
 
 	return nil
+}
+
+// GetObjectFromReconciler fetches the reconciled object into o.
+// It returns (found=false, nil) when the object no longer exists, so the caller
+// can stop the reconcile loop cleanly.
+func GetObjectFromReconciler(ctx context.Context, c client.Client, req reconcile.Request, o client.Object, logger *logrus.Entry) (found bool, err error) {
+	if err = c.Get(ctx, req.NamespacedName, o); err != nil {
+		if k8serrors.IsNotFound(err) {
+			return false, nil
+		}
+		logger.Errorf("Error when get object: %s", err.Error())
+		return false, errors.Wrap(err, ErrWhenGetObjectFromReconciler.Error())
+	}
+	logger.Debug("Get object successfully")
+	return true, nil
+}
+
+// DeferStatusUpdate snapshots the current object status and returns a deferred
+// function that updates the status on the API server if it changed.
+// It returns a no-op function when the object has no status.
+func DeferStatusUpdate(ctx context.Context, c client.Client, o client.Object, logger *logrus.Entry) (deferred func() error, err error) {
+	if GetObjectStatus(o) == nil {
+		return func() error { return nil }, nil
+	}
+
+	currentStatus, err := copystructure.Copy(GetObjectStatus(o))
+	if err != nil {
+		logger.Errorf("Error when get object status: %s", err.Error())
+		return nil, errors.Wrap(err, ErrWhenGetObjectStatus.Error())
+	}
+
+	return func() error {
+		if !reflect.DeepEqual(currentStatus, GetObjectStatus(o)) {
+			logger.Debugf("Detect that it need to update status with diff:\n%s", cmp.Diff(currentStatus, GetObjectStatus(o)))
+			if err := c.Status().Update(ctx, o); err != nil {
+				logger.Errorf("Error when update resource status: %s", err.Error())
+				return err
+			}
+			logger.Debug("Update status successfully")
+		}
+		return nil
+	}, nil
+}
+
+// IsReconcileIgnored returns true when the object carries the ignoreReconcile annotation.
+func IsReconcileIgnored(o client.Object) bool {
+	return o.GetAnnotations()[fmt.Sprintf("%s/ignoreReconcile", BaseAnnotation)] == "true"
 }

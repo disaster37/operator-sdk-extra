@@ -109,8 +109,6 @@ func (h *DefaultSentinelAction[k8sObject]) Apply(ctx context.Context, o k8sObjec
 
 // Delete deletes objects
 func (h *DefaultSentinelAction[k8sObject]) Delete(ctx context.Context, o k8sObject, data map[string]any, objects []client.Object, logger *logrus.Entry) (res reconcile.Result, err error) {
-	// Note: Apply mutates diff objects in-place (clears managedFields and resourceVersion).
-	// Callers must not reuse objects from GetObjectsToApply() after calling Apply.
 	for _, oChild := range objects {
 		if err = h.Client().Delete(ctx, oChild); err != nil {
 			return res, errors.Wrapf(err, "Error when delete object '%s'", oChild.GetName())

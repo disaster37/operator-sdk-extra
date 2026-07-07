@@ -4,7 +4,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// MultiPhaseObject is used when your CRD is used to create multiple K8s resources
+// RemoteObject is use when your CRD is used to call remote API (not create K8s resources)
 type RemoteObject interface {
 	client.Object
 
@@ -15,7 +15,7 @@ type RemoteObject interface {
 	GetExternalName() string
 }
 
-// RemoteObject is use when your CRD is used to call remote API (not create K8s resources)
+// RemoteObjectStatus is the status interface for a RemoteObject
 type RemoteObjectStatus interface {
 	ObjectStatus
 

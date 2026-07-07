@@ -10,9 +10,7 @@ import (
 
 func GetZapLogLevelFromEnv() zapcore.Level {
 	switch logLevel, _ := os.LookupEnv("LOG_LEVEL"); strings.ToLower(logLevel) {
-	case "trace":
-		return zapcore.DebugLevel
-	case zapcore.DebugLevel.String():
+	case "trace", zapcore.DebugLevel.String():
 		return zapcore.DebugLevel
 	case zapcore.InfoLevel.String():
 		return zapcore.InfoLevel
@@ -45,9 +43,7 @@ func GetLogrusLogLevelFromEnv() logrus.Level {
 		return logrus.DebugLevel
 	case logrus.InfoLevel.String():
 		return logrus.InfoLevel
-	case "warn":
-		return logrus.WarnLevel
-	case logrus.WarnLevel.String():
+	case "warn", logrus.WarnLevel.String():
 		return logrus.WarnLevel
 	case logrus.ErrorLevel.String():
 		return logrus.ErrorLevel

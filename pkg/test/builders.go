@@ -16,10 +16,6 @@ func NewCR[T client.Object](name, namespace string) *CRBuilder[T] {
 	return &CRBuilder[T]{obj: obj}
 }
 
-func (b *CRBuilder[T]) WithSpec(spec any) *CRBuilder[T] {
-	return b
-}
-
 func (b *CRBuilder[T]) WithLabels(labels map[string]string) *CRBuilder[T] {
 	b.obj.SetLabels(labels)
 	return b

@@ -19,15 +19,11 @@ type DefaultRemoteObjectStatus struct {
 }
 
 func (h *DefaultRemoteObjectStatus) GetIsSync() bool {
-	if h.IsSync == nil || !*h.IsSync {
-		return false
-	}
-
-	return true
+	return h.IsSync != nil && *h.IsSync
 }
 
 func (h *DefaultRemoteObjectStatus) SetIsSync(isSync bool) {
-	h.IsSync = ptr.To[bool](isSync)
+	h.IsSync = ptr.To(isSync)
 }
 
 func (h *DefaultRemoteObjectStatus) GetLastAppliedConfiguration() string {

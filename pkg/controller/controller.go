@@ -26,7 +26,6 @@ type Controller interface {
 type DefaultController struct{}
 
 // NewController is the default implementation of Controller
-// index can be nil
 func NewController() Controller {
 	return &DefaultController{}
 }
@@ -35,7 +34,7 @@ func (h *DefaultController) SetupWithManager(mgr ctrl.Manager) error {
 	panic("You need implement it")
 }
 
-func (h *DefaultController) Reconcile(context.Context, reconcile.Request) (res reconcile.Result, err error) {
+func (h *DefaultController) Reconcile(context.Context, reconcile.Request) (reconcile.Result, error) {
 	panic("You need implement it")
 }
 

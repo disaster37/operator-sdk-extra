@@ -55,7 +55,8 @@ func GetObjectType(o schema.ObjectKind) string {
 	if o == nil {
 		panic("Object can't be nil")
 	}
-	return fmt.Sprintf("%s/%s/%s", o.GroupVersionKind().Group, o.GroupVersionKind().Version, o.GroupVersionKind().Kind)
+	gvk := o.GroupVersionKind()
+	return fmt.Sprintf("%s/%s/%s", gvk.Group, gvk.Version, gvk.Kind)
 }
 
 // CloneObject permit to clone current object type

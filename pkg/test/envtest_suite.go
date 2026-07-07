@@ -85,8 +85,7 @@ func (s *EnvTestSuite) SetupSuite() {
 	}
 
 	go func() {
-		err = k8sManager.Start(ctrl.SetupSignalHandler())
-		if err != nil {
+		if err := k8sManager.Start(ctrl.SetupSignalHandler()); err != nil {
 			panic(err)
 		}
 	}()

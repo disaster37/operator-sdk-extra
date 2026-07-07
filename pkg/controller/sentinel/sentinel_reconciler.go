@@ -2,17 +2,12 @@ package sentinel
 
 import (
 	"context"
-	"fmt"
-	"reflect"
 	"time"
 
 	"emperror.dev/errors"
 	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller"
 	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller/multiphase"
-	"github.com/google/go-cmp/cmp"
-	"github.com/mitchellh/copystructure"
 	"github.com/sirupsen/logrus"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -67,35 +62,27 @@ func (h *DefaultSentinelReconciler[k8sObject]) Reconcile(ctx context.Context, re
 	time.Sleep(time.Second * 1)
 
 	// Get current resource
-	if err = h.Client().Get(ctx, req.NamespacedName, o); err != nil {
-		if k8serrors.IsNotFound(err) {
-			return res, nil
-		}
-		logger.Errorf("Error when get object: %s", err.Error())
-		return res, errors.Wrap(err, controller.ErrWhenGetObjectFromReconciler.Error())
+	found, err := controller.GetObjectFromReconciler(ctx, h.Client(), req, o, logger)
+	if err != nil {
+		return res, err
 	}
-	logger.Debug("Get object successfully")
+	if !found {
+		return res, nil
+	}
 
 	// Handle status update if exist
-	if controller.GetObjectStatus(o) != nil {
-		currentStatus, err := copystructure.Copy(controller.GetObjectStatus(o))
-		if err != nil {
-			logger.Errorf("Error when get object status: %s", err.Error())
-			return res, errors.Wrap(err, controller.ErrWhenGetObjectStatus.Error())
-		}
-		defer func() {
-			if !reflect.DeepEqual(currentStatus, controller.GetObjectStatus(o)) {
-				logger.Debugf("Detect that it need to update status with diff:\n%s", cmp.Diff(currentStatus, controller.GetObjectStatus(o)))
-				if err = h.Client().Status().Update(ctx, o); err != nil {
-					logger.Errorf("Error when update resource status: %s", err.Error())
-				}
-				logger.Debug("Update status successfully")
-			}
-		}()
+	deferStatusUpdate, err := controller.DeferStatusUpdate(ctx, h.Client(), o, logger)
+	if err != nil {
+		return res, err
 	}
+	defer func() {
+		if statusErr := deferStatusUpdate(); statusErr != nil {
+			err = statusErr
+		}
+	}()
 
 	// Ignore if needed by annotation
-	if o.GetAnnotations()[fmt.Sprintf("%s/ignoreReconcile", controller.BaseAnnotation)] == "true" {
+	if controller.IsReconcileIgnored(o) {
 		logger.Info("Found annotation on ressource to ignore reconcile")
 		return res, nil
 	}

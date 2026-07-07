@@ -33,10 +33,10 @@ func (ma *MapAny) DeepCopyInto(maCopy *MapAny) {
 	if err != nil {
 		panic(err)
 	}
-	clone := &map[string]any{}
-	err = json.Unmarshal(bytes, clone)
+	clone := map[string]any{}
+	err = json.Unmarshal(bytes, &clone)
 	if err != nil {
 		panic(err)
 	}
-	maCopy.Data = *clone
+	maCopy.Data = clone
 }

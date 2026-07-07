@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 	"testing"
 	"time"
 
@@ -57,10 +58,21 @@ func AssertHasPhase(t *testing.T, o object.MultiPhaseObject, phase string) {
 	}
 }
 
+// failOnWaitError fails the test with an appropriate message depending on whether
+// the wait timed out or errored.
+func failOnWaitError(t *testing.T, isTimeout bool, err error, timeoutMsg, errPrefix string) {
+	if err == nil && !isTimeout {
+		return
+	}
+	if err == nil {
+		t.Fatalf("%s", timeoutMsg)
+	}
+	t.Fatalf("%s: %s", errPrefix, err.Error())
+}
+
 func WaitForReadyCondition[T client.Object](t *testing.T, c client.Client, key types.NamespacedName, timeout time.Duration) {
 	isTimeout, err := RunWithTimeout(func() error {
-		var obj T
-		obj = reflectNewObject[T]()
+		obj := reflectNewObject[T]()
 		if err := c.Get(context.Background(), key, obj); err != nil {
 			return err
 		}
@@ -70,18 +82,14 @@ func WaitForReadyCondition[T client.Object](t *testing.T, c client.Client, key t
 		}
 		return fmt.Errorf("object %s/%s not ready yet", key.Namespace, key.Name)
 	}, timeout, 1*time.Second)
-	if err != nil || isTimeout {
-		if err == nil {
-			t.Fatalf("Timed out waiting for Ready condition on %s/%s", key.Namespace, key.Name)
-		}
-		t.Fatalf("Error waiting for Ready condition on %s/%s: %s", key.Namespace, key.Name, err.Error())
-	}
+	failOnWaitError(t, isTimeout, err,
+		fmt.Sprintf("Timed out waiting for Ready condition on %s/%s", key.Namespace, key.Name),
+		fmt.Sprintf("Error waiting for Ready condition on %s/%s", key.Namespace, key.Name))
 }
 
 func WaitForGenerationIncrement[T client.Object](t *testing.T, c client.Client, key types.NamespacedName, minGeneration int64, timeout time.Duration) {
 	isTimeout, err := RunWithTimeout(func() error {
-		var obj T
-		obj = reflectNewObject[T]()
+		obj := reflectNewObject[T]()
 		if err := c.Get(context.Background(), key, obj); err != nil {
 			return err
 		}
@@ -91,18 +99,14 @@ func WaitForGenerationIncrement[T client.Object](t *testing.T, c client.Client, 
 		}
 		return fmt.Errorf("observed generation %d < %d", observedGen, minGeneration)
 	}, timeout, 1*time.Second)
-	if err != nil || isTimeout {
-		if err == nil {
-			t.Fatalf("Timed out waiting for generation >= %d on %s/%s", minGeneration, key.Namespace, key.Name)
-		}
-		t.Fatalf("Error waiting for generation on %s/%s: %s", key.Namespace, key.Name, err.Error())
-	}
+	failOnWaitError(t, isTimeout, err,
+		fmt.Sprintf("Timed out waiting for generation >= %d on %s/%s", minGeneration, key.Namespace, key.Name),
+		fmt.Sprintf("Error waiting for generation on %s/%s", key.Namespace, key.Name))
 }
 
 func WaitForResourceVersionChange[T client.Object](t *testing.T, c client.Client, key types.NamespacedName, oldVersion string, timeout time.Duration) {
 	isTimeout, err := RunWithTimeout(func() error {
-		var obj T
-		obj = reflectNewObject[T]()
+		obj := reflectNewObject[T]()
 		if err := c.Get(context.Background(), key, obj); err != nil {
 			return err
 		}
@@ -111,23 +115,15 @@ func WaitForResourceVersionChange[T client.Object](t *testing.T, c client.Client
 		}
 		return fmt.Errorf("resource version not changed yet")
 	}, timeout, 1*time.Second)
-	if err != nil || isTimeout {
-		if err == nil {
-			t.Fatalf("Timed out waiting for resource version change on %s/%s", key.Namespace, key.Name)
-		}
-		t.Fatalf("Error waiting for resource version change on %s/%s: %s", key.Namespace, key.Name, err.Error())
-	}
+	failOnWaitError(t, isTimeout, err,
+		fmt.Sprintf("Timed out waiting for resource version change on %s/%s", key.Namespace, key.Name),
+		fmt.Sprintf("Error waiting for resource version change on %s/%s", key.Namespace, key.Name))
 }
 
 func AssertOwnerReference(t *testing.T, obj client.Object, owner metav1.Object) {
-	refs := obj.GetOwnerReferences()
-	found := false
-	for _, ref := range refs {
-		if ref.Name == owner.GetName() && ref.UID == owner.GetUID() {
-			found = true
-			break
-		}
-	}
+	found := slices.ContainsFunc(obj.GetOwnerReferences(), func(ref metav1.OwnerReference) bool {
+		return ref.Name == owner.GetName() && ref.UID == owner.GetUID()
+	})
 	if !found {
 		assert.Fail(t, fmt.Sprintf("Expected owner reference to %s/%s not found on %s/%s", owner.GetNamespace(), owner.GetName(), obj.GetNamespace(), obj.GetName()))
 	}
@@ -143,20 +139,26 @@ func reflectNewObject[T any]() T {
 	return reflect.New(reflect.TypeOf((*T)(nil)).Elem().Elem()).Interface().(T)
 }
 
-func reflectGetConditions(obj client.Object) []metav1.Condition {
-	rv := reflect.ValueOf(obj).Elem()
-	statusField := rv.FieldByName("Status")
+// reflectStatusField returns the named field of the object's Status struct.
+// The returned value is invalid when Status or the field is absent or unexported.
+func reflectStatusField(obj client.Object, name string) reflect.Value {
+	statusField := reflect.ValueOf(obj).Elem().FieldByName("Status")
 	if !statusField.IsValid() {
+		return reflect.Value{}
+	}
+	f := statusField.FieldByName(name)
+	if !f.IsValid() || !f.CanInterface() {
+		return reflect.Value{}
+	}
+	return f
+}
+
+func reflectGetConditions(obj client.Object) []metav1.Condition {
+	f := reflectStatusField(obj, "Conditions")
+	if !f.IsValid() {
 		return nil
 	}
-	conditionsField := statusField.FieldByName("Conditions")
-	if !conditionsField.IsValid() {
-		return nil
-	}
-	if !conditionsField.CanInterface() {
-		return nil
-	}
-	conditions, ok := conditionsField.Interface().([]metav1.Condition)
+	conditions, ok := f.Interface().([]metav1.Condition)
 	if !ok {
 		return nil
 	}
@@ -164,17 +166,9 @@ func reflectGetConditions(obj client.Object) []metav1.Condition {
 }
 
 func reflectGetObservedGeneration(obj client.Object) int64 {
-	rv := reflect.ValueOf(obj).Elem()
-	statusField := rv.FieldByName("Status")
-	if !statusField.IsValid() {
+	f := reflectStatusField(obj, "ObservedGeneration")
+	if !f.IsValid() {
 		return 0
 	}
-	ogField := statusField.FieldByName("ObservedGeneration")
-	if !ogField.IsValid() {
-		return 0
-	}
-	if !ogField.CanInterface() {
-		return 0
-	}
-	return ogField.Int()
+	return f.Int()
 }
