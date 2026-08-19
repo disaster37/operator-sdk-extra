@@ -2,7 +2,7 @@ package controller
 
 import (
 	"emperror.dev/errors"
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/apis/shared"
+	"github.com/disaster37/operator-sdk-extra/v3/pkg/apis/shared"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"

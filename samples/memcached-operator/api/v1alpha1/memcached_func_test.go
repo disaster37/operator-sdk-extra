@@ -3,7 +3,7 @@ package v1alpha1
 import (
 	"testing"
 
-	multiphase "github.com/disaster37/operator-sdk-extra/v2/pkg/apis/multiphase"
+	multiphase "github.com/disaster37/operator-sdk-extra/v3/pkg/apis/multiphase"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

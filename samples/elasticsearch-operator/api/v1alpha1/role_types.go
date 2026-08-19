@@ -17,7 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	remoteapis "github.com/disaster37/operator-sdk-extra/v2/pkg/apis/remote"
+	remoteapis "github.com/disaster37/operator-sdk-extra/v3/pkg/apis/remote"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

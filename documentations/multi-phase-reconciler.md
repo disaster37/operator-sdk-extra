@@ -52,7 +52,7 @@ Complete source code: `samples/memcached-operator/`
 package v1alpha1
 
 import (
-	multiphase "github.com/disaster37/operator-sdk-extra/v2/pkg/apis/multiphase"
+	multiphase "github.com/disaster37/operator-sdk-extra/v3/pkg/apis/multiphase"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -110,7 +110,7 @@ Key points:
 ```go
 package v1alpha1
 
-import "github.com/disaster37/operator-sdk-extra/v2/pkg/object"
+import "github.com/disaster37/operator-sdk-extra/v3/pkg/object"
 
 func (h *Memcached) GetStatus() object.MultiPhaseObjectStatus {
 	return &h.Status
@@ -132,7 +132,7 @@ Builders are plain functions that produce the desired K8s objects from the CRD s
 package controllers
 
 import (
-	"github.com/disaster37/operator-sdk-extra/v2/samples/memcached-operator/api/v1alpha1"
+	"github.com/disaster37/operator-sdk-extra/v3/samples/memcached-operator/api/v1alpha1"
 	"github.com/thoas/go-funk"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -182,9 +182,9 @@ import (
 	"fmt"
 
 	"emperror.dev/errors"
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/apis/shared"
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller/multiphase"
-	cachecrd "github.com/disaster37/operator-sdk-extra/v2/samples/memcached-operator/api/v1alpha1"
+	"github.com/disaster37/operator-sdk-extra/v3/pkg/apis/shared"
+	"github.com/disaster37/operator-sdk-extra/v3/pkg/controller/multiphase"
+	cachecrd "github.com/disaster37/operator-sdk-extra/v3/samples/memcached-operator/api/v1alpha1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -271,10 +271,10 @@ import (
 	k8scontroller "sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/apis/shared"
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller"
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller/multiphase"
-	cachecrd "github.com/disaster37/operator-sdk-extra/v2/samples/memcached-operator/api/v1alpha1"
+	"github.com/disaster37/operator-sdk-extra/v3/pkg/apis/shared"
+	"github.com/disaster37/operator-sdk-extra/v3/pkg/controller"
+	"github.com/disaster37/operator-sdk-extra/v3/pkg/controller/multiphase"
+	cachecrd "github.com/disaster37/operator-sdk-extra/v3/samples/memcached-operator/api/v1alpha1"
 	"github.com/sirupsen/logrus"
 )
 
@@ -384,8 +384,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	cachev1alpha1 "github.com/disaster37/operator-sdk-extra/v2/samples/memcached-operator/api/v1alpha1"
-	"github.com/disaster37/operator-sdk-extra/v2/samples/memcached-operator/controllers"
+	cachev1alpha1 "github.com/disaster37/operator-sdk-extra/v3/samples/memcached-operator/api/v1alpha1"
+	"github.com/disaster37/operator-sdk-extra/v3/samples/memcached-operator/controllers"
 	"github.com/sirupsen/logrus"
 )
 

@@ -19,7 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	testpkg "github.com/disaster37/operator-sdk-extra/v2/pkg/test"
+	testpkg "github.com/disaster37/operator-sdk-extra/v3/pkg/test"
 )
 
 type mockRemoteReconcilerAction2 struct {

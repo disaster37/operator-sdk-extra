@@ -1,7 +1,7 @@
 package remote
 
 import (
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/apis"
+	"github.com/disaster37/operator-sdk-extra/v3/pkg/apis"
 	"k8s.io/utils/ptr"
 )
 

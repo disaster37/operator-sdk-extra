@@ -76,7 +76,7 @@ Full source code: `samples/elasticsearch-operator/`.
 package v1alpha1
 
 import (
-	remoteapis "github.com/disaster37/operator-sdk-extra/v2/pkg/apis/remote"
+	remoteapis "github.com/disaster37/operator-sdk-extra/v3/pkg/apis/remote"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -120,7 +120,7 @@ Key points:
 ```go
 package v1alpha1
 
-import "github.com/disaster37/operator-sdk-extra/v2/pkg/object"
+import "github.com/disaster37/operator-sdk-extra/v3/pkg/object"
 
 func (o *Role) GetStatus() object.RemoteObjectStatus {
 	return &o.Status
@@ -151,8 +151,8 @@ import (
 	"encoding/json"
 
 	eshandler "github.com/disaster37/es-handler/v8"
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller/remote"
-	elasticsearchapicrd "github.com/disaster37/operator-sdk-extra/v2/samples/elasticsearch-operator/api/v1alpha1"
+	"github.com/disaster37/operator-sdk-extra/v3/pkg/controller/remote"
+	elasticsearchapicrd "github.com/disaster37/operator-sdk-extra/v3/samples/elasticsearch-operator/api/v1alpha1"
 )
 
 type roleApiClient struct {
@@ -210,8 +210,8 @@ import (
 	"time"
 
 	eshandler "github.com/disaster37/es-handler/v8"
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller/remote"
-	elasticsearchapicrd "github.com/disaster37/operator-sdk-extra/v2/samples/elasticsearch-operator/api/v1alpha1"
+	"github.com/disaster37/operator-sdk-extra/v3/pkg/controller/remote"
+	elasticsearchapicrd "github.com/disaster37/operator-sdk-extra/v3/samples/elasticsearch-operator/api/v1alpha1"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -262,10 +262,10 @@ import (
 	"context"
 
 	eshandler "github.com/disaster37/es-handler/v8"
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/apis/shared"
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller"
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller/remote"
-	elasticsearchapicrd "github.com/disaster37/operator-sdk-extra/v2/samples/elasticsearch-operator/api/v1alpha1"
+	"github.com/disaster37/operator-sdk-extra/v3/pkg/apis/shared"
+	"github.com/disaster37/operator-sdk-extra/v3/pkg/controller"
+	"github.com/disaster37/operator-sdk-extra/v3/pkg/controller/remote"
+	elasticsearchapicrd "github.com/disaster37/operator-sdk-extra/v3/samples/elasticsearch-operator/api/v1alpha1"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"

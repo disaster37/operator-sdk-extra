@@ -1,4 +1,4 @@
-module github.com/disaster37/operator-sdk-extra/v2
+module github.com/disaster37/operator-sdk-extra/v3
 
 go 1.26
 

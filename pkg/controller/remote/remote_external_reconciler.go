@@ -3,7 +3,7 @@ package remote
 import (
 	"emperror.dev/errors"
 	"github.com/disaster37/generic-objectmatcher/patch"
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/object"
+	"github.com/disaster37/operator-sdk-extra/v3/pkg/object"
 	jsonIterator "github.com/json-iterator/go"
 )
 

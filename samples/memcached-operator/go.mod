@@ -1,10 +1,10 @@
-module github.com/disaster37/operator-sdk-extra/v2/samples/memcached-operator
+module github.com/disaster37/operator-sdk-extra/v3/samples/memcached-operator
 
 go 1.26
 
 require (
 	emperror.dev/errors v0.8.1
-	github.com/disaster37/operator-sdk-extra/v2 v2.0.0
+	github.com/disaster37/operator-sdk-extra/v3 v3.0.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.10.0
 	github.com/thoas/go-funk v0.9.3
@@ -81,4 +81,4 @@ require (
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
-replace github.com/disaster37/operator-sdk-extra/v2 => ../../
+replace github.com/disaster37/operator-sdk-extra/v3 => ../../

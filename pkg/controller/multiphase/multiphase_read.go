@@ -3,7 +3,7 @@ package multiphase
 import (
 	"reflect"
 
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/helper"
+	"github.com/disaster37/operator-sdk-extra/v3/pkg/helper"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 

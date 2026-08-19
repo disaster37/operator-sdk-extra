@@ -3,7 +3,7 @@ package certificate_test
 import (
 	"testing"
 
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller/certificate"
+	"github.com/disaster37/operator-sdk-extra/v3/pkg/controller/certificate"
 	"github.com/stretchr/testify/assert"
 )
 

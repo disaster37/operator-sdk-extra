@@ -8,7 +8,7 @@ import (
 
 	"emperror.dev/errors"
 	"github.com/disaster37/k8s-objectmatcher/patch"
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/apis/shared"
+	"github.com/disaster37/operator-sdk-extra/v3/pkg/apis/shared"
 	"github.com/google/go-cmp/cmp"
 	"github.com/mitchellh/copystructure"
 	"github.com/sirupsen/logrus"

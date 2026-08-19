@@ -3,7 +3,7 @@ package v1alpha1
 import (
 	"testing"
 
-	remoteapis "github.com/disaster37/operator-sdk-extra/v2/pkg/apis/remote"
+	remoteapis "github.com/disaster37/operator-sdk-extra/v3/pkg/apis/remote"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

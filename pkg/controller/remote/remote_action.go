@@ -6,9 +6,9 @@ import (
 
 	"emperror.dev/errors"
 	"github.com/disaster37/generic-objectmatcher/patch"
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller"
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/helper"
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/object"
+	"github.com/disaster37/operator-sdk-extra/v3/pkg/controller"
+	"github.com/disaster37/operator-sdk-extra/v3/pkg/helper"
+	"github.com/disaster37/operator-sdk-extra/v3/pkg/object"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	condition "k8s.io/apimachinery/pkg/api/meta"

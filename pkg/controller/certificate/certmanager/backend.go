@@ -12,8 +12,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller/certificate"
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/object"
+	"github.com/disaster37/operator-sdk-extra/v3/pkg/controller/certificate"
+	"github.com/disaster37/operator-sdk-extra/v3/pkg/object"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"

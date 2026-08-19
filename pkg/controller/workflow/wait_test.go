@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller/workflow"
+	"github.com/disaster37/operator-sdk-extra/v3/pkg/controller/workflow"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"

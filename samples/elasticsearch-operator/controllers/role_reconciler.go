@@ -5,8 +5,8 @@ import (
 	"time"
 
 	eshandler "github.com/disaster37/es-handler/v8"
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller/remote"
-	elasticsearchapicrd "github.com/disaster37/operator-sdk-extra/v2/samples/elasticsearch-operator/api/v1alpha1"
+	"github.com/disaster37/operator-sdk-extra/v3/pkg/controller/remote"
+	elasticsearchapicrd "github.com/disaster37/operator-sdk-extra/v3/samples/elasticsearch-operator/api/v1alpha1"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"

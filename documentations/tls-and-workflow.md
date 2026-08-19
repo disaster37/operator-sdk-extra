@@ -1,7 +1,7 @@
 # TLS Certificate Management & Workflow Orchestration
 
 This document describes the reusable certificate management and multi-cycle
-workflow abstractions added in `operator-sdk-extra/v2`. They were extracted
+workflow abstractions added in `operator-sdk-extra/v3`. They were extracted
 from patterns pioneered by the elasticsearch-operator and generalized for any
 operator built on this library.
 
@@ -119,7 +119,7 @@ The `certmanager` subpackage is optional. Core library packages do not import
 it. Only operators that use the cert-manager backend need to import:
 
 ```go
-import "github.com/disaster37/operator-sdk-extra/v2/pkg/controller/certificate/certmanager"
+import "github.com/disaster37/operator-sdk-extra/v3/pkg/controller/certificate/certmanager"
 ```
 
 ---

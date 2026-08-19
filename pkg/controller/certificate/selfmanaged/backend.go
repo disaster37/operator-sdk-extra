@@ -15,8 +15,8 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller/certificate"
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/object"
+	"github.com/disaster37/operator-sdk-extra/v3/pkg/controller/certificate"
+	"github.com/disaster37/operator-sdk-extra/v3/pkg/object"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"

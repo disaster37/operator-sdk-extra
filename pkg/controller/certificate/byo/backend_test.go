@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller/certificate"
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller/certificate/byo"
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/object"
+	"github.com/disaster37/operator-sdk-extra/v3/pkg/controller/certificate"
+	"github.com/disaster37/operator-sdk-extra/v3/pkg/controller/certificate/byo"
+	"github.com/disaster37/operator-sdk-extra/v3/pkg/object"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

@@ -1,11 +1,11 @@
-module github.com/disaster37/operator-sdk-extra/v2/samples/ingress-sentinel-operator
+module github.com/disaster37/operator-sdk-extra/v3/samples/ingress-sentinel-operator
 
 go 1.26
 
-replace github.com/disaster37/operator-sdk-extra/v2 => ../../
+replace github.com/disaster37/operator-sdk-extra/v3 => ../../
 
 require (
-	github.com/disaster37/operator-sdk-extra/v2 v2.0.0
+	github.com/disaster37/operator-sdk-extra/v3 v3.0.0
 	github.com/sirupsen/logrus v1.9.3
 	k8s.io/api v0.32.0
 	k8s.io/apimachinery v0.32.0

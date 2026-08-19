@@ -1,8 +1,8 @@
 package multiphase
 
 import (
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/apis"
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/apis/shared"
+	"github.com/disaster37/operator-sdk-extra/v3/pkg/apis"
+	"github.com/disaster37/operator-sdk-extra/v3/pkg/apis/shared"
 )
 
 // DefaultMultiPhaseObjectStatus is the default status for CRD used to create multiple K8s resources

@@ -7,8 +7,8 @@ import (
 
 	eshandler "github.com/disaster37/es-handler/v8"
 	"github.com/disaster37/es-handler/v8/mocks"
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller/remote"
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/mock"
+	"github.com/disaster37/operator-sdk-extra/v3/pkg/controller/remote"
+	"github.com/disaster37/operator-sdk-extra/v3/pkg/mock"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"

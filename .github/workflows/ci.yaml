@@ -5,12 +5,14 @@ on:
     branches:
       - main
       - v2
+      - v3
     tags:
       - "*"
   pull_request:
     branches:
       - main
       - v2
+      - v3
 
 jobs:
   build:

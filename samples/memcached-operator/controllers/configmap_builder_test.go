@@ -3,8 +3,8 @@ package controllers
 import (
 	"testing"
 
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/test"
-	cachecrd "github.com/disaster37/operator-sdk-extra/v2/samples/memcached-operator/api/v1alpha1"
+	"github.com/disaster37/operator-sdk-extra/v3/pkg/test"
+	cachecrd "github.com/disaster37/operator-sdk-extra/v3/samples/memcached-operator/api/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

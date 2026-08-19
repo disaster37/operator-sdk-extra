@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/object"
+	"github.com/disaster37/operator-sdk-extra/v3/pkg/object"
 	"github.com/stretchr/testify/assert"
 	condition "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

@@ -10,7 +10,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	"github.com/disaster37/operator-sdk-extra/v2/samples/ingress-sentinel-operator/controllers"
+	"github.com/disaster37/operator-sdk-extra/v3/samples/ingress-sentinel-operator/controllers"
 	"github.com/sirupsen/logrus"
 )
 

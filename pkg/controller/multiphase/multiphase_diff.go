@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"emperror.dev/errors"
-	"github.com/disaster37/operator-sdk-extra/v2/pkg/helper"
-	ssadiff "github.com/disaster37/operator-sdk-extra/v2/pkg/helper/ssa"
+	"github.com/disaster37/operator-sdk-extra/v3/pkg/helper"
+	ssadiff "github.com/disaster37/operator-sdk-extra/v3/pkg/helper/ssa"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
