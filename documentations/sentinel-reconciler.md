@@ -33,7 +33,6 @@ func newTemplateAnnotationsReconciler[k8sObject client.Object](c client.Client, 
             c,
             recorder,
             "template-sentinel",
-            false,
         ),
     }
 }
@@ -157,8 +156,8 @@ func (h *TestReconciler) SetupWithManager(mgr ctrl.Manager) error {
 3. Check `operator-sdk-extra.webcenter.fr/ignoreReconcile` annotation
 4. Call `Configure()` — optional
 5. Call `Read()` — user reads current, builds expected, groups by type via `SentinelRead`
-6. Call `Diff()` — per-type comparison, classifies into create/update/delete. When `dryRun=true`, uses SSA dry-run to detect actual changes.
-7. Call `OnDiff()` — pre-apply hook (errors if diff disabled and not overridden)
+6. Call `Diff()` — per-type comparison, classifies into create/update/delete. The **simple** variant always uses always-apply classification; the **diff** (`...WithDiff`) variant uses SSA dry-run to detect actual changes.
+7. Call `OnDiff()` — pre-apply hook, only when the action implements the `...WithDiff` variant (default no-op)
 8. `Apply()`, `Delete()` as needed
 9. Call `OnSuccess()` — optional
 
@@ -179,7 +178,8 @@ func (h *TestReconciler) SetupWithManager(mgr ctrl.Manager) error {
 | Constructor | Description |
 |---|---|
 | `sentinel.NewSentinelReconciler[k8sObject](client, name, logger, recorder)` | Creates the orchestrator |
-| `sentinel.NewSentinelAction[k8sObject](client, recorder, fieldManager, dryRun)` | Creates default action — you only need to override `Read()`. `fieldManager` identifies this controller for SSA. `dryRun` enables SSA dry-run diff detection (opt-in, one extra API call per existing object). |
+| `sentinel.NewSentinelAction[k8sObject](client, recorder, fieldManager)` | Creates the default **simple** action — you only need to override `Read()`. `fieldManager` identifies this controller for SSA. `Diff` always uses always-apply classification and there is **no** `OnDiff` hook. |
+| `sentinel.NewSentinelActionWithDiff[k8sObject](client, recorder, fieldManager)` | Creates the default **diff** action — `Diff` always uses SSA dry-run classification and adds `OnDiff` (default no-op, safe to override). |
 | `sentinel.NewSentinelRead(scheme)` | Creates a read result to collect objects |
 
 ## Helpers
@@ -188,8 +188,6 @@ func (h *TestReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 ## Detecting changes with SSA (dry-run diff)
 
-When `dryRun=true` is passed to `NewSentinelAction`, the Diff() step performs an SSA dry-run for each existing object to predict what the API server would produce. Objects are classified into **create**, **update**, and **delete** lists. Unchanged objects are skipped (no API call).
+The **diff** variant (`NewSentinelActionWithDiff`) makes `Diff()` perform an SSA dry-run for each existing object to predict what the API server would produce. Objects are classified into **create**, **update**, and **delete** lists. Unchanged objects are skipped (no API call). The **simple** variant (`NewSentinelAction`) always uses always-apply classification instead.
 
-**OnDiff pre-task pattern**: override `OnDiff` to run logic before Apply, keyed on `diff.NeedUpdate()` / `diff.GetObjectsToUpdate()`.
-
-**Disabled-diff contract**: when `dryRun=false`, the default `OnDiff` returns `controller.ErrDiffDisabled`. Override `OnDiff` to `return reconcile.Result{}, nil` if you do not need pre-tasks.
+**OnDiff pre-task pattern**: override `OnDiff` to run logic before Apply, keyed on `diff.NeedUpdate()` / `diff.GetObjectsToUpdate()`. It is only invoked when the action implements the `...WithDiff` variant, and its default is a safe no-op.

@@ -500,8 +500,10 @@ If any step returns an error, `OnError()` is called to update the status conditi
 |---|---|
 | `multiphase.NewMultiPhaseReconciler[k8sObject](client, name, finalizer, logger, recorder)` | Main orchestrator with finalizer and status tracking |
 | `multiphase.NewMultiPhaseReconcilerAction[k8sObject](client, conditionName, recorder)` | Default action: initializes ready condition, provides `OnError` / `OnSuccess` |
-| `multiphase.NewMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject](client, phaseName, conditionName, recorder, fieldManager, dryRun)` | Default step action: provides `Configure`, `Read`, `Diff`, `Apply`, `Delete`, `OnError`, `OnSuccess`, `OnDiff`. `fieldManager` identifies this controller for SSA. `dryRun` enables SSA dry-run diff detection (opt-in). |
-| `multiphase.NewObjectMultiPhaseStepReconcilerAction[k8sObject, src, dst](stepReconciler)` | Wraps a typed step reconciler to convert from a specific type (e.g. `*ConfigMap`) to `client.Object` |
+| `multiphase.NewMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject](client, phaseName, conditionName, recorder, fieldManager)` | Default **simple** step action: provides `Configure`, `Read`, `Diff`, `Apply`, `Delete`, `OnError`, `OnSuccess`. `Diff` always uses always-apply classification and there is **no** `OnDiff` hook. |
+| `multiphase.NewMultiPhaseStepReconcilerActionWithDiff[k8sObject, k8sStepObject](client, phaseName, conditionName, recorder, fieldManager)` | Default **diff** step action: embeds the simple action, `Diff` always uses SSA dry-run classification, and adds `OnDiff` (default no-op, safe to override). |
+| `multiphase.NewObjectMultiPhaseStepReconcilerAction[k8sObject, src, dst](stepReconciler)` | Wraps a typed simple step reconciler to convert from a specific type (e.g. `*ConfigMap`) to `client.Object` |
+| `multiphase.NewObjectMultiPhaseStepReconcilerActionWithDiff[k8sObject, src, dst](stepReconciler)` | Wraps a typed diff step reconciler to convert from a specific type (e.g. `*Deployment`) to `client.Object`, preserving `OnDiff` |
 | `multiphase.NewMultiPhaseRead[k8sStepObject]()` | Creates an empty read result for collecting current and expected objects |
 | `controller.NewController()` | Base controller (no-op scaffolding) |
 
@@ -521,19 +523,29 @@ The multi-phase reconciler uses **Server-Side Apply** exclusively. SSA delegates
 ### Reconciliation Flow
 
 ```
-Configure -> Read -> Diff -> OnDiff -> Apply/Delete -> OnSuccess
+Configure -> Read -> Diff -> [OnDiff] -> Apply/Delete -> OnSuccess
 ```
 
-- **Diff()** classifies objects into create, update, and delete lists. When `dryRun=true`, uses SSA dry-run to detect actual changes. When `dryRun=false`, all expected objects with current counterparts go to the update list (legacy always-apply).
-- **OnDiff()** is a pre-apply hook called between Diff and Apply. Use it for pre-tasks like draining nodes before a StatefulSet update.
+- **Diff()** classifies objects into create, update, and delete lists. The **simple** variant always uses always-apply classification: all expected objects with current counterparts go to the update list. The **diff** (`...WithDiff`) variant always uses SSA dry-run to detect actual changes; unchanged objects are skipped.
+- **OnDiff()** exists **only** on the diff variant. The step reconciler detects it via the optional-interface idiom (type assertion against `MultiPhaseStepReconcilerActionWithDiff`) and calls it between Diff and Apply — but only when the action implements it. Use it for pre-tasks like draining nodes before a StatefulSet update.
 - **Apply()** uses `client.Patch(obj, client.Apply, client.FieldOwner(...), client.ForceOwnership)` for each object, handling both creation and updates in a single call.
 - **Delete()** removes orphaned objects (current objects that are no longer expected).
 
+### Two variants
+
+The `dryRun` constructor flag is gone. Instead, pick one of two type-safe constructors:
+
+- **`NewMultiPhaseStepReconcilerAction`** — the simple variant. `Diff` always uses always-apply classification (every expected object is applied). There is **no** `OnDiff` hook, and the reconciler never attempts to call one.
+- **`NewMultiPhaseStepReconcilerActionWithDiff`** — the diff variant. `Diff` always uses SSA dry-run classification. It adds an `OnDiff` hook whose default implementation is a safe no-op (`return reconcile.Result{}, nil`), so overriding it is optional.
+
+The reconciler uses the standard Go optional-interface assertion to detect the `OnDiff` capability and only calls it when implemented. A simple action is therefore never asked to run an `OnDiff` pre-task.
+
 ### Constructor
 
-The `fieldManager` and `dryRun` are required parameters when constructing the step reconciler action:
+The `fieldManager` is the only SSA-related parameter when constructing a step reconciler action:
 
 ```go
+// Simple variant: no OnDiff, always-apply classification.
 func newConfigMapReconciler(c client.Client, recorder record.EventRecorder) multiphase.MultiPhaseStepReconcilerAction[*Memcached, *corev1.ConfigMap] {
     return &configMapReconciler{
         MultiPhaseStepReconcilerAction: multiphase.NewMultiPhaseStepReconcilerAction[*Memcached, *corev1.ConfigMap](
@@ -542,7 +554,19 @@ func newConfigMapReconciler(c client.Client, recorder record.EventRecorder) mult
             ConfigmapCondition,
             recorder,
             "memcached-operator",  // fieldManager — required
-            false,                  // dryRun — false means all objects always-applied
+        ),
+    }
+}
+
+// Diff variant: SSA dry-run classification + optional OnDiff hook.
+func newDeploymentReconciler(c client.Client, recorder record.EventRecorder) multiphase.MultiPhaseStepReconcilerActionWithDiff[*Memcached, *appv1.Deployment] {
+    return &deploymentReconciler{
+        MultiPhaseStepReconcilerActionWithDiff: multiphase.NewMultiPhaseStepReconcilerActionWithDiff[*Memcached, *appv1.Deployment](
+            c,
+            DeploymentPhase,
+            DeploymentCondition,
+            recorder,
+            "memcached-operator",  // fieldManager — required
         ),
     }
 }
@@ -550,16 +574,16 @@ func newConfigMapReconciler(c client.Client, recorder record.EventRecorder) mult
 
 ### Detecting changes with SSA (dry-run diff)
 
-When `dryRun=true`, the Diff() step performs an SSA dry-run (`client.Apply` + `client.DryRunAll`) for each existing object to predict what the API server would produce. It normalizes both the predicted and current object (stripping `resourceVersion`, `generation`, `managedFields`, `status`, etc.) and compares them. Objects are then classified:
+The diff variant's `Diff()` step performs an SSA dry-run (`client.Apply` + `client.DryRunAll`) for each existing object to predict what the API server would produce. It normalizes both the predicted and current object (stripping `resourceVersion`, `generation`, `managedFields`, `status`, etc.) and compares them. Objects are then classified:
 
 - **Create**: no current counterpart exists
 - **Update**: current counterpart exists and the normalized diff is non-empty
 - **Unchanged**: current counterpart exists and the normalized diff is empty — **skipped** (no API call)
 - **Delete**: current object with no expected counterpart (orphan)
 
-**How to enable**: pass `dryRun=true` to `NewMultiPhaseStepReconcilerAction`. Note this adds one extra dry-run API call per existing object.
+**How to enable**: use `NewMultiPhaseStepReconcilerActionWithDiff`. Note this adds one extra dry-run API call per existing object.
 
-**OnDiff pre-task pattern**: override `OnDiff` to run logic before Apply, keyed on `diff.NeedUpdate()` / `diff.GetObjectsToUpdate()`:
+**OnDiff pre-task pattern**: the diff variant's `OnDiff` defaults to a no-op. Override it to run logic before Apply, keyed on `diff.NeedUpdate()` / `diff.GetObjectsToUpdate()`:
 
 ```go
 func (r *deploymentReconciler) OnDiff(ctx context.Context, o *Memcached, data map[string]any, diff multiphase.MultiPhaseDiff[*appv1.Deployment], logger *logrus.Entry) (reconcile.Result, error) {
@@ -571,11 +595,7 @@ func (r *deploymentReconciler) OnDiff(ctx context.Context, o *Memcached, data ma
 }
 ```
 
-**Disabled-diff contract**: when `dryRun=false`, the default `OnDiff` returns `controller.ErrDiffDisabled`. Controllers that do not need pre-tasks must either:
-- Enable diff with `dryRun=true`, or
-- Override `OnDiff` to return `reconcile.Result{}, nil` (safe no-op)
-
-This ensures no accidental silent no-op when pre-tasks are configured but diff detection is left disabled.
+**Optional-interface semantics**: `OnDiff` is only invoked when the step action implements `MultiPhaseStepReconcilerActionWithDiff`. The simple variant never implements it, so the reconciler skips the call — no trap, no `ErrDiffDisabled`.
 
 **Caveat**: mutating webhooks may modify objects during dry-run apply, causing false-positive updates (predicted differs from live despite identical input). Webhook-noise filtering is documented for a future enhancement.
 

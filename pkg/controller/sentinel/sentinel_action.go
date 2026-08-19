@@ -16,6 +16,8 @@ import (
 
 // SentinelReconcilerAction is the interface that use by sentinel reconciler
 // It uses Server-Side Apply to manage child resources.
+// This is the simple variant: it has no OnDiff hook and Diff always uses
+// always-apply classification (all expected objects with current counterparts are applied).
 type SentinelReconcilerAction[k8sObject client.Object] interface {
 	controller.ReconcilerAction
 
@@ -40,35 +42,61 @@ type SentinelReconcilerAction[k8sObject client.Object] interface {
 	// It's the right way to set status condition when everything is good
 	OnSuccess(ctx context.Context, o k8sObject, data map[string]any, diff multiphase.MultiPhaseDiff[client.Object], logger *logrus.Entry) (res reconcile.Result, err error)
 
-	// OnDiff is called between Diff and Apply, after the diff has been computed.
-	// When dry-run diff detection is disabled, the default implementation returns ErrDiffDisabled.
-	// Controllers that need pre-apply tasks can check diff.NeedUpdate() / diff.GetObjectsToUpdate() here.
-	OnDiff(ctx context.Context, o k8sObject, data map[string]any, diff multiphase.MultiPhaseDiff[client.Object], logger *logrus.Entry) (res reconcile.Result, err error)
-
-	// Diff permit to compare the actual state and the expected state
-	// When dryRun is enabled, uses SSA dry-run to classify objects into create/update/delete.
-	// When dryRun is disabled, all expected objects go to the update list (legacy always-apply).
+	// Diff permit to compare the actual state and the expected state.
+	// The simple variant always uses always-apply classification: all expected objects
+	// with current counterparts go to the update list (legacy always-apply).
 	Diff(ctx context.Context, o k8sObject, read SentinelRead, data map[string]any, logger *logrus.Entry) (diff multiphase.MultiPhaseDiff[client.Object], res reconcile.Result, err error)
 
 	// GetFieldManager returns the field manager name for SSA
 	GetFieldManager() string
 }
 
+// SentinelReconcilerActionWithDiff is the diff variant of SentinelReconcilerAction.
+// It embeds the base interface and adds OnDiff. Diff always uses SSA dry-run classification,
+// so diff.NeedUpdate() / diff.GetObjectsToUpdate() are reliable in OnDiff.
+type SentinelReconcilerActionWithDiff[k8sObject client.Object] interface {
+	SentinelReconcilerAction[k8sObject]
+
+	// OnDiff is called between Diff and Apply, after the diff has been computed.
+	// The diff variant always uses SSA dry-run classification. The default implementation
+	// returns nil (safe no-op); override it to run pre-apply tasks.
+	OnDiff(ctx context.Context, o k8sObject, data map[string]any, diff multiphase.MultiPhaseDiff[client.Object], logger *logrus.Entry) (res reconcile.Result, err error)
+}
+
 // DefaultSentinelAction is the default implementation of SentinelAction
+// (simple variant, always-apply classification).
 type DefaultSentinelAction[k8sObject client.Object] struct {
 	controller.ReconcilerAction
 	fieldManager string
-	dryRun       bool
 }
 
 // NewSentinelAction creates a new sentinel action using Server-Side Apply.
 // The fieldManager parameter identifies this controller as the owner of the fields it manages.
-// The dryRun parameter enables SSA dry-run diff detection (one extra API call per existing object).
-func NewSentinelAction[k8sObject client.Object](client client.Client, recorder record.EventRecorder, fieldManager string, dryRun bool) (sentinelReconciler SentinelReconcilerAction[k8sObject]) {
+// This is the simple variant: Diff always uses always-apply classification and no OnDiff hook is available.
+func NewSentinelAction[k8sObject client.Object](client client.Client, recorder record.EventRecorder, fieldManager string) (sentinelReconciler SentinelReconcilerAction[k8sObject]) {
 	return &DefaultSentinelAction[k8sObject]{
 		ReconcilerAction: controller.NewReconcilerAction(client, recorder, controller.ReadyCondition),
 		fieldManager:     fieldManager,
-		dryRun:           dryRun,
+	}
+}
+
+// DefaultSentinelActionWithDiff is the default implementation of SentinelReconcilerActionWithDiff.
+// It embeds the simple default action, overrides Diff to use SSA dry-run classification,
+// and adds an OnDiff hook that returns nil by default.
+type DefaultSentinelActionWithDiff[k8sObject client.Object] struct {
+	*DefaultSentinelAction[k8sObject]
+}
+
+// NewSentinelActionWithDiff creates a new sentinel action using Server-Side Apply.
+// The fieldManager parameter identifies this controller as the owner of the fields it manages.
+// This is the diff variant: Diff always uses SSA dry-run classification and OnDiff defaults to a safe no-op.
+func NewSentinelActionWithDiff[k8sObject client.Object](client client.Client, recorder record.EventRecorder, fieldManager string) (sentinelReconciler SentinelReconcilerActionWithDiff[k8sObject]) {
+	return &DefaultSentinelActionWithDiff[k8sObject]{
+		DefaultSentinelAction: NewSentinelAction[k8sObject](
+			client,
+			recorder,
+			fieldManager,
+		).(*DefaultSentinelAction[k8sObject]),
 	}
 }
 
@@ -129,20 +157,20 @@ func (h *DefaultSentinelAction[k8sObject]) OnSuccess(ctx context.Context, o k8sO
 	return res, nil
 }
 
-func (h *DefaultSentinelAction[k8sObject]) OnDiff(ctx context.Context, o k8sObject, data map[string]any, diff multiphase.MultiPhaseDiff[client.Object], logger *logrus.Entry) (res reconcile.Result, err error) {
-	if !h.dryRun {
-		return res, controller.ErrDiffDisabled
-	}
-	return res, nil
+func (h *DefaultSentinelAction[k8sObject]) Diff(ctx context.Context, o k8sObject, read SentinelRead, data map[string]any, logger *logrus.Entry) (diff multiphase.MultiPhaseDiff[client.Object], res reconcile.Result, err error) {
+	return h.classifyDiff(ctx, read, logger, false)
 }
 
-func (h *DefaultSentinelAction[k8sObject]) Diff(ctx context.Context, o k8sObject, read SentinelRead, data map[string]any, logger *logrus.Entry) (diff multiphase.MultiPhaseDiff[client.Object], res reconcile.Result, err error) {
+// classifyDiff classifies the read objects into create/update/delete lists using SSA.
+// When dryRun is true the classification uses an SSA dry-run apply; otherwise it uses
+// legacy always-apply classification.
+func (h *DefaultSentinelAction[k8sObject]) classifyDiff(ctx context.Context, read SentinelRead, logger *logrus.Entry, dryRun bool) (diff multiphase.MultiPhaseDiff[client.Object], res reconcile.Result, err error) {
 	diff = multiphase.NewMultiPhaseDiff[client.Object]()
 
 	for objectType, reader := range read.GetReads() {
 		logger.Debugf("Start process object type '%s'", objectType)
 
-		creates, updates, deletes, diffStrs, err := multiphase.ClassifyObjects(ctx, h.Client(), reader.GetExpectedObjects(), reader.GetCurrentObjects(), h.fieldManager, h.dryRun)
+		creates, updates, deletes, diffStrs, err := multiphase.ClassifyObjects(ctx, h.Client(), reader.GetExpectedObjects(), reader.GetCurrentObjects(), h.fieldManager, dryRun)
 		if err != nil {
 			return diff, res, err
 		}
@@ -150,4 +178,12 @@ func (h *DefaultSentinelAction[k8sObject]) Diff(ctx context.Context, o k8sObject
 	}
 
 	return diff, res, nil
+}
+
+func (h *DefaultSentinelActionWithDiff[k8sObject]) OnDiff(ctx context.Context, o k8sObject, data map[string]any, diff multiphase.MultiPhaseDiff[client.Object], logger *logrus.Entry) (res reconcile.Result, err error) {
+	return res, nil
+}
+
+func (h *DefaultSentinelActionWithDiff[k8sObject]) Diff(ctx context.Context, o k8sObject, read SentinelRead, data map[string]any, logger *logrus.Entry) (diff multiphase.MultiPhaseDiff[client.Object], res reconcile.Result, err error) {
+	return h.classifyDiff(ctx, read, logger, true)
 }

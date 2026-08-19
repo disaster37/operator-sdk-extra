@@ -37,6 +37,9 @@ type mockSentinelReconcilerAction struct {
 	diffRes      reconcile.Result
 	diffErr      error
 	diffObj      multiphase.MultiPhaseDiff[client.Object]
+	onDiffRes    reconcile.Result
+	onDiffErr    error
+	onDiffCalled bool
 }
 
 func (m *mockSentinelReconcilerAction) Configure(ctx context.Context, req reconcile.Request, o *corev1.Pod, data map[string]any, logger *logrus.Entry) (reconcile.Result, error) {
@@ -64,7 +67,8 @@ func (m *mockSentinelReconcilerAction) OnSuccess(ctx context.Context, o *corev1.
 }
 
 func (m *mockSentinelReconcilerAction) OnDiff(ctx context.Context, o *corev1.Pod, data map[string]any, diff multiphase.MultiPhaseDiff[client.Object], logger *logrus.Entry) (reconcile.Result, error) {
-	return reconcile.Result{}, nil
+	m.onDiffCalled = true
+	return m.onDiffRes, m.onDiffErr
 }
 
 func (m *mockSentinelReconcilerAction) Diff(ctx context.Context, o *corev1.Pod, read SentinelRead, data map[string]any, logger *logrus.Entry) (multiphase.MultiPhaseDiff[client.Object], reconcile.Result, error) {
@@ -72,6 +76,59 @@ func (m *mockSentinelReconcilerAction) Diff(ctx context.Context, o *corev1.Pod, 
 }
 
 func (m *mockSentinelReconcilerAction) GetFieldManager() string {
+	return "test-manager"
+}
+
+// mockSentinelReconcilerActionSimple is a simple (base) SentinelReconcilerAction mock.
+// It does NOT implement OnDiff.
+type mockSentinelReconcilerActionSimple struct {
+	SentinelReconcilerAction[*corev1.Pod]
+	configureRes reconcile.Result
+	configureErr error
+	readRes      reconcile.Result
+	readErr      error
+	readObj      SentinelRead
+	applyRes     reconcile.Result
+	applyErr     error
+	deleteRes    reconcile.Result
+	deleteErr    error
+	onSuccessRes reconcile.Result
+	onSuccessErr error
+	onErrorRes   reconcile.Result
+	diffRes      reconcile.Result
+	diffErr      error
+	diffObj      multiphase.MultiPhaseDiff[client.Object]
+}
+
+func (m *mockSentinelReconcilerActionSimple) Configure(ctx context.Context, req reconcile.Request, o *corev1.Pod, data map[string]any, logger *logrus.Entry) (reconcile.Result, error) {
+	return m.configureRes, m.configureErr
+}
+
+func (m *mockSentinelReconcilerActionSimple) Read(ctx context.Context, o *corev1.Pod, data map[string]any, logger *logrus.Entry) (SentinelRead, reconcile.Result, error) {
+	return m.readObj, m.readRes, m.readErr
+}
+
+func (m *mockSentinelReconcilerActionSimple) Apply(ctx context.Context, o *corev1.Pod, data map[string]any, objects []client.Object, logger *logrus.Entry) (reconcile.Result, error) {
+	return m.applyRes, m.applyErr
+}
+
+func (m *mockSentinelReconcilerActionSimple) Delete(ctx context.Context, o *corev1.Pod, data map[string]any, objects []client.Object, logger *logrus.Entry) (reconcile.Result, error) {
+	return m.deleteRes, m.deleteErr
+}
+
+func (m *mockSentinelReconcilerActionSimple) OnError(ctx context.Context, o *corev1.Pod, data map[string]any, currentErr error, logger *logrus.Entry) (reconcile.Result, error) {
+	return m.onErrorRes, currentErr
+}
+
+func (m *mockSentinelReconcilerActionSimple) OnSuccess(ctx context.Context, o *corev1.Pod, data map[string]any, diff multiphase.MultiPhaseDiff[client.Object], logger *logrus.Entry) (reconcile.Result, error) {
+	return m.onSuccessRes, m.onSuccessErr
+}
+
+func (m *mockSentinelReconcilerActionSimple) Diff(ctx context.Context, o *corev1.Pod, read SentinelRead, data map[string]any, logger *logrus.Entry) (multiphase.MultiPhaseDiff[client.Object], reconcile.Result, error) {
+	return m.diffObj, m.diffRes, m.diffErr
+}
+
+func (m *mockSentinelReconcilerActionSimple) GetFieldManager() string {
 	return "test-manager"
 }
 
@@ -277,4 +334,102 @@ func TestDefaultSentinelReconciler_Reconcile(t *testing.T) {
 		assert.Error(t, err)
 		assert.True(t, res.Requeue)
 	})
+}
+
+func TestDefaultSentinelReconciler_Reconcile_SimpleAction_OnDiffNotCalled(t *testing.T) {
+	scheme := runtime.NewScheme()
+	err := clientgoscheme.AddToScheme(scheme)
+	require.NoError(t, err)
+
+	mockObj := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: "default",
+			UID:       types.UID("test-uid"),
+		},
+	}
+
+	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(mockObj).Build()
+	logger := logrus.NewEntry(logrus.StandardLogger())
+	recorder := record.NewFakeRecorder(10)
+
+	reconciler := NewSentinelReconciler[*corev1.Pod](c, "test", logger, recorder)
+	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: "test", Namespace: "default"}}
+
+	diff := multiphase.NewMultiPhaseDiff[client.Object]()
+	mockAction := &mockSentinelReconcilerActionSimple{
+		readObj: NewSentinelRead(scheme),
+		diffObj: diff,
+	}
+
+	res, err := reconciler.Reconcile(context.Background(), req, mockObj, map[string]any{}, mockAction)
+	assert.NoError(t, err)
+	assert.Equal(t, reconcile.Result{}, res)
+}
+
+func TestDefaultSentinelReconciler_Reconcile_WithDiffAction_OnDiffError(t *testing.T) {
+	scheme := runtime.NewScheme()
+	err := clientgoscheme.AddToScheme(scheme)
+	require.NoError(t, err)
+
+	mockObj := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: "default",
+			UID:       types.UID("test-uid"),
+		},
+	}
+
+	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(mockObj).Build()
+	logger := logrus.NewEntry(logrus.StandardLogger())
+	recorder := record.NewFakeRecorder(10)
+
+	reconciler := NewSentinelReconciler[*corev1.Pod](c, "test", logger, recorder)
+	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: "test", Namespace: "default"}}
+
+	diff := multiphase.NewMultiPhaseDiff[client.Object]()
+	mockAction := &mockSentinelReconcilerAction{
+		readObj:    NewSentinelRead(scheme),
+		diffObj:    diff,
+		onDiffErr:  errors.New("onDiff failed"),
+		onErrorRes: reconcile.Result{Requeue: true},
+	}
+
+	res, err := reconciler.Reconcile(context.Background(), req, mockObj, map[string]any{}, mockAction)
+	assert.Error(t, err)
+	assert.True(t, res.Requeue)
+	assert.True(t, mockAction.onDiffCalled)
+}
+
+func TestDefaultSentinelReconciler_Reconcile_WithDiffAction_OnDiffRequeue(t *testing.T) {
+	scheme := runtime.NewScheme()
+	err := clientgoscheme.AddToScheme(scheme)
+	require.NoError(t, err)
+
+	mockObj := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: "default",
+			UID:       types.UID("test-uid"),
+		},
+	}
+
+	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(mockObj).Build()
+	logger := logrus.NewEntry(logrus.StandardLogger())
+	recorder := record.NewFakeRecorder(10)
+
+	reconciler := NewSentinelReconciler[*corev1.Pod](c, "test", logger, recorder)
+	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: "test", Namespace: "default"}}
+
+	diff := multiphase.NewMultiPhaseDiff[client.Object]()
+	mockAction := &mockSentinelReconcilerAction{
+		readObj:   NewSentinelRead(scheme),
+		diffObj:   diff,
+		onDiffRes: reconcile.Result{Requeue: true},
+	}
+
+	res, err := reconciler.Reconcile(context.Background(), req, mockObj, map[string]any{}, mockAction)
+	assert.NoError(t, err)
+	assert.True(t, res.Requeue)
+	assert.True(t, mockAction.onDiffCalled)
 }

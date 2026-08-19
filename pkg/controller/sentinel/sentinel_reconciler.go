@@ -121,13 +121,16 @@ func (h *DefaultSentinelReconciler[k8sObject]) Reconcile(ctx context.Context, re
 	}
 
 	// OnDiff: pre-apply hook
-	res, err = reconcilerAction.OnDiff(ctx, o, data, diff, logger)
-	if err != nil {
-		logger.Errorf("Failed to call 'onDiff' from reconciler: %s", err.Error())
-		return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallOnDiffFromReconciler.Error()), logger)
-	}
-	if res != (reconcile.Result{}) {
-		return res, nil
+	// It is optional: only called when the action implements the WithDiff variant.
+	if diffAction, ok := reconcilerAction.(SentinelReconcilerActionWithDiff[k8sObject]); ok {
+		res, err = diffAction.OnDiff(ctx, o, data, diff, logger)
+		if err != nil {
+			logger.Errorf("Failed to call 'onDiff' from reconciler: %s", err.Error())
+			return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallOnDiffFromReconciler.Error()), logger)
+		}
+		if res != (reconcile.Result{}) {
+			return res, nil
+		}
 	}
 
 	// Apply resources via SSA

@@ -68,7 +68,7 @@ func NewMemcachedReconciler(c client.Client, logger *logrus.Entry, recorder reco
 		name: "memcached",
 		stepReconcilers: []multiphase.MultiPhaseStepReconcilerAction[*cachecrd.Memcached, client.Object]{
 			multiphase.NewObjectMultiPhaseStepReconcilerAction[*cachecrd.Memcached, *corev1.ConfigMap, client.Object](configMapStep),
-			multiphase.NewObjectMultiPhaseStepReconcilerAction[*cachecrd.Memcached, *appv1.Deployment, client.Object](deploymentStep),
+			multiphase.NewObjectMultiPhaseStepReconcilerActionWithDiff[*cachecrd.Memcached, *appv1.Deployment, client.Object](deploymentStep),
 		},
 	}
 }

@@ -6,6 +6,7 @@ import (
 
 	"github.com/disaster37/operator-sdk-extra/v3/pkg/apis/shared"
 	apworkflow "github.com/disaster37/operator-sdk-extra/v3/pkg/apis/workflow"
+	"github.com/disaster37/operator-sdk-extra/v3/pkg/controller/multiphase"
 	"github.com/disaster37/operator-sdk-extra/v3/pkg/controller/workflow"
 	"github.com/disaster37/operator-sdk-extra/v3/pkg/object"
 	"github.com/sirupsen/logrus"
@@ -87,7 +88,6 @@ func TestNewWorkflowStepReconcilerAction(t *testing.T) {
 		"test-condition",
 		recorder,
 		"test-manager",
-		true,
 	)
 
 	require.NotNil(t, action)
@@ -102,7 +102,7 @@ func TestCurrentPhase(t *testing.T) {
 	recorder := record.NewFakeRecorder(10)
 
 	action := workflow.NewWorkflowStepReconcilerAction[*testMultiPhaseObject, *corev1.Secret](
-		c, "test-phase", "test-condition", recorder, "test-manager", true,
+		c, "test-phase", "test-condition", recorder, "test-manager",
 	)
 
 	o := &testMultiPhaseObject{
@@ -128,7 +128,7 @@ func TestAdvancePhase(t *testing.T) {
 	recorder := record.NewFakeRecorder(10)
 
 	action := workflow.NewWorkflowStepReconcilerAction[*testMultiPhaseObject, *corev1.Secret](
-		c, "test-phase", "test-condition", recorder, "test-manager", true,
+		c, "test-phase", "test-condition", recorder, "test-manager",
 	)
 
 	o := &testMultiPhaseObject{
@@ -150,7 +150,7 @@ func TestIsPhaseEmpty(t *testing.T) {
 	recorder := record.NewFakeRecorder(10)
 
 	action := workflow.NewWorkflowStepReconcilerAction[*testMultiPhaseObject, *corev1.Secret](
-		c, "test-phase", "test-condition", recorder, "test-manager", true,
+		c, "test-phase", "test-condition", recorder, "test-manager",
 	)
 
 	o := &testMultiPhaseObject{
@@ -174,7 +174,7 @@ func TestWorkflowStatusGetterIntegration(t *testing.T) {
 	recorder := record.NewFakeRecorder(10)
 
 	action := workflow.NewWorkflowStepReconcilerAction[*testMultiPhaseObject, *corev1.Secret](
-		c, "test-phase", "test-condition", recorder, "test-manager", true,
+		c, "test-phase", "test-condition", recorder, "test-manager",
 	)
 
 	o := &testMultiPhaseObject{
@@ -186,4 +186,58 @@ func TestWorkflowStatusGetterIntegration(t *testing.T) {
 	o.Status.Ws.Advance("custom-phase")
 	assert.True(t, action.IsPhase(o, "custom-phase"))
 	assert.Equal(t, apworkflow.WorkflowPhase("custom-phase"), action.CurrentPhase(o))
+}
+
+func TestNewWorkflowStepReconcilerActionWithDiff(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+
+	c := fake.NewClientBuilder().WithScheme(scheme).Build()
+	recorder := record.NewFakeRecorder(10)
+
+	action := workflow.NewWorkflowStepReconcilerActionWithDiff[*testMultiPhaseObject, *corev1.Secret](
+		c,
+		"test-phase",
+		"test-condition",
+		recorder,
+		"test-manager",
+	)
+
+	require.NotNil(t, action)
+	assert.Equal(t, shared.PhaseName("test-phase"), action.GetPhaseName())
+
+	// The diff variant satisfies the multiphase WithDiff interface.
+	var _ multiphase.MultiPhaseStepReconcilerActionWithDiff[*testMultiPhaseObject, *corev1.Secret] = action
+
+	// Phase management methods work.
+	o := &testMultiPhaseObject{
+		ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
+		Status:     testWorkflowStatus{Ws: &apworkflow.WorkflowStatus{}},
+	}
+	assert.True(t, action.IsPhaseEmpty(o))
+	action.AdvancePhase(context.Background(), o, "phase-1", logrus.NewEntry(logrus.StandardLogger()))
+	assert.Equal(t, apworkflow.WorkflowPhase("phase-1"), action.CurrentPhase(o))
+	assert.True(t, action.IsPhase(o, "phase-1"))
+	assert.False(t, action.IsPhase(o, "phase-2"))
+}
+
+func TestDefaultWorkflowStepReconcilerActionWithDiff_OnDiff(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+
+	c := fake.NewClientBuilder().WithScheme(scheme).Build()
+	recorder := record.NewFakeRecorder(10)
+
+	action := workflow.NewWorkflowStepReconcilerActionWithDiff[*testMultiPhaseObject, *corev1.Secret](
+		c, "test-phase", "test-condition", recorder, "test-manager",
+	)
+
+	o := &testMultiPhaseObject{
+		ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
+	}
+	diff := multiphase.NewMultiPhaseDiff[*corev1.Secret]()
+
+	res, err := action.OnDiff(context.Background(), o, map[string]any{}, diff, logrus.NewEntry(logrus.StandardLogger()))
+	require.NoError(t, err)
+	assert.Equal(t, reconcile.Result{}, res)
 }

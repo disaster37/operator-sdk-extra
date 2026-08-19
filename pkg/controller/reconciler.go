@@ -23,7 +23,6 @@ var (
 	ErrWhenAddFinalizer                     = errors.Sentinel("Error when add finalizer")
 	ErrWhenDeleteFinalizer                  = errors.Sentinel("Error when delete finalizer")
 	ErrWhenGetObjectStatus                  = errors.Sentinel("Error when get object status")
-	ErrDiffDisabled                         = errors.Sentinel("Dry-run diff detection is disabled. Either enable it with dryRun=true or override OnDiff to return nil")
 )
 
 type Reconciler interface {

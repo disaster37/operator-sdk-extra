@@ -28,7 +28,7 @@ const (
 type TestReconciler struct {
 	controller.Controller
 	sentinel.SentinelReconciler[*corev1.Namespace]
-	sentinel.SentinelReconcilerAction[*corev1.Namespace]
+	sentinel.SentinelReconcilerActionWithDiff[*corev1.Namespace]
 	name string
 }
 
@@ -41,7 +41,7 @@ func NewTestReconciler(c client.Client, logger *logrus.Entry, recorder record.Ev
 			logger,
 			recorder,
 		),
-		SentinelReconcilerAction: newTemplateAnnotationsReconciler[*corev1.Namespace](
+		SentinelReconcilerActionWithDiff: newTemplateAnnotationsReconciler[*corev1.Namespace](
 			c,
 			recorder,
 		),
@@ -58,7 +58,7 @@ func (r *TestReconciler) Reconcile(ctx context.Context, req reconcile.Request) (
 		req,
 		o,
 		data,
-		r.SentinelReconcilerAction,
+		r.SentinelReconcilerActionWithDiff,
 	)
 }
 
@@ -81,16 +81,15 @@ func (h *TestReconciler) SetupWithManager(mgr ctrl.Manager) error {
  */
 
 type templateAnnotationsReconciler[k8sObject client.Object] struct {
-	sentinel.SentinelReconcilerAction[k8sObject]
+	sentinel.SentinelReconcilerActionWithDiff[k8sObject]
 }
 
-func newTemplateAnnotationsReconciler[k8sObject client.Object](c client.Client, recorder record.EventRecorder) sentinel.SentinelReconcilerAction[k8sObject] {
+func newTemplateAnnotationsReconciler[k8sObject client.Object](c client.Client, recorder record.EventRecorder) sentinel.SentinelReconcilerActionWithDiff[k8sObject] {
 	return &templateAnnotationsReconciler[k8sObject]{
-		SentinelReconcilerAction: sentinel.NewSentinelAction[k8sObject](
+		SentinelReconcilerActionWithDiff: sentinel.NewSentinelActionWithDiff[k8sObject](
 			c,
 			recorder,
 			"test-sentinel-operator",
-			true,
 		),
 	}
 }

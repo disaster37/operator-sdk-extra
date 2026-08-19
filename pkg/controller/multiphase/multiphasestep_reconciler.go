@@ -81,13 +81,16 @@ func (h *DefaultMultiPhaseStepReconciler[k8sObject, k8sStepObject]) Reconcile(ct
 	}
 
 	// OnDiff: pre-apply hook for pre-tasks (drain, etc.)
-	res, err = reconcilerAction.OnDiff(ctx, o, data, diff, logger)
-	if err != nil {
-		logger.Errorf("Error when call 'onDiff' from step reconciler: %s", err.Error())
-		return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallOnDiffFromReconciler.Error()), logger)
-	}
-	if res != (reconcile.Result{}) {
-		return res, nil
+	// It is optional: only called when the action implements the WithDiff variant.
+	if diffAction, ok := reconcilerAction.(MultiPhaseStepReconcilerActionWithDiff[k8sObject, k8sStepObject]); ok {
+		res, err = diffAction.OnDiff(ctx, o, data, diff, logger)
+		if err != nil {
+			logger.Errorf("Error when call 'onDiff' from step reconciler: %s", err.Error())
+			return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenCallOnDiffFromReconciler.Error()), logger)
+		}
+		if res != (reconcile.Result{}) {
+			return res, nil
+		}
 	}
 
 	// Apply resources via SSA

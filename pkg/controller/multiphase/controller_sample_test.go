@@ -55,7 +55,7 @@ func NewTestReconciler(c client.Client, logger *logrus.Entry, recorder record.Ev
 		),
 		name: name,
 		stepReconcilers: []multiphase.MultiPhaseStepReconcilerAction[*MultiPhaseObject, client.Object]{
-			multiphase.NewObjectMultiPhaseStepReconcilerAction[*MultiPhaseObject, *corev1.ConfigMap, client.Object](newConfiMapReconciler(c, recorder)),
+			multiphase.NewObjectMultiPhaseStepReconcilerActionWithDiff[*MultiPhaseObject, *corev1.ConfigMap, client.Object](newConfiMapReconciler(c, recorder)),
 		},
 	}
 }
@@ -100,18 +100,17 @@ func (h *TestReconciler) Recorder() record.EventRecorder {
  */
 
 type configMapReconciler struct {
-	multiphase.MultiPhaseStepReconcilerAction[*MultiPhaseObject, *corev1.ConfigMap]
+	multiphase.MultiPhaseStepReconcilerActionWithDiff[*MultiPhaseObject, *corev1.ConfigMap]
 }
 
-func newConfiMapReconciler(c client.Client, recorder record.EventRecorder) (multiPhaseStepReconcilerAction multiphase.MultiPhaseStepReconcilerAction[*MultiPhaseObject, *corev1.ConfigMap]) {
+func newConfiMapReconciler(c client.Client, recorder record.EventRecorder) (multiPhaseStepReconcilerAction multiphase.MultiPhaseStepReconcilerActionWithDiff[*MultiPhaseObject, *corev1.ConfigMap]) {
 	return &configMapReconciler{
-		MultiPhaseStepReconcilerAction: multiphase.NewMultiPhaseStepReconcilerAction[*MultiPhaseObject, *corev1.ConfigMap](
+		MultiPhaseStepReconcilerActionWithDiff: multiphase.NewMultiPhaseStepReconcilerActionWithDiff[*MultiPhaseObject, *corev1.ConfigMap](
 			c,
 			ConfigmapPhase,
 			ConfigmapCondition,
 			recorder,
 			fieldManagerName,
-			true,
 		),
 	}
 }

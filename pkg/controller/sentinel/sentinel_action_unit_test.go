@@ -68,7 +68,7 @@ func TestDefaultSentinelAction_GetFieldManager(t *testing.T) {
 	recorder := record.NewFakeRecorder(10)
 
 	fieldManager := "test-field-manager"
-	action := NewSentinelAction[*mockK8sObject](fakeClient, recorder, fieldManager, false)
+	action := NewSentinelAction[*mockK8sObject](fakeClient, recorder, fieldManager)
 
 	t.Run("get field manager returns correct value", func(t *testing.T) {
 		result := action.GetFieldManager()
@@ -84,7 +84,7 @@ func TestDefaultSentinelAction_Configure(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 	recorder := record.NewFakeRecorder(10)
 
-	action := NewSentinelAction[*mockK8sObject](fakeClient, recorder, "test-field-manager", false)
+	action := NewSentinelAction[*mockK8sObject](fakeClient, recorder, "test-field-manager")
 
 	t.Run("configure returns empty result", func(t *testing.T) {
 		ctx := context.Background()
@@ -112,7 +112,7 @@ func TestDefaultSentinelAction_Read(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 	recorder := record.NewFakeRecorder(10)
 
-	action := NewSentinelAction[*mockK8sObject](fakeClient, recorder, "test-field-manager", false)
+	action := NewSentinelAction[*mockK8sObject](fakeClient, recorder, "test-field-manager")
 
 	t.Run("read panics when not implemented", func(t *testing.T) {
 		ctx := context.Background()
@@ -143,7 +143,7 @@ func TestDefaultSentinelAction_Delete(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(child1, child2).Build()
 	recorder := record.NewFakeRecorder(10)
 
-	action := NewSentinelAction[*corev1.ConfigMap](fakeClient, recorder, "test-field-manager", false)
+	action := NewSentinelAction[*corev1.ConfigMap](fakeClient, recorder, "test-field-manager")
 
 	t.Run("delete objects successfully", func(t *testing.T) {
 		ctx := context.Background()
@@ -174,7 +174,7 @@ func TestDefaultSentinelAction_OnError(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 	recorder := record.NewFakeRecorder(10)
 
-	action := NewSentinelAction[*mockK8sObject](fakeClient, recorder, "test-field-manager", false)
+	action := NewSentinelAction[*mockK8sObject](fakeClient, recorder, "test-field-manager")
 
 	t.Run("on error records event and returns error", func(t *testing.T) {
 		ctx := context.Background()
@@ -207,7 +207,7 @@ func TestDefaultSentinelAction_OnSuccess(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 	recorder := record.NewFakeRecorder(10)
 
-	action := NewSentinelAction[*mockK8sObject](fakeClient, recorder, "test-field-manager", false)
+	action := NewSentinelAction[*mockK8sObject](fakeClient, recorder, "test-field-manager")
 
 	t.Run("on success returns empty result", func(t *testing.T) {
 		ctx := context.Background()
@@ -233,7 +233,7 @@ func TestDefaultSentinelAction_Diff(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 	recorder := record.NewFakeRecorder(10)
 
-	action := NewSentinelAction[*mockK8sObject](fakeClient, recorder, "test-field-manager", false)
+	action := NewSentinelAction[*mockK8sObject](fakeClient, recorder, "test-field-manager")
 
 	t.Run("diff computes apply and delete lists", func(t *testing.T) {
 		ctx := context.Background()
@@ -292,4 +292,81 @@ func TestDefaultSentinelAction_Diff(t *testing.T) {
 		assert.Contains(t, diffStr, "Create object 'newObject'")
 		assert.Contains(t, diffStr, "Need delete object 'toBeDeleted'")
 	})
+}
+
+func TestNewSentinelActionWithDiff(t *testing.T) {
+	scheme := runtime.NewScheme()
+	err := clientgoscheme.AddToScheme(scheme)
+	require.NoError(t, err)
+
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+	recorder := record.NewFakeRecorder(10)
+
+	action := NewSentinelActionWithDiff[*mockK8sObject](fakeClient, recorder, "test-field-manager")
+	require.NotNil(t, action)
+	assert.Equal(t, "test-field-manager", action.GetFieldManager())
+}
+
+func TestDefaultSentinelActionWithDiff_OnDiff(t *testing.T) {
+	scheme := runtime.NewScheme()
+	err := clientgoscheme.AddToScheme(scheme)
+	require.NoError(t, err)
+
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+	recorder := record.NewFakeRecorder(10)
+
+	action := NewSentinelActionWithDiff[*mockK8sObject](fakeClient, recorder, "test-field-manager")
+
+	diff := multiphase.NewMultiPhaseDiff[client.Object]()
+	res, err := action.OnDiff(context.Background(), &mockK8sObject{name: "parent", namespace: "test-ns"}, map[string]any{}, diff, logrus.NewEntry(logrus.New()))
+	assert.NoError(t, err)
+	assert.Equal(t, reconcile.Result{}, res)
+}
+
+func TestDefaultSentinelActionWithDiff_Diff(t *testing.T) {
+	scheme := runtime.NewScheme()
+	err := clientgoscheme.AddToScheme(scheme)
+	require.NoError(t, err)
+
+	expected := &corev1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "ConfigMap",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: "test-ns",
+		},
+		Data: map[string]string{
+			"foo": "bar",
+		},
+	}
+	current := expected.DeepCopy()
+
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(current).Build()
+	recorder := record.NewFakeRecorder(10)
+
+	action := NewSentinelActionWithDiff[*mockK8sObject](fakeClient, recorder, "test-field-manager")
+
+	obj := &mockK8sObject{name: "parent", namespace: "test-ns"}
+	mockReader := multiphase.NewMultiPhaseRead[client.Object]()
+	mockReader.AddExpectedObject(expected)
+	mockReader.AddCurrentObject(current)
+
+	read := &mockSentinelRead{
+		reads: map[string]multiphase.MultiPhaseRead[client.Object]{
+			"test-type": mockReader,
+		},
+	}
+
+	diff, res, err := action.Diff(context.Background(), obj, read, map[string]any{}, logrus.NewEntry(logrus.New()))
+	if err != nil {
+		t.Skipf("fake client does not support SSA dry-run apply: %s", err)
+	}
+	assert.Equal(t, reconcile.Result{}, res)
+	// The diff variant uses SSA dry-run classification: an unchanged object must not
+	// be classified as update.
+	assert.False(t, diff.NeedUpdate())
+	assert.False(t, diff.NeedCreate())
+	assert.False(t, diff.NeedDelete())
 }

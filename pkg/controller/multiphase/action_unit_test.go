@@ -108,7 +108,7 @@ func TestNewMultiPhaseStepReconcilerAction(t *testing.T) {
 	client := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
 	recorder := &mockEventRecorder{}
 	
-	action := NewMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap](client, "phase", "condition", recorder, "fieldManager", false)
+	action := NewMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap](client, "phase", "condition", recorder, "fieldManager")
 	assert.NotNil(t, action)
 }
 
@@ -358,7 +358,7 @@ func TestMultiPhaseStepReconcilerAction(t *testing.T) {
 	client := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
 	recorder := &mockEventRecorder{}
 	
-	action := NewMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap](client, "phase", "condition", recorder, "fieldManager", false)
+	action := NewMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap](client, "phase", "condition", recorder, "fieldManager")
 	
 	// Test GetPhaseName
 	phaseName := action.GetPhaseName()
@@ -370,7 +370,7 @@ func TestNewObjectMultiPhaseStepReconcilerAction(t *testing.T) {
 	client := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
 	recorder := &mockEventRecorder{}
 	
-	innerAction := NewMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap](client, "phase", "condition", recorder, "fieldManager", false)
+	innerAction := NewMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap](client, "phase", "condition", recorder, "fieldManager")
 	objectAction := NewObjectMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap, *corev1.Secret](innerAction)
 	
 	assert.NotNil(t, objectAction)
@@ -385,7 +385,7 @@ func TestMultiPhaseStepReconcilerActionImplementations(t *testing.T) {
 	client := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
 	recorder := &mockEventRecorder{}
 	
-	action := NewMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap](client, "phase", "condition", recorder, "fieldManager", false)
+	action := NewMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap](client, "phase", "condition", recorder, "fieldManager")
 	logger := logrus.NewEntry(logrus.StandardLogger())
 
 	// Create a mock object
@@ -455,7 +455,7 @@ func TestObjectMultiPhaseStepReconcilerActionImplementations(t *testing.T) {
 	client := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
 	recorder := &mockEventRecorder{}
 	
-	innerAction := NewMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap](client, "phase", "condition", recorder, "fieldManager", false)
+	innerAction := NewMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap](client, "phase", "condition", recorder, "fieldManager")
 	objectAction := NewObjectMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap, *corev1.Secret](innerAction)
 	logger := logrus.NewEntry(logrus.StandardLogger())
 

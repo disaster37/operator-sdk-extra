@@ -33,7 +33,6 @@ func newConfigMapReconciler(c client.Client, recorder record.EventRecorder) mult
 			ConfigmapCondition,
 			recorder,
 			"memcached-operator",
-			false,
 		),
 	}
 }
@@ -63,8 +62,4 @@ func (r *configMapReconciler) Read(ctx context.Context, o *cachecrd.Memcached, d
 	}
 
 	return read, res, nil
-}
-
-func (r *configMapReconciler) OnDiff(ctx context.Context, o *cachecrd.Memcached, data map[string]any, diff multiphase.MultiPhaseDiff[*corev1.ConfigMap], logger *logrus.Entry) (res reconcile.Result, err error) {
-	return reconcile.Result{}, nil
 }
