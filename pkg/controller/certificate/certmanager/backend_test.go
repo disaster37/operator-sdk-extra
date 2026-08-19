@@ -1,0 +1,154 @@
+package certmanager_test
+
+import (
+	"context"
+	"testing"
+
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller/certificate"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/controller/certificate/certmanager"
+	"github.com/disaster37/operator-sdk-extra/v2/pkg/object"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+)
+
+type testCMObject struct {
+	metav1.TypeMeta
+	metav1.ObjectMeta
+}
+
+func (o *testCMObject) GetStatus() object.MultiPhaseObjectStatus {
+	return nil
+}
+
+func (o *testCMObject) DeepCopyObject() runtime.Object {
+	return &testCMObject{
+		TypeMeta:   o.TypeMeta,
+		ObjectMeta: *o.ObjectMeta.DeepCopy(),
+	}
+}
+
+func TestNewCertManagerBackend(t *testing.T) {
+	backend := certmanager.NewCertManagerBackend[*testCMObject]()
+	require.NotNil(t, backend)
+}
+
+func TestCertManagerBackendDedicatedCA(t *testing.T) {
+	backend := certmanager.NewCertManagerBackend[*testCMObject]()
+	o := &testCMObject{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: "default",
+		},
+	}
+
+	spec := certificate.TLSSpec{
+		SecretName:   "test-tls",
+		CommonName:   "test.example.com",
+		DNSNames:     []string{"test.example.com"},
+		Organization: "TestOrg",
+	}
+
+	objects, err := backend.DesiredObjects(context.Background(), o, spec)
+	require.NoError(t, err)
+	require.Len(t, objects, 3, "expected self-signed Issuer, CA Certificate, leaf Certificate")
+
+	// First object should be a self-signed Issuer
+	issuer, ok := objects[0].(*unstructured.Unstructured)
+	require.True(t, ok)
+	assert.Equal(t, "Issuer", issuer.GetKind())
+	assert.Equal(t, "cert-manager.io/v1", issuer.GetAPIVersion())
+	assert.Equal(t, "test-tls-ca-issuer", issuer.GetName())
+	assert.Equal(t, "default", issuer.GetNamespace())
+
+	selfSigned, found, err := unstructured.NestedMap(issuer.Object, "spec", "selfSigned")
+	require.NoError(t, err)
+	assert.True(t, found, "expected spec.selfSigned to exist")
+	assert.Empty(t, selfSigned)
+
+	// Second object should be a CA Certificate
+	caCert, ok := objects[1].(*unstructured.Unstructured)
+	require.True(t, ok)
+	assert.Equal(t, "Certificate", caCert.GetKind())
+	assert.Equal(t, "test-tls-ca", caCert.GetName())
+
+	isCA, found, err := unstructured.NestedBool(caCert.Object, "spec", "isCA")
+	require.NoError(t, err)
+	assert.True(t, found)
+	assert.True(t, isCA)
+
+	// Third object should be a leaf Certificate
+	leaf, ok := objects[2].(*unstructured.Unstructured)
+	require.True(t, ok)
+	assert.Equal(t, "Certificate", leaf.GetKind())
+	assert.Equal(t, "test-tls", leaf.GetName())
+
+	commonName, found, err := unstructured.NestedString(leaf.Object, "spec", "commonName")
+	require.NoError(t, err)
+	assert.True(t, found)
+	assert.Equal(t, "test.example.com", commonName)
+}
+
+func TestCertManagerBackendExistingCA(t *testing.T) {
+	backend := certmanager.NewCertManagerBackend[*testCMObject]()
+	o := &testCMObject{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: "default",
+		},
+	}
+
+	spec := certificate.TLSSpec{
+		SecretName:   "test-tls",
+		CommonName:   "test.example.com",
+		DNSNames:     []string{"test.example.com"},
+		IssuerRef:    "my-cluster-issuer",
+	}
+
+	objects, err := backend.DesiredObjects(context.Background(), o, spec)
+	require.NoError(t, err)
+	require.Len(t, objects, 1, "expected only leaf Certificate in existing-CA mode")
+
+	leaf, ok := objects[0].(*unstructured.Unstructured)
+	require.True(t, ok)
+	assert.Equal(t, "Certificate", leaf.GetKind())
+	assert.Equal(t, "test-tls", leaf.GetName())
+
+	issuerRef, found, err := unstructured.NestedString(leaf.Object, "spec", "issuerRef", "name")
+	require.NoError(t, err)
+	assert.True(t, found)
+	assert.Equal(t, "my-cluster-issuer", issuerRef)
+}
+
+func TestCertManagerBackendEmptySecretName(t *testing.T) {
+	backend := certmanager.NewCertManagerBackend[*testCMObject]()
+	o := &testCMObject{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: "default",
+		},
+	}
+
+	spec := certificate.TLSSpec{SecretName: ""}
+	_, err := backend.DesiredObjects(context.Background(), o, spec)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "non-empty SecretName")
+}
+
+func TestCertManagerCertificateSecretName(t *testing.T) {
+	backend := certmanager.NewCertManagerBackend[*testCMObject]()
+	o := &testCMObject{
+		ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
+	}
+
+	spec := certificate.TLSSpec{SecretName: "my-tls"}
+	name := backend.CertificateSecretName(o, spec)
+	assert.Equal(t, "my-tls", name)
+}
+
+func TestCertManagerRequiresRotationSaga(t *testing.T) {
+	backend := certmanager.NewCertManagerBackend[*testCMObject]()
+	assert.False(t, backend.RequiresRotationSaga())
+}

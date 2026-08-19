@@ -83,6 +83,10 @@ go get github.com/disaster37/operator-sdk-extra/v2@latest
 
 Refer to the [Multiphase](documentations/multi-phase-reconciler.md), [Remote](documentations/remote-reconciler.md) or [Sentinel](documentations/sentinel-reconciler.md) documentation to implement the pattern that fits your use case.
 
+> **Upgrading from v1?** This is a major, breaking release (new `/v2` module path, package split, and
+> a switch from client-side 3-way diff to **Server-Side Apply** for the multiphase and sentinel
+> patterns). Follow the [v1 → v2 migration guide](documentations/migration-v1-to-v2.md).
+
 ### Run the full CI pipeline locally (without pushing)
 
 ```bash
