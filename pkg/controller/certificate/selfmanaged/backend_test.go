@@ -54,11 +54,11 @@ func TestSelfManagedBackendDesiredObjects(t *testing.T) {
 	}
 
 	spec := certificate.TLSSpec{
-		SecretName:   "test-tls",
-		CommonName:   "test.example.com",
-		DNSNames:     []string{"test.example.com", "test-alt.example.com"},
-		Organization: "TestOrg",
-		ValidityDays: 90,
+		SecretName:       "test-tls",
+		CommonName:       "test.example.com",
+		DNSNames:         []string{"test.example.com", "test-alt.example.com"},
+		Organization:     "TestOrg",
+		LeafValidityDays: 90,
 	}
 
 	objects, err := backend.DesiredObjects(context.Background(), o, spec)
@@ -338,10 +338,10 @@ func TestSelfManagedBackendCRLAbsent(t *testing.T) {
 // must outlive ThisUpdate and track the CA lifetime.
 func TestSelfManagedBackendCRLNextUpdateMatchesCA(t *testing.T) {
 	spec := certificate.TLSSpec{
-		SecretName:   "test-tls",
-		CommonName:   "test.example.com",
-		GenerateCRL:  true,
-		ValidityDays: 90,
+		SecretName:       "test-tls",
+		CommonName:       "test.example.com",
+		GenerateCRL:      true,
+		LeafValidityDays: 90,
 	}
 
 	caSecret, _ := testSelfManagedObjects(t, spec)
@@ -376,132 +376,452 @@ func makeTestCert(t *testing.T, cn string, notBefore, notAfter time.Time) []byte
 	return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
 }
 
-func TestNeedRenewal_NilSecret(t *testing.T) {
-	need, err := selfmanaged.NeedRenewal(nil, certificate.TLSSpec{}, time.Now())
+func TestBuildCASecret(t *testing.T) {
+	spec := certificate.TLSSpec{
+		SecretName:       "test-tls",
+		CommonName:       "test.example.com",
+		LeafValidityDays: 90,
+	}
+	caSecret, _, caCert, err := selfmanaged.BuildCA("default", spec.SecretName, spec)
+	require.NoError(t, err)
+	assert.Equal(t, "test-tls-ca", caSecret.Name)
+	assert.Equal(t, "default", caSecret.Namespace)
+	assert.Contains(t, caSecret.Data, selfmanaged.CAKey)
+	assert.Contains(t, caSecret.Data, selfmanaged.CAKeyPrivate)
+	_, ok := caSecret.Data[selfmanaged.CRLKey]
+	assert.False(t, ok, "ca.crl should be absent when GenerateCRL is false")
+
+	// CA NotAfter ≈ now + GetValidCADays (2× leaf = 180 days).
+	want := time.Now().Add(time.Duration(certificate.GetValidCADays(spec)) * 24 * time.Hour)
+	assert.WithinDuration(t, want, caCert.NotAfter, 5*time.Minute)
+}
+
+func TestBuildCASecretWithCRL(t *testing.T) {
+	spec := certificate.TLSSpec{
+		SecretName:  "test-tls",
+		CommonName:  "test.example.com",
+		GenerateCRL: true,
+	}
+	caSecret, _, _, err := selfmanaged.BuildCA("default", spec.SecretName, spec)
+	require.NoError(t, err)
+	assert.Contains(t, caSecret.Data, selfmanaged.CRLKey)
+}
+
+func TestSignLeaf(t *testing.T) {
+	spec := certificate.TLSSpec{
+		CommonName:       "test.example.com",
+		DNSNames:         []string{"test.example.com"},
+		Organization:     "TestOrg",
+		LeafValidityDays: 90,
+		IPAddresses:      []string{"10.0.0.1"},
+	}
+	_, caKey, caCert, err := selfmanaged.BuildCA("default", "test-tls", spec)
+	require.NoError(t, err)
+
+	certPEM, keyPEM, err := selfmanaged.SignLeaf(caCert, caKey, spec)
+	require.NoError(t, err)
+	assert.Contains(t, string(keyPEM), "BEGIN EC PRIVATE KEY")
+
+	block, _ := pem.Decode(certPEM)
+	require.NotNil(t, block)
+	leafCert, err := x509.ParseCertificate(block.Bytes)
+	require.NoError(t, err)
+	assert.Equal(t, "test.example.com", leafCert.Subject.CommonName)
+	assert.Equal(t, []string{"TestOrg"}, leafCert.Subject.Organization)
+	assert.Equal(t, []string{"test.example.com"}, leafCert.DNSNames)
+	require.Len(t, leafCert.IPAddresses, 1)
+	assert.True(t, leafCert.IPAddresses[0].Equal(net.ParseIP("10.0.0.1")))
+
+	// Signed by the CA.
+	require.NoError(t, leafCert.CheckSignatureFrom(caCert))
+
+	// Validity ≈ now + GetValidLeafDays.
+	want := time.Now().Add(time.Duration(certificate.GetValidLeafDays(spec)) * 24 * time.Hour)
+	assert.WithinDuration(t, want, leafCert.NotAfter, 5*time.Minute)
+}
+
+func TestSignLeaf_UniqueSerialNumbers(t *testing.T) {
+	spec := certificate.TLSSpec{
+		CommonName:   "test.example.com",
+		DNSNames:     []string{"test.example.com"},
+		Organization: "TestOrg",
+	}
+	_, caKey, caCert, err := selfmanaged.BuildCA("default", "test-tls", spec)
+	require.NoError(t, err)
+	require.NotNil(t, caCert)
+	require.NotZero(t, caCert.SerialNumber.Sign(), "CA serial must be positive and non-zero")
+
+	certPEM1, _, err := selfmanaged.SignLeaf(caCert, caKey, spec)
+	require.NoError(t, err)
+	certPEM2, _, err := selfmanaged.SignLeaf(caCert, caKey, spec)
+	require.NoError(t, err)
+
+	parseSerial := func(t *testing.T, pemBytes []byte) *big.Int {
+		t.Helper()
+		block, _ := pem.Decode(pemBytes)
+		require.NotNil(t, block)
+		cert, err := x509.ParseCertificate(block.Bytes)
+		require.NoError(t, err)
+		return cert.SerialNumber
+	}
+
+	s1 := parseSerial(t, certPEM1)
+	s2 := parseSerial(t, certPEM2)
+	assert.NotZero(t, s1.Sign())
+	assert.NotZero(t, s2.Sign())
+	assert.NotEqual(t, s1, s2, "each leaf issued by a CA must have a unique serial number")
+}
+
+func TestParseCA(t *testing.T) {
+	caSecret, caKey, caCert, err := selfmanaged.BuildCA("default", "test-tls", certificate.TLSSpec{CommonName: "test.example.com"})
+	require.NoError(t, err)
+
+	parsedCert, parsedKey, err := selfmanaged.ParseCA(caSecret)
+	require.NoError(t, err)
+	assert.Equal(t, caCert.Raw, parsedCert.Raw)
+	assert.True(t, caKey.PublicKey.Equal(&parsedKey.PublicKey))
+}
+
+func TestParseCA_MismatchedKeyCert(t *testing.T) {
+	caSecret, _, _, err := selfmanaged.BuildCA("default", "test-tls", certificate.TLSSpec{CommonName: "test.example.com"})
+	require.NoError(t, err)
+
+	// Replace ca.key with a different (valid) EC key so the key no longer
+	// matches ca.crt. ParseCA must fail closed rather than sign broken certs.
+	otherKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	der, err := x509.MarshalECPrivateKey(otherKey)
+	require.NoError(t, err)
+	caSecret.Data[selfmanaged.CAKeyPrivate] = pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: der})
+
+	_, _, err = selfmanaged.ParseCA(caSecret)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "does not match")
+}
+
+func TestParseCA_MissingCAKey(t *testing.T) {
+	caSecret, _, _, err := selfmanaged.BuildCA("default", "test-tls", certificate.TLSSpec{CommonName: "test.example.com"})
+	require.NoError(t, err)
+	delete(caSecret.Data, selfmanaged.CAKeyPrivate)
+
+	_, _, err = selfmanaged.ParseCA(caSecret)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "missing ca.key")
+}
+
+func TestParseCA_Malformed(t *testing.T) {
+	caSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-tls-ca", Namespace: "default"},
+		Data: map[string][]byte{
+			selfmanaged.CAKey:        []byte("garbage"),
+			selfmanaged.CAKeyPrivate: []byte("garbage"),
+		},
+	}
+	_, _, err := selfmanaged.ParseCA(caSecret)
+	require.Error(t, err)
+}
+
+func TestCANeedsRenewal_NilSecret(t *testing.T) {
+	need, err := selfmanaged.CANeedsRenewal(nil, certificate.TLSSpec{}, time.Now())
 	require.NoError(t, err)
 	assert.True(t, need)
 }
 
-func TestNeedRenewal_MissingTLSCrt(t *testing.T) {
+func TestCANeedsRenewal_MissingCACrt(t *testing.T) {
 	secret := &corev1.Secret{Data: map[string][]byte{}}
-	need, err := selfmanaged.NeedRenewal(secret, certificate.TLSSpec{}, time.Now())
+	need, err := selfmanaged.CANeedsRenewal(secret, certificate.TLSSpec{}, time.Now())
 	require.NoError(t, err)
 	assert.True(t, need)
 }
 
-func TestNeedRenewal_EmptyTLSCrt(t *testing.T) {
-	secret := &corev1.Secret{Data: map[string][]byte{selfmanaged.CertKey: {}}}
-	need, err := selfmanaged.NeedRenewal(secret, certificate.TLSSpec{}, time.Now())
+func TestCANeedsRenewal_EmptyCACrt(t *testing.T) {
+	secret := &corev1.Secret{Data: map[string][]byte{selfmanaged.CAKey: {}}}
+	need, err := selfmanaged.CANeedsRenewal(secret, certificate.TLSSpec{}, time.Now())
 	require.NoError(t, err)
 	assert.True(t, need)
 }
 
-func TestNeedRenewal_MalformedPEM(t *testing.T) {
-	secret := &corev1.Secret{Data: map[string][]byte{selfmanaged.CertKey: []byte("not pem")}}
-	_, err := selfmanaged.NeedRenewal(secret, certificate.TLSSpec{}, time.Now())
+func TestCANeedsRenewal_Malformed(t *testing.T) {
+	secret := &corev1.Secret{Data: map[string][]byte{selfmanaged.CAKey: []byte("garbage")}}
+	_, err := selfmanaged.CANeedsRenewal(secret, certificate.TLSSpec{}, time.Now())
 	require.Error(t, err)
 }
 
-func TestNeedRenewal_Expired(t *testing.T) {
+func TestCANeedsRenewal_Expired(t *testing.T) {
 	now := time.Now()
-	certPEM := makeTestCert(t, "test.example.com", now.Add(-48*time.Hour), now.Add(24*time.Hour))
-	secret := &corev1.Secret{Data: map[string][]byte{selfmanaged.CertKey: certPEM}}
+	certPEM := makeTestCert(t, "test.example.com-ca", now.Add(-48*time.Hour), now.Add(-24*time.Hour))
+	secret := &corev1.Secret{Data: map[string][]byte{selfmanaged.CAKey: certPEM}}
 
-	need, err := selfmanaged.NeedRenewal(secret, certificate.TLSSpec{RenewalDays: 30}, now.Add(48*time.Hour))
+	need, err := selfmanaged.CANeedsRenewal(secret, certificate.TLSSpec{RenewalDays: 30}, now)
 	require.NoError(t, err)
 	assert.True(t, need)
 }
 
-func TestNeedRenewal_WithinWindow(t *testing.T) {
+func TestCANeedsRenewal_WithinWindow(t *testing.T) {
 	now := time.Now()
-	certPEM := makeTestCert(t, "test.example.com", now.Add(-1*time.Hour), now.Add(365*24*time.Hour))
-	secret := &corev1.Secret{Data: map[string][]byte{selfmanaged.CertKey: certPEM}}
+	certPEM := makeTestCert(t, "test.example.com-ca", now.Add(-1*time.Hour), now.Add(5*24*time.Hour))
+	secret := &corev1.Secret{Data: map[string][]byte{selfmanaged.CAKey: certPEM}}
 
-	need, err := selfmanaged.NeedRenewal(secret, certificate.TLSSpec{RenewalDays: 30}, now.Add(355*24*time.Hour))
+	need, err := selfmanaged.CANeedsRenewal(secret, certificate.TLSSpec{RenewalDays: 30}, now)
 	require.NoError(t, err)
 	assert.True(t, need)
 }
 
-func TestNeedRenewal_OutsideWindow(t *testing.T) {
+func TestCANeedsRenewal_OutsideWindow(t *testing.T) {
 	now := time.Now()
-	certPEM := makeTestCert(t, "test.example.com", now.Add(-1*time.Hour), now.Add(365*24*time.Hour))
-	secret := &corev1.Secret{Data: map[string][]byte{selfmanaged.CertKey: certPEM}}
+	certPEM := makeTestCert(t, "test.example.com-ca", now.Add(-1*time.Hour), now.Add(365*24*time.Hour))
+	secret := &corev1.Secret{Data: map[string][]byte{selfmanaged.CAKey: certPEM}}
 
-	need, err := selfmanaged.NeedRenewal(secret, certificate.TLSSpec{RenewalDays: 30}, now.Add(265*24*time.Hour))
+	need, err := selfmanaged.CANeedsRenewal(secret, certificate.TLSSpec{RenewalDays: 30}, now)
 	require.NoError(t, err)
 	assert.False(t, need)
 }
 
-func TestNeedRenewal_CANearExpiry(t *testing.T) {
+func TestCANeedsRenewal_RenewalDaysOverflowClamped(t *testing.T) {
 	now := time.Now()
-	// Leaf far from expiry.
-	leafPEM := makeTestCert(t, "test.example.com", now.Add(-1*time.Hour), now.Add(365*24*time.Hour))
-	// CA near expiry (within the 30-day window).
-	caPEM := makeTestCert(t, "test.example.com-ca", now.Add(-1*time.Hour), now.Add(5*24*time.Hour))
-	secret := &corev1.Secret{Data: map[string][]byte{
-		selfmanaged.CertKey: leafPEM,
-		selfmanaged.CAKey:   caPEM,
-	}}
+	certPEM := makeTestCert(t, "test.example.com-ca", now.Add(-1*time.Hour), now.Add(1*time.Hour))
+	secret := &corev1.Secret{Data: map[string][]byte{selfmanaged.CAKey: certPEM}}
 
-	need, err := selfmanaged.NeedRenewal(secret, certificate.TLSSpec{RenewalDays: 30}, now)
+	need, err := selfmanaged.CANeedsRenewal(secret, certificate.TLSSpec{RenewalDays: 1 << 62}, now)
 	require.NoError(t, err)
-	assert.True(t, need)
+	assert.True(t, need, "clamped renewal window must still trigger renewal for a near-expiry CA")
 }
 
-func TestNeedRenewal_CABadButAbsent(t *testing.T) {
-	now := time.Now()
-	leafPEM := makeTestCert(t, "test.example.com", now.Add(-1*time.Hour), now.Add(365*24*time.Hour))
-	secret := &corev1.Secret{Data: map[string][]byte{selfmanaged.CertKey: leafPEM}}
+func TestDesiredLeafWithCA(t *testing.T) {
+	backend := selfmanaged.NewSelfManagedBackend[*testSelfManagedObject]()
+	o := &testSelfManagedObject{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"}}
+	spec := certificate.TLSSpec{
+		SecretName:   "test-tls",
+		CommonName:   "test.example.com",
+		DNSNames:     []string{"test.example.com"},
+		Organization: "TestOrg",
+	}
+	caSecret, oldLeaf := testSelfManagedObjects(t, spec)
 
-	need, err := selfmanaged.NeedRenewal(secret, certificate.TLSSpec{RenewalDays: 30}, now)
+	newLeaf, err := backend.DesiredLeafWithCA(context.Background(), o, spec, caSecret)
 	require.NoError(t, err)
-	assert.False(t, need)
+	assert.Equal(t, "test-tls", newLeaf.Name)
+	assert.Equal(t, "default", newLeaf.Namespace)
+	assert.Equal(t, corev1.SecretTypeTLS, newLeaf.Type)
+	// ca.crt is a single CA (no bundle).
+	assert.Equal(t, caSecret.Data[selfmanaged.CAKey], newLeaf.Data[selfmanaged.CAKey])
+	// Fresh leaf key differs from the old leaf's key.
+	assert.NotEqual(t, oldLeaf.Data[selfmanaged.KeyKey], newLeaf.Data[selfmanaged.KeyKey])
+
+	caCert, _, err := selfmanaged.ParseCA(caSecret)
+	require.NoError(t, err)
+	leafCert := parseLeafCert(t, newLeaf)
+	require.NoError(t, leafCert.CheckSignatureFrom(caCert))
 }
 
-func TestNeedRenewal_MalformedCA(t *testing.T) {
-	now := time.Now()
-	leafPEM := makeTestCert(t, "test.example.com", now.Add(-1*time.Hour), now.Add(365*24*time.Hour))
-	secret := &corev1.Secret{Data: map[string][]byte{
-		selfmanaged.CertKey: leafPEM,
-		selfmanaged.CAKey:   []byte("garbage"),
-	}}
+func TestDesiredLeafWithCA_MissingCAKey(t *testing.T) {
+	backend := selfmanaged.NewSelfManagedBackend[*testSelfManagedObject]()
+	o := &testSelfManagedObject{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"}}
+	spec := certificate.TLSSpec{SecretName: "test-tls", CommonName: "test.example.com"}
 
-	_, err := selfmanaged.NeedRenewal(secret, certificate.TLSSpec{RenewalDays: 30}, now)
+	caSecret, _, _, err := selfmanaged.BuildCA("default", spec.SecretName, spec)
+	require.NoError(t, err)
+	delete(caSecret.Data, selfmanaged.CAKeyPrivate)
+
+	_, err = backend.DesiredLeafWithCA(context.Background(), o, spec, caSecret)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "missing ca.key")
+}
+
+func leafNeedsChange(t *testing.T, leafSecret *corev1.Secret, spec certificate.TLSSpec, now time.Time) certificate.LeafChange {
+	t.Helper()
+	backend := selfmanaged.NewSelfManagedBackend[*testSelfManagedObject]()
+	o := &testSelfManagedObject{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"}}
+	chg, err := backend.LeafNeedsChange(context.Background(), o, leafSecret, spec, now)
+	require.NoError(t, err)
+	return chg
+}
+
+func TestLeafNeedsChange_NilSecret(t *testing.T) {
+	chg := leafNeedsChange(t, nil, certificate.TLSSpec{}, time.Now())
+	assert.Equal(t, certificate.LeafMissing, chg.Reason)
+}
+
+func TestLeafNeedsChange_MissingTLSCrt(t *testing.T) {
+	chg := leafNeedsChange(t, &corev1.Secret{Data: map[string][]byte{}}, certificate.TLSSpec{}, time.Now())
+	assert.Equal(t, certificate.LeafMissing, chg.Reason)
+}
+
+func TestLeafNeedsChange_MalformedPEM(t *testing.T) {
+	backend := selfmanaged.NewSelfManagedBackend[*testSelfManagedObject]()
+	o := &testSelfManagedObject{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"}}
+	leaf := &corev1.Secret{Data: map[string][]byte{selfmanaged.CertKey: []byte("not pem")}}
+	_, err := backend.LeafNeedsChange(context.Background(), o, leaf, certificate.TLSSpec{}, time.Now())
 	require.Error(t, err)
 }
 
-func TestNeedRenewal_NonCertificateBlock(t *testing.T) {
-	block := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: []byte("x")})
-	secret := &corev1.Secret{Data: map[string][]byte{selfmanaged.CertKey: block}}
-
-	_, err := selfmanaged.NeedRenewal(secret, certificate.TLSSpec{}, time.Now())
-	require.Error(t, err)
+func TestLeafNeedsChange_NoChange(t *testing.T) {
+	spec := certificate.TLSSpec{
+		SecretName:   "test-tls",
+		CommonName:   "test.example.com",
+		DNSNames:     []string{"test.example.com"},
+		Organization: "TestOrg",
+	}
+	_, leaf := testSelfManagedObjects(t, spec)
+	chg := leafNeedsChange(t, leaf, spec, time.Now())
+	assert.True(t, chg.IsZero())
+	assert.Equal(t, certificate.LeafNone, chg.Reason)
 }
 
-func TestNeedRenewal_BadDERCertificate(t *testing.T) {
-	block := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: []byte("bad der")})
-	secret := &corev1.Secret{Data: map[string][]byte{selfmanaged.CertKey: block}}
-
-	_, err := selfmanaged.NeedRenewal(secret, certificate.TLSSpec{}, time.Now())
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to parse certificate")
+func TestLeafNeedsChange_Expiring(t *testing.T) {
+	spec := certificate.TLSSpec{
+		SecretName:       "test-tls",
+		CommonName:       "test.example.com",
+		DNSNames:         []string{"test.example.com"},
+		Organization:     "TestOrg",
+		LeafValidityDays: 365,
+	}
+	_, leaf := testSelfManagedObjects(t, spec)
+	chg := leafNeedsChange(t, leaf, spec, time.Now().Add(340*24*time.Hour))
+	assert.Equal(t, certificate.LeafExpiring, chg.Reason)
 }
 
-// TestNeedRenewal_RenewalDaysOverflowClamped verifies that an absurdly large
-// RenewalDays (which would overflow time.Duration and yield a negative
-// renewal window, silently disabling renewal) is clamped by
-// GetValidRenewalDays so NeedRenewal behaves sanely: a near-expiry cert still
-// reports renewal needed (no silent "never renew"), and the call does not
-// panic.
-func TestNeedRenewal_RenewalDaysOverflowClamped(t *testing.T) {
-	now := time.Now()
-	// Cert expiring in 1 hour.
-	certPEM := makeTestCert(t, "test.example.com", now.Add(-1*time.Hour), now.Add(1*time.Hour))
-	secret := &corev1.Secret{Data: map[string][]byte{selfmanaged.CertKey: certPEM}}
+func TestLeafNeedsChange_CNChanged(t *testing.T) {
+	buildSpec := certificate.TLSSpec{
+		SecretName:   "test-tls",
+		CommonName:   "test.example.com",
+		DNSNames:     []string{"test.example.com"},
+		Organization: "TestOrg",
+	}
+	_, leaf := testSelfManagedObjects(t, buildSpec)
+	driftSpec := buildSpec
+	driftSpec.CommonName = "other.example.com"
+	chg := leafNeedsChange(t, leaf, driftSpec, time.Now())
+	assert.Equal(t, certificate.LeafCNChanged, chg.Reason)
+}
 
-	// Near-max int would overflow `RenewalDays * 24 * time.Hour` to a negative
-	// window without clamping, making NeedRenewal return false (never renew).
-	need, err := selfmanaged.NeedRenewal(secret, certificate.TLSSpec{RenewalDays: 1 << 62}, now)
-	require.NoError(t, err)
-	assert.True(t, need, "clamped renewal window must still trigger renewal for a near-expiry cert")
+func TestLeafNeedsChange_OrgChanged(t *testing.T) {
+	buildSpec := certificate.TLSSpec{
+		SecretName:   "test-tls",
+		CommonName:   "test.example.com",
+		DNSNames:     []string{"test.example.com"},
+		Organization: "TestOrg",
+	}
+	_, leaf := testSelfManagedObjects(t, buildSpec)
+	driftSpec := buildSpec
+	driftSpec.Organization = "OtherOrg"
+	chg := leafNeedsChange(t, leaf, driftSpec, time.Now())
+	assert.Equal(t, certificate.LeafOrgChanged, chg.Reason)
+}
+
+func TestLeafNeedsChange_SANAdded(t *testing.T) {
+	buildSpec := certificate.TLSSpec{
+		SecretName:   "test-tls",
+		CommonName:   "test.example.com",
+		DNSNames:     []string{"test.example.com"},
+		Organization: "TestOrg",
+	}
+	_, leaf := testSelfManagedObjects(t, buildSpec)
+	driftSpec := buildSpec
+	driftSpec.DNSNames = []string{"test.example.com", "new.example.com"}
+	chg := leafNeedsChange(t, leaf, driftSpec, time.Now())
+	assert.Equal(t, certificate.LeafSANsChanged, chg.Reason)
+	assert.Equal(t, []string{"new.example.com"}, chg.SANsAdded)
+	assert.Empty(t, chg.SANsRemoved)
+}
+
+func TestLeafNeedsChange_SANRemoved(t *testing.T) {
+	buildSpec := certificate.TLSSpec{
+		SecretName:   "test-tls",
+		CommonName:   "test.example.com",
+		DNSNames:     []string{"test.example.com", "extra.example.com"},
+		Organization: "TestOrg",
+	}
+	_, leaf := testSelfManagedObjects(t, buildSpec)
+	driftSpec := buildSpec
+	driftSpec.DNSNames = []string{"test.example.com"}
+	chg := leafNeedsChange(t, leaf, driftSpec, time.Now())
+	assert.Equal(t, certificate.LeafSANsChanged, chg.Reason)
+	assert.Empty(t, chg.SANsAdded)
+	assert.Equal(t, []string{"extra.example.com"}, chg.SANsRemoved)
+}
+
+func TestLeafNeedsChange_SANAddAndRemove(t *testing.T) {
+	buildSpec := certificate.TLSSpec{
+		SecretName:   "test-tls",
+		CommonName:   "test.example.com",
+		DNSNames:     []string{"a.example.com", "b.example.com"},
+		Organization: "TestOrg",
+	}
+	_, leaf := testSelfManagedObjects(t, buildSpec)
+	driftSpec := buildSpec
+	driftSpec.DNSNames = []string{"b.example.com", "c.example.com"}
+	chg := leafNeedsChange(t, leaf, driftSpec, time.Now())
+	assert.Equal(t, certificate.LeafSANsChanged, chg.Reason)
+	assert.Equal(t, []string{"c.example.com"}, chg.SANsAdded)
+	assert.Equal(t, []string{"a.example.com"}, chg.SANsRemoved)
+}
+
+func TestLeafNeedsChange_IPAdded(t *testing.T) {
+	buildSpec := certificate.TLSSpec{
+		SecretName:   "test-tls",
+		CommonName:   "test.example.com",
+		DNSNames:     []string{"test.example.com"},
+		Organization: "TestOrg",
+		IPAddresses:  []string{"10.0.0.1"},
+	}
+	_, leaf := testSelfManagedObjects(t, buildSpec)
+	driftSpec := buildSpec
+	driftSpec.IPAddresses = []string{"10.0.0.1", "10.0.0.2"}
+	chg := leafNeedsChange(t, leaf, driftSpec, time.Now())
+	assert.Equal(t, certificate.LeafIPsChanged, chg.Reason)
+	assert.Equal(t, []string{"10.0.0.2"}, chg.IPsAdded)
+	assert.Empty(t, chg.IPsRemoved)
+}
+
+func TestLeafNeedsChange_IPRemoved(t *testing.T) {
+	buildSpec := certificate.TLSSpec{
+		SecretName:   "test-tls",
+		CommonName:   "test.example.com",
+		DNSNames:     []string{"test.example.com"},
+		Organization: "TestOrg",
+		IPAddresses:  []string{"10.0.0.1", "10.0.0.2"},
+	}
+	_, leaf := testSelfManagedObjects(t, buildSpec)
+	driftSpec := buildSpec
+	driftSpec.IPAddresses = []string{"10.0.0.1"}
+	chg := leafNeedsChange(t, leaf, driftSpec, time.Now())
+	assert.Equal(t, certificate.LeafIPsChanged, chg.Reason)
+	assert.Empty(t, chg.IPsAdded)
+	assert.Equal(t, []string{"10.0.0.2"}, chg.IPsRemoved)
+}
+
+func TestLeafNeedsChange_MultiPEM(t *testing.T) {
+	buildSpec := certificate.TLSSpec{
+		SecretName:   "test-tls",
+		CommonName:   "test.example.com",
+		DNSNames:     []string{"test.example.com"},
+		Organization: "TestOrg",
+	}
+	_, leaf := testSelfManagedObjects(t, buildSpec)
+
+	// Append a second, unrelated certificate. LeafNeedsChange must use the
+	// first CERTIFICATE block only.
+	extra := makeTestCert(t, "unrelated.example.com", time.Now().Add(-1*time.Hour), time.Now().Add(24*time.Hour))
+	leaf.Data[selfmanaged.CertKey] = append(leaf.Data[selfmanaged.CertKey], extra...)
+
+	chg := leafNeedsChange(t, leaf, buildSpec, time.Now())
+	assert.True(t, chg.IsZero())
+}
+
+func TestLeafNeedsChange_ExpiringDominatesSANRemoval(t *testing.T) {
+	buildSpec := certificate.TLSSpec{
+		SecretName:       "test-tls",
+		CommonName:       "test.example.com",
+		DNSNames:         []string{"test.example.com", "extra.example.com"},
+		Organization:     "TestOrg",
+		LeafValidityDays: 365,
+	}
+	_, leaf := testSelfManagedObjects(t, buildSpec)
+	driftSpec := buildSpec
+	driftSpec.DNSNames = []string{"test.example.com"}
+
+	chg := leafNeedsChange(t, leaf, driftSpec, time.Now().Add(340*24*time.Hour))
+	assert.Equal(t, certificate.LeafExpiring, chg.Reason)
+	assert.Equal(t, []string{"extra.example.com"}, chg.SANsRemoved)
 }

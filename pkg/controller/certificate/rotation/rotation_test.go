@@ -19,6 +19,7 @@ import (
 	"github.com/disaster37/operator-sdk-extra/v3/pkg/controller/certificate/byo"
 	"github.com/disaster37/operator-sdk-extra/v3/pkg/controller/certificate/rotation"
 	"github.com/disaster37/operator-sdk-extra/v3/pkg/controller/certificate/selfmanaged"
+	"github.com/disaster37/operator-sdk-extra/v3/pkg/controller/certificate/selfmanaged/pernode"
 	"github.com/disaster37/operator-sdk-extra/v3/pkg/controller/multiphase"
 	"github.com/disaster37/operator-sdk-extra/v3/pkg/controller/workflow"
 	"github.com/disaster37/operator-sdk-extra/v3/pkg/object"
@@ -29,6 +30,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
@@ -93,6 +95,16 @@ func newFakeClient(t *testing.T, objs ...client.Object) client.Client {
 	return fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build()
 }
 
+var rotGV = schema.GroupVersion{Group: "test.operator-sdk-extra", Version: "v1"}
+
+func newFakeClientWithRot(t *testing.T, objs ...client.Object) client.Client {
+	t.Helper()
+	scheme := runtime.NewScheme()
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	scheme.AddKnownTypes(rotGV, &rotObject{})
+	return fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build()
+}
+
 func testLogger() *logrus.Entry {
 	return logrus.NewEntry(logrus.New())
 }
@@ -105,18 +117,29 @@ func newRotObject() *rotObject {
 
 func testSpecBuilder(o *rotObject) certificate.TLSSpec {
 	return certificate.TLSSpec{
-		SecretName:   "test-tls",
-		CommonName:   "test.example.com",
-		DNSNames:     []string{"test.example.com"},
-		ValidityDays: 365,
-		RenewalDays:  30,
+		SecretName:       "test-tls",
+		CommonName:       "test.example.com",
+		DNSNames:         []string{"test.example.com"},
+		LeafValidityDays: 365,
+		RenewalDays:      30,
 	}
 }
 
 func newStep(c client.Client, backend certificate.TLSBackend[*rotObject], opts ...rotation.Option[*rotObject]) workflow.WorkflowStepReconcilerActionWithDiff[*rotObject, client.Object] {
+	return newStepRecorder(c, backend, record.NewFakeRecorder(10), opts...)
+}
+
+func newStepRecorder(c client.Client, backend certificate.TLSBackend[*rotObject], recorder record.EventRecorder, opts ...rotation.Option[*rotObject]) workflow.WorkflowStepReconcilerActionWithDiff[*rotObject, client.Object] {
+	return rotation.NewTLSStep[*rotObject](
+		c, "tls", "TLSCertificatesReady", recorder, "test-manager",
+		backend, certificate.TLSSpecProviderFunc[*rotObject](testSpecBuilder), opts...,
+	)
+}
+
+func newStepProvider(c client.Client, backend certificate.TLSBackend[*rotObject], provider certificate.TLSSpecProvider[*rotObject], opts ...rotation.Option[*rotObject]) workflow.WorkflowStepReconcilerActionWithDiff[*rotObject, client.Object] {
 	return rotation.NewTLSStep[*rotObject](
 		c, "tls", "TLSCertificatesReady", record.NewFakeRecorder(10), "test-manager",
-		backend, testSpecBuilder, opts...,
+		backend, provider, opts...,
 	)
 }
 
@@ -157,12 +180,13 @@ func makeCertPEM(t *testing.T, cn string, notBefore, notAfter time.Time) []byte 
 	require.NoError(t, err)
 	tmpl := &x509.Certificate{
 		SerialNumber:          big.NewInt(1),
-		Subject:               pkix.Name{CommonName: cn},
+		Subject:               pkix.Name{CommonName: cn, Organization: []string{""}},
 		NotBefore:             notBefore,
 		NotAfter:              notAfter,
 		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
 		IsCA:                  true,
 		BasicConstraintsValid: true,
+		DNSNames:              []string{"test.example.com"},
 	}
 	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
 	require.NoError(t, err)
@@ -312,7 +336,7 @@ func TestRead_RenewalTriggered_WithOldSecret(t *testing.T) {
 		selfmanaged.CAKey:   []byte("OLD-CA-PEM"),
 	})
 	oldCA := newSecret("test-tls-ca", "default", map[string][]byte{
-		selfmanaged.CAKey:        []byte("OLD-CA-CERT-PEM"),
+		selfmanaged.CAKey:        makeCertPEM(t, "old-ca", now.Add(-48*time.Hour), now.Add(-24*time.Hour)),
 		selfmanaged.CAKeyPrivate: []byte("old-key"),
 	})
 
@@ -636,7 +660,7 @@ func TestFullProgression(t *testing.T) {
 		selfmanaged.CAKey:   []byte("OLD-CA-PEM"),
 	})
 	oldCA := newSecret("test-tls-ca", "default", map[string][]byte{
-		selfmanaged.CAKey:        []byte("OLD-CA-CERT-PEM"),
+		selfmanaged.CAKey:        makeCertPEM(t, "old-ca", now.Add(-48*time.Hour), now.Add(-24*time.Hour)),
 		selfmanaged.CAKeyPrivate: []byte("old-key"),
 	})
 
@@ -723,9 +747,11 @@ func TestRead_NoSagaBackend_Error(t *testing.T) {
 	require.ErrorIs(t, err, boom)
 }
 
-func TestRead_Saga_NeedRenewalError(t *testing.T) {
-	leaf := newSecret("test-tls", "default", map[string][]byte{selfmanaged.CertKey: []byte("not pem")})
-	ca := newSecret("test-tls-ca", "default", map[string][]byte{selfmanaged.CAKey: []byte("y")})
+func TestRead_Saga_CANeedsRenewalError(t *testing.T) {
+	leaf := newSecret("test-tls", "default", map[string][]byte{
+		selfmanaged.CertKey: makeCertPEM(t, "test.example.com", time.Now().Add(-1*time.Hour), time.Now().Add(365*24*time.Hour)),
+	})
+	ca := newSecret("test-tls-ca", "default", map[string][]byte{selfmanaged.CAKey: []byte("not pem")})
 	step := newStep(newFakeClient(t, leaf, ca), selfmanaged.NewSelfManagedBackend[*rotObject]())
 	_, _, err := step.Read(context.Background(), newRotObject(), map[string]any{}, testLogger())
 	require.Error(t, err)
@@ -897,4 +923,421 @@ func TestRead_LeafCADiffersButNotBundle_NoAdvance(t *testing.T) {
 	_, _, err := step.Read(context.Background(), o, map[string]any{}, testLogger())
 	require.NoError(t, err)
 	assert.True(t, step.IsPhaseEmpty(o), "non-bundle ca.crt difference must not trigger recovery")
+}
+
+func TestRead_LeafOnly_SANAdd(t *testing.T) {
+	backend := selfmanaged.NewSelfManagedBackend[*rotObject]()
+	o := newRotObject()
+	spec := certificate.TLSSpec{SecretName: "test-tls", CommonName: "test.example.com", DNSNames: []string{"test.example.com"}, LeafValidityDays: 365, RenewalDays: 30}
+	objs, err := backend.DesiredObjects(context.Background(), o, spec)
+	require.NoError(t, err)
+	ca := objs[0].(*corev1.Secret)
+	leaf := objs[1].(*corev1.Secret)
+
+	c := newFakeClient(t, ca, leaf)
+	driftProvider := certificate.TLSSpecProviderFunc[*rotObject](func(o *rotObject) certificate.TLSSpec {
+		return certificate.TLSSpec{SecretName: "test-tls", CommonName: "test.example.com", DNSNames: []string{"test.example.com", "new.example.com"}, LeafValidityDays: 365, RenewalDays: 30}
+	})
+	step := newStepProvider(c, backend, driftProvider)
+	data := map[string]any{}
+	read, res, err := step.Read(context.Background(), o, data, testLogger())
+	require.NoError(t, err)
+	assert.Equal(t, reconcile.Result{}, res)
+
+	expected := read.GetExpectedObjects()
+	require.Len(t, expected, 2)
+	newLeaf := findSecret(t, expected, "test-tls")
+	currentCA := findSecret(t, expected, "test-tls-ca")
+	assert.NotEqual(t, leaf.Data[selfmanaged.CertKey], newLeaf.Data[selfmanaged.CertKey])
+	assert.Equal(t, ca.Data[selfmanaged.CAKey], currentCA.Data[selfmanaged.CAKey])
+
+	_, renewed := data["rotationRenewed"]
+	assert.False(t, renewed, "leaf-only regen must not mark rotationRenewed")
+	assert.True(t, step.IsPhaseEmpty(o), "leaf-only regen must not write a phase")
+
+	sig, ok := data["tls.tls"].(*certificate.LayerSignals)
+	require.True(t, ok)
+	assert.True(t, sig.LeafRegenerated)
+	assert.False(t, sig.CARotated)
+	assert.Equal(t, []string{"new.example.com"}, sig.LeafChange.SANsAdded)
+}
+
+func TestRead_LeafOnly_SANRemove(t *testing.T) {
+	backend := selfmanaged.NewSelfManagedBackend[*rotObject]()
+	o := newRotObject()
+	buildSpec := certificate.TLSSpec{SecretName: "test-tls", CommonName: "test.example.com", DNSNames: []string{"test.example.com", "extra.example.com"}, LeafValidityDays: 365, RenewalDays: 30}
+	objs, err := backend.DesiredObjects(context.Background(), o, buildSpec)
+	require.NoError(t, err)
+	ca := objs[0].(*corev1.Secret)
+	leaf := objs[1].(*corev1.Secret)
+
+	c := newFakeClient(t, ca, leaf)
+	driftProvider := certificate.TLSSpecProviderFunc[*rotObject](func(o *rotObject) certificate.TLSSpec {
+		return certificate.TLSSpec{SecretName: "test-tls", CommonName: "test.example.com", DNSNames: []string{"test.example.com"}, LeafValidityDays: 365, RenewalDays: 30}
+	})
+	step := newStepProvider(c, backend, driftProvider)
+	data := map[string]any{}
+	read, res, err := step.Read(context.Background(), o, data, testLogger())
+	require.NoError(t, err)
+	assert.Equal(t, reconcile.Result{}, res)
+
+	expected := read.GetExpectedObjects()
+	require.Len(t, expected, 2)
+	newLeaf := findSecret(t, expected, "test-tls")
+	assert.NotEqual(t, leaf.Data[selfmanaged.CertKey], newLeaf.Data[selfmanaged.CertKey])
+
+	sig, ok := data["tls.tls"].(*certificate.LayerSignals)
+	require.True(t, ok)
+	assert.True(t, sig.LeafRegenerated)
+	assert.False(t, sig.CARotated)
+	assert.Equal(t, []string{"extra.example.com"}, sig.LeafChange.SANsRemoved)
+	assert.False(t, certificate.ShouldRollout(certificate.RolloutOnAdditive, sig))
+}
+
+type rotNodeProvider struct {
+	expected []string
+	err      error
+}
+
+func (p *rotNodeProvider) ExpectedNodeNames(o *rotObject) ([]string, error) {
+	return p.expected, p.err
+}
+
+func (p *rotNodeProvider) NodeCertSpec(o *rotObject, nodeName string) (string, []string, []string, error) {
+	return nodeName + ".example.com", []string{nodeName + ".example.com"}, nil, nil
+}
+
+func TestRead_PerNode_NodeAdded(t *testing.T) {
+	buildProvider := &rotNodeProvider{expected: []string{"node1"}}
+	backend := pernode.NewPerNodeBackend[*rotObject](buildProvider)
+	o := newRotObject()
+	spec := certificate.TLSSpec{SecretName: "test-tls", CommonName: "cluster", Organization: "TestOrg", LeafValidityDays: 365, RenewalDays: 30}
+	objs, err := backend.DesiredObjects(context.Background(), o, spec)
+	require.NoError(t, err)
+	ca := objs[0].(*corev1.Secret)
+	leaf := objs[1].(*corev1.Secret)
+
+	c := newFakeClient(t, ca, leaf)
+	driftBackend := pernode.NewPerNodeBackend[*rotObject](&rotNodeProvider{expected: []string{"node1", "node2"}})
+	specProvider := certificate.TLSSpecProviderFunc[*rotObject](func(o *rotObject) certificate.TLSSpec { return spec })
+	step := newStepProvider(c, driftBackend, specProvider)
+
+	data := map[string]any{}
+	read, res, err := step.Read(context.Background(), o, data, testLogger())
+	require.NoError(t, err)
+	assert.Equal(t, reconcile.Result{}, res)
+	assert.True(t, step.IsPhaseEmpty(o))
+
+	expected := read.GetExpectedObjects()
+	require.Len(t, expected, 2)
+	newLeaf := findSecret(t, expected, "test-tls")
+	assert.Contains(t, newLeaf.Data, "node2"+pernode.NodeCertSuffix)
+
+	_, renewed := data["rotationRenewed"]
+	assert.False(t, renewed)
+	_, ok := data["tlsSecret"]
+	assert.False(t, ok, "per-node steps must not publish tlsSecret")
+
+	sig, ok := data["tls.tls"].(*certificate.LayerSignals)
+	require.True(t, ok)
+	assert.True(t, sig.LeafRegenerated)
+	assert.False(t, sig.CARotated)
+	assert.Equal(t, []string{"node2"}, sig.LeafChange.NodesAdded)
+	assert.False(t, certificate.ShouldRollout(certificate.RolloutOnAdditive, sig))
+}
+
+func TestRead_PerNode_NodeRemoved(t *testing.T) {
+	buildProvider := &rotNodeProvider{expected: []string{"node1", "node2"}}
+	backend := pernode.NewPerNodeBackend[*rotObject](buildProvider)
+	o := newRotObject()
+	spec := certificate.TLSSpec{SecretName: "test-tls", CommonName: "cluster", Organization: "TestOrg", LeafValidityDays: 365, RenewalDays: 30}
+	objs, err := backend.DesiredObjects(context.Background(), o, spec)
+	require.NoError(t, err)
+	ca := objs[0].(*corev1.Secret)
+	leaf := objs[1].(*corev1.Secret)
+
+	c := newFakeClient(t, ca, leaf)
+	driftBackend := pernode.NewPerNodeBackend[*rotObject](&rotNodeProvider{expected: []string{"node1"}})
+	specProvider := certificate.TLSSpecProviderFunc[*rotObject](func(o *rotObject) certificate.TLSSpec { return spec })
+	step := newStepProvider(c, driftBackend, specProvider)
+
+	data := map[string]any{}
+	read, res, err := step.Read(context.Background(), o, data, testLogger())
+	require.NoError(t, err)
+	assert.Equal(t, reconcile.Result{}, res)
+	assert.True(t, step.IsPhaseEmpty(o))
+
+	expected := read.GetExpectedObjects()
+	require.Len(t, expected, 2)
+	newLeaf := findSecret(t, expected, "test-tls")
+	assert.NotContains(t, newLeaf.Data, "node2"+pernode.NodeCertSuffix)
+
+	sig, ok := data["tls.tls"].(*certificate.LayerSignals)
+	require.True(t, ok)
+	assert.True(t, sig.LeafRegenerated)
+	assert.Equal(t, []string{"node2"}, sig.LeafChange.NodesRemoved)
+}
+
+func TestRead_PerNode_Expiring(t *testing.T) {
+	buildProvider := &rotNodeProvider{expected: []string{"node1"}}
+	backend := pernode.NewPerNodeBackend[*rotObject](buildProvider)
+	o := newRotObject()
+	spec := certificate.TLSSpec{SecretName: "test-tls", CommonName: "cluster", Organization: "TestOrg", LeafValidityDays: 1, RenewalDays: 30}
+	objs, err := backend.DesiredObjects(context.Background(), o, spec)
+	require.NoError(t, err)
+	ca := objs[0].(*corev1.Secret)
+	leaf := objs[1].(*corev1.Secret)
+
+	c := newFakeClient(t, ca, leaf)
+	specProvider := certificate.TLSSpecProviderFunc[*rotObject](func(o *rotObject) certificate.TLSSpec { return spec })
+	step := newStepProvider(c, backend, specProvider)
+
+	data := map[string]any{}
+	read, res, err := step.Read(context.Background(), o, data, testLogger())
+	require.NoError(t, err)
+	assert.Equal(t, reconcile.Result{}, res)
+	assert.True(t, step.IsPhaseEmpty(o))
+
+	expected := read.GetExpectedObjects()
+	require.Len(t, expected, 2)
+	newLeaf := findSecret(t, expected, "test-tls")
+	assert.NotEqual(t, leaf.Data["node1"+pernode.NodeCertSuffix], newLeaf.Data["node1"+pernode.NodeCertSuffix])
+
+	sig, ok := data["tls.tls"].(*certificate.LayerSignals)
+	require.True(t, ok)
+	assert.True(t, sig.LeafRegenerated)
+	assert.Equal(t, certificate.LeafExpiring, sig.LeafChange.Reason)
+	assert.True(t, certificate.ShouldRollout(certificate.RolloutOnAdditive, sig))
+}
+
+func TestRead_ForceAll_FullSaga(t *testing.T) {
+	o := newRotObject()
+	o.SetAnnotations(map[string]string{certificate.AnnotationForceRegenerateAll: "true"})
+	step := newStep(newFakeClient(t), selfmanaged.NewSelfManagedBackend[*rotObject]())
+	data := map[string]any{}
+	read, res, err := step.Read(context.Background(), o, data, testLogger())
+	require.NoError(t, err)
+	assert.Equal(t, reconcile.Result{}, res)
+	require.Len(t, read.GetExpectedObjects(), 2)
+	assert.Equal(t, true, data["rotationRenewed"])
+
+	sig, ok := data["tls.tls"].(*certificate.LayerSignals)
+	require.True(t, ok)
+	assert.True(t, sig.Forced)
+	assert.True(t, sig.CARotated)
+	assert.True(t, sig.LeafRegenerated)
+}
+
+func TestRead_ForceLeaf_LeafOnly(t *testing.T) {
+	backend := selfmanaged.NewSelfManagedBackend[*rotObject]()
+	o := newRotObject()
+	spec := testSpecBuilder(o)
+	objs, err := backend.DesiredObjects(context.Background(), o, spec)
+	require.NoError(t, err)
+	ca := objs[0].(*corev1.Secret)
+	leaf := objs[1].(*corev1.Secret)
+
+	c := newFakeClient(t, ca, leaf)
+	o.SetAnnotations(map[string]string{certificate.AnnotationForceRegenerateLeaf: "true"})
+	step := newStep(c, backend)
+
+	data := map[string]any{}
+	read, res, err := step.Read(context.Background(), o, data, testLogger())
+	require.NoError(t, err)
+	assert.Equal(t, reconcile.Result{}, res)
+	require.Len(t, read.GetExpectedObjects(), 2)
+	assert.True(t, step.IsPhaseEmpty(o))
+
+	_, renewed := data["rotationRenewed"]
+	assert.False(t, renewed)
+
+	sig, ok := data["tls.tls"].(*certificate.LayerSignals)
+	require.True(t, ok)
+	assert.True(t, sig.Forced)
+	assert.True(t, sig.LeafRegenerated)
+	assert.False(t, sig.CARotated)
+	assert.Equal(t, certificate.LeafForceRegen, sig.LeafChange.Reason)
+}
+
+func TestRead_ForceLeaf_MissingCA_FallsBackToSaga(t *testing.T) {
+	o := newRotObject()
+	o.SetAnnotations(map[string]string{certificate.AnnotationForceRegenerateLeaf: "true"})
+	step := newStep(newFakeClient(t), selfmanaged.NewSelfManagedBackend[*rotObject]())
+	data := map[string]any{}
+	read, res, err := step.Read(context.Background(), o, data, testLogger())
+	require.NoError(t, err)
+	assert.Equal(t, reconcile.Result{}, res)
+	require.Len(t, read.GetExpectedObjects(), 2)
+	assert.Equal(t, true, data["rotationRenewed"])
+
+	sig, ok := data["tls.tls"].(*certificate.LayerSignals)
+	require.True(t, ok)
+	assert.True(t, sig.Forced)
+	assert.True(t, sig.CARotated)
+}
+
+func TestRead_ForceAllWins_OverForceLeaf(t *testing.T) {
+	o := newRotObject()
+	o.SetAnnotations(map[string]string{
+		certificate.AnnotationForceRegenerateAll:  "true",
+		certificate.AnnotationForceRegenerateLeaf: "true",
+	})
+	step := newStep(newFakeClient(t), selfmanaged.NewSelfManagedBackend[*rotObject]())
+	data := map[string]any{}
+	_, res, err := step.Read(context.Background(), o, data, testLogger())
+	require.NoError(t, err)
+	assert.Equal(t, reconcile.Result{}, res)
+	assert.Equal(t, true, data["rotationRenewed"])
+
+	sig, ok := data["tls.tls"].(*certificate.LayerSignals)
+	require.True(t, ok)
+	assert.True(t, sig.Forced)
+	assert.True(t, sig.CARotated)
+}
+
+func TestRead_ForceIgnored_MidSaga(t *testing.T) {
+	o := newRotObject()
+	o.Status.Ws = &apworkflow.WorkflowStatus{CurrentPhase: rotation.PhaseRotate}
+	o.SetAnnotations(map[string]string{certificate.AnnotationForceRegenerateAll: "true"})
+	step := newStep(newFakeClient(t), selfmanaged.NewSelfManagedBackend[*rotObject]())
+	data := map[string]any{}
+	_, res, err := step.Read(context.Background(), o, data, testLogger())
+	require.NoError(t, err)
+	assert.Equal(t, reconcile.Result{}, res)
+	assert.Equal(t, "true", o.GetAnnotations()[certificate.AnnotationForceRegenerateAll], "force annotation must be left in place mid-saga")
+	_, ok := data["tls.tls"]
+	assert.False(t, ok, "no signal must be published mid-saga")
+}
+
+func TestRead_NonSaga_ForceUnsupported(t *testing.T) {
+	recorder := record.NewFakeRecorder(10)
+	o := newRotObject()
+	o.TypeMeta = metav1.TypeMeta{APIVersion: rotGV.String(), Kind: "RotObject"}
+	o.SetAnnotations(map[string]string{certificate.AnnotationForceRegenerateAll: "true"})
+	c := newFakeClientWithRot(t, o)
+	step := newStepRecorder(c, byo.NewBYOBackend[*rotObject](), recorder)
+
+	data := map[string]any{}
+	read, res, err := step.Read(context.Background(), o, data, testLogger())
+	require.NoError(t, err)
+	assert.Equal(t, reconcile.Result{}, res)
+	assert.Empty(t, read.GetExpectedObjects())
+
+	_, ok := o.GetAnnotations()[certificate.AnnotationForceRegenerateAll]
+	assert.False(t, ok, "force annotation must be removed for non-saga backends")
+
+	select {
+	case ev := <-recorder.Events:
+		assert.Contains(t, ev, "TLSForceUnsupported")
+	default:
+		t.Fatal("expected TLSForceUnsupported event")
+	}
+}
+
+func TestRead_NonSaga_ForceUnsupported_CustomAnnotation(t *testing.T) {
+	recorder := record.NewFakeRecorder(10)
+	o := newRotObject()
+	o.TypeMeta = metav1.TypeMeta{APIVersion: rotGV.String(), Kind: "RotObject"}
+	o.SetAnnotations(map[string]string{"my.example.com/force": "true"})
+	c := newFakeClientWithRot(t, o)
+	step := newStepRecorder(c, byo.NewBYOBackend[*rotObject](), recorder,
+		rotation.WithForceRegenerateAllAnnotation[*rotObject]("my.example.com/force"))
+
+	data := map[string]any{}
+	_, res, err := step.Read(context.Background(), o, data, testLogger())
+	require.NoError(t, err)
+	assert.Equal(t, reconcile.Result{}, res)
+
+	_, ok := o.GetAnnotations()["my.example.com/force"]
+	assert.False(t, ok)
+}
+
+func TestOnSuccess_ForceAll_RemovesAnnotations(t *testing.T) {
+	o := newRotObject()
+	o.TypeMeta = metav1.TypeMeta{APIVersion: rotGV.String(), Kind: "RotObject"}
+	o.SetAnnotations(map[string]string{certificate.AnnotationForceRegenerateAll: "true"})
+	c := newFakeClientWithRot(t, o)
+	step := newStep(c, selfmanaged.NewSelfManagedBackend[*rotObject]())
+
+	data := map[string]any{
+		"rotationStartPhase": apworkflow.WorkflowPhase(""),
+		"rotationRenewed":    true,
+		"tls.tls":            &certificate.LayerSignals{Forced: true, CARotated: true},
+	}
+	res, err := step.OnSuccess(context.Background(), o, data, multiphase.NewMultiPhaseDiff[client.Object](), testLogger())
+	require.NoError(t, err)
+	assert.Equal(t, reconcile.Result{}, res)
+	assert.Equal(t, rotation.PhaseRotate, step.CurrentPhase(o))
+
+	_, ok := o.GetAnnotations()[certificate.AnnotationForceRegenerateAll]
+	assert.False(t, ok, "force-all annotation must be removed on success")
+}
+
+func TestOnSuccess_ForceLeaf_RemovesAnnotation(t *testing.T) {
+	o := newRotObject()
+	o.TypeMeta = metav1.TypeMeta{APIVersion: rotGV.String(), Kind: "RotObject"}
+	o.SetAnnotations(map[string]string{certificate.AnnotationForceRegenerateLeaf: "true"})
+	c := newFakeClientWithRot(t, o)
+	step := newStep(c, selfmanaged.NewSelfManagedBackend[*rotObject]())
+
+	data := map[string]any{
+		"rotationStartPhase": apworkflow.WorkflowPhase(""),
+		"tls.tls":            &certificate.LayerSignals{Forced: true, LeafRegenerated: true},
+	}
+	res, err := step.OnSuccess(context.Background(), o, data, multiphase.NewMultiPhaseDiff[client.Object](), testLogger())
+	require.NoError(t, err)
+	assert.Equal(t, reconcile.Result{}, res)
+	assert.True(t, step.IsPhaseEmpty(o), "force-leaf must not advance phase")
+
+	_, ok := o.GetAnnotations()[certificate.AnnotationForceRegenerateLeaf]
+	assert.False(t, ok, "force-leaf annotation must be removed on success")
+}
+
+func TestRead_TwoSteps_NamespacedSignals(t *testing.T) {
+	backend := selfmanaged.NewSelfManagedBackend[*rotObject]()
+	o := newRotObject()
+	spec := testSpecBuilder(o)
+	objs, err := backend.DesiredObjects(context.Background(), o, spec)
+	require.NoError(t, err)
+	ca := objs[0].(*corev1.Secret)
+	leaf := objs[1].(*corev1.Secret)
+	c := newFakeClient(t, ca, leaf)
+
+	forceObj := newRotObject()
+	forceObj.SetAnnotations(map[string]string{certificate.AnnotationForceRegenerateAll: "true"})
+	provider := certificate.TLSSpecProviderFunc[*rotObject](testSpecBuilder)
+
+	transport := rotation.NewTLSStep[*rotObject](c, "transport", "TLSCertificatesReady", record.NewFakeRecorder(10), "test-manager", backend, provider)
+	api := rotation.NewTLSStep[*rotObject](c, "api", "TLSCertificatesReady", record.NewFakeRecorder(10), "test-manager", backend, provider)
+
+	data := map[string]any{}
+	_, _, err = transport.Read(context.Background(), forceObj, data, testLogger())
+	require.NoError(t, err)
+	_, _, err = api.Read(context.Background(), forceObj, data, testLogger())
+	require.NoError(t, err)
+
+	_, okTransport := data["tls.transport"].(*certificate.LayerSignals)
+	_, okAPI := data["tls.api"].(*certificate.LayerSignals)
+	assert.True(t, okTransport, "transport signal must be namespaced")
+	assert.True(t, okAPI, "api signal must be namespaced")
+}
+
+func TestRead_SagaNoLeafManager_MissingLeaf_FallsBackToSaga(t *testing.T) {
+	now := time.Now()
+	ca := newSecret("test-tls-ca", "default", map[string][]byte{
+		selfmanaged.CAKey: makeCertPEM(t, "test.example.com-ca", now.Add(-1*time.Hour), now.Add(730*24*time.Hour)),
+	})
+	c := newFakeClient(t, ca)
+	stub := &stubBackend{saga: true, objs: []client.Object{
+		ca,
+		newSecret("test-tls", "default", map[string][]byte{selfmanaged.CertKey: makeCertPEM(t, "test.example.com", now.Add(-1*time.Hour), now.Add(365*24*time.Hour))}),
+	}}
+	step := newStep(c, stub)
+
+	data := map[string]any{}
+	read, res, err := step.Read(context.Background(), newRotObject(), data, testLogger())
+	require.NoError(t, err)
+	assert.Equal(t, reconcile.Result{}, res)
+	require.Len(t, read.GetExpectedObjects(), 2)
+	assert.Equal(t, true, data["rotationRenewed"])
 }

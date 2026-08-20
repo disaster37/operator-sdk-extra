@@ -90,3 +90,97 @@ func TestSecretHashAnnotationNil(t *testing.T) {
 func TestAnnotationSecretHashConstant(t *testing.T) {
 	assert.Equal(t, "operator-sdk-extra.webcenter.fr/certificate-hash", certificate.AnnotationSecretHash)
 }
+
+func TestForceAnnotationConstants(t *testing.T) {
+	assert.Equal(t, "operator-sdk-extra.webcenter.fr/force-regenerate-tls", certificate.AnnotationForceRegenerateAll)
+	assert.Equal(t, "operator-sdk-extra.webcenter.fr/force-regenerate-certificates", certificate.AnnotationForceRegenerateLeaf)
+}
+
+func TestLayerSignalsStruct(t *testing.T) {
+	lc := &certificate.LeafChange{Reason: certificate.LeafExpiring}
+	sig := &certificate.LayerSignals{CARotated: true, LeafRegenerated: true, LeafChange: lc, Forced: true}
+	assert.True(t, sig.CARotated)
+	assert.True(t, sig.LeafRegenerated)
+	assert.True(t, sig.Forced)
+	assert.Equal(t, lc, sig.LeafChange)
+}
+
+func TestShouldRolloutNilSignal(t *testing.T) {
+	assert.False(t, certificate.ShouldRollout(certificate.RolloutAlways, nil))
+}
+
+func TestShouldRolloutForcedOverridesNever(t *testing.T) {
+	assert.True(t, certificate.ShouldRollout(certificate.RolloutNever, &certificate.LayerSignals{Forced: true}))
+}
+
+func TestShouldRolloutAlways(t *testing.T) {
+	assert.True(t, certificate.ShouldRollout(certificate.RolloutAlways, &certificate.LayerSignals{CARotated: true}))
+	assert.True(t, certificate.ShouldRollout(certificate.RolloutAlways, &certificate.LayerSignals{LeafRegenerated: true}))
+	assert.False(t, certificate.ShouldRollout(certificate.RolloutAlways, &certificate.LayerSignals{}))
+}
+
+func TestShouldRolloutOnCAChange(t *testing.T) {
+	assert.True(t, certificate.ShouldRollout(certificate.RolloutOnCAChange, &certificate.LayerSignals{CARotated: true}))
+	assert.False(t, certificate.ShouldRollout(certificate.RolloutOnCAChange, &certificate.LayerSignals{LeafRegenerated: true}))
+}
+
+func TestShouldRolloutNever(t *testing.T) {
+	assert.False(t, certificate.ShouldRollout(certificate.RolloutNever, &certificate.LayerSignals{CARotated: true}))
+	assert.True(t, certificate.ShouldRollout(certificate.RolloutNever, &certificate.LayerSignals{Forced: true}))
+}
+
+func TestShouldRolloutOnAdditiveMatrix(t *testing.T) {
+	reason := func(r certificate.LeafChangeReason) *certificate.LeafChange {
+		return &certificate.LeafChange{Reason: r}
+	}
+	cases := []struct {
+		name string
+		sig  *certificate.LayerSignals
+		want bool
+	}{
+		{"CARotated", &certificate.LayerSignals{CARotated: true}, true},
+		{"Expiring", &certificate.LayerSignals{LeafRegenerated: true, LeafChange: reason(certificate.LeafExpiring)}, true},
+		{"CNChanged", &certificate.LayerSignals{LeafRegenerated: true, LeafChange: reason(certificate.LeafCNChanged)}, true},
+		{"OrgChanged", &certificate.LayerSignals{LeafRegenerated: true, LeafChange: reason(certificate.LeafOrgChanged)}, true},
+		{"Missing", &certificate.LayerSignals{LeafRegenerated: true, LeafChange: reason(certificate.LeafMissing)}, true},
+		{"LeafForceRegen", &certificate.LayerSignals{LeafRegenerated: true, LeafChange: reason(certificate.LeafForceRegen)}, true},
+		{"SANsAdded", &certificate.LayerSignals{LeafRegenerated: true, LeafChange: &certificate.LeafChange{Reason: certificate.LeafSANsChanged, SANsAdded: []string{"a"}}}, true},
+		{"SANsRemovedOnly", &certificate.LayerSignals{LeafRegenerated: true, LeafChange: &certificate.LeafChange{Reason: certificate.LeafSANsChanged, SANsRemoved: []string{"a"}}}, false},
+		{"IPsAdded", &certificate.LayerSignals{LeafRegenerated: true, LeafChange: &certificate.LeafChange{Reason: certificate.LeafIPsChanged, IPsAdded: []string{"1.2.3.4"}}}, true},
+		{"IPsRemovedOnly", &certificate.LayerSignals{LeafRegenerated: true, LeafChange: &certificate.LeafChange{Reason: certificate.LeafIPsChanged, IPsRemoved: []string{"1.2.3.4"}}}, false},
+		{"SANsAddedAndRemoved", &certificate.LayerSignals{LeafRegenerated: true, LeafChange: &certificate.LeafChange{Reason: certificate.LeafSANsChanged, SANsAdded: []string{"a"}, SANsRemoved: []string{"b"}}}, true},
+		{"NodesChangedOnly", &certificate.LayerSignals{LeafRegenerated: true, LeafChange: &certificate.LeafChange{Reason: certificate.LeafNodesChanged, NodesAdded: []string{"n"}}}, false},
+		{"LeafNone", &certificate.LayerSignals{LeafRegenerated: true, LeafChange: reason(certificate.LeafNone)}, false},
+		{"nilLeafChange", &certificate.LayerSignals{LeafRegenerated: true, LeafChange: nil}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, certificate.ShouldRollout(certificate.RolloutOnAdditive, tc.sig))
+		})
+	}
+}
+
+func TestRolloutAnnotationRollout(t *testing.T) {
+	secret := &corev1.Secret{Data: map[string][]byte{"tls.crt": []byte("x")}}
+	ann, err := certificate.RolloutAnnotation(true, secret, "old-hash")
+	require.NoError(t, err)
+	want, err := certificate.SecretHashAnnotation(secret)
+	require.NoError(t, err)
+	assert.Equal(t, want, ann)
+}
+
+func TestRolloutAnnotationKeep(t *testing.T) {
+	secret := &corev1.Secret{Data: map[string][]byte{"tls.crt": []byte("x")}}
+	ann, err := certificate.RolloutAnnotation(false, secret, "abc")
+	require.NoError(t, err)
+	assert.Equal(t, map[string]string{certificate.AnnotationSecretHash: "abc"}, ann)
+}
+
+func TestRolloutAnnotationKeepButEmptyInitializes(t *testing.T) {
+	secret := &corev1.Secret{Data: map[string][]byte{"tls.crt": []byte("x")}}
+	ann, err := certificate.RolloutAnnotation(false, secret, "")
+	require.NoError(t, err)
+	want, err := certificate.SecretHashAnnotation(secret)
+	require.NoError(t, err)
+	assert.Equal(t, want, ann)
+}

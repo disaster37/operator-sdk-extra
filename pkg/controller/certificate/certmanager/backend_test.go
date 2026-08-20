@@ -2,6 +2,7 @@ package certmanager_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/disaster37/operator-sdk-extra/v3/pkg/controller/certificate"
@@ -357,4 +358,104 @@ func TestCertManagerBackendRenewBeforeClamped(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, found)
 	assert.Equal(t, "876000h", renewBefore)
+}
+
+func TestCertManagerBackendLeafValidityDays(t *testing.T) {
+	backend := certmanager.NewCertManagerBackend[*testCMObject]()
+	o := &testCMObject{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: "default",
+		},
+	}
+
+	spec := certificate.TLSSpec{
+		SecretName:       "test-tls",
+		CommonName:       "test.example.com",
+		LeafValidityDays: 90,
+	}
+
+	// Dedicated-CA mode.
+	objects, err := backend.DesiredObjects(context.Background(), o, spec)
+	require.NoError(t, err)
+	require.Len(t, objects, 3)
+	leaf, ok := objects[2].(*unstructured.Unstructured)
+	require.True(t, ok)
+	duration, found, err := unstructured.NestedString(leaf.Object, "spec", "duration")
+	require.NoError(t, err)
+	assert.True(t, found)
+	assert.Equal(t, "2160h", duration)
+
+	// Existing-CA mode.
+	spec.IssuerRef = "my-cluster-issuer"
+	objects, err = backend.DesiredObjects(context.Background(), o, spec)
+	require.NoError(t, err)
+	require.Len(t, objects, 1)
+	leaf, ok = objects[0].(*unstructured.Unstructured)
+	require.True(t, ok)
+	duration, found, err = unstructured.NestedString(leaf.Object, "spec", "duration")
+	require.NoError(t, err)
+	assert.True(t, found)
+	assert.Equal(t, "2160h", duration)
+}
+
+func TestCertManagerBackendCADuration(t *testing.T) {
+	backend := certmanager.NewCertManagerBackend[*testCMObject]()
+	o := &testCMObject{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: "default",
+		},
+	}
+
+	t.Run("default", func(t *testing.T) {
+		spec := certificate.TLSSpec{SecretName: "test-tls", CommonName: "test.example.com"}
+		objects, err := backend.DesiredObjects(context.Background(), o, spec)
+		require.NoError(t, err)
+		require.Len(t, objects, 3)
+		caCert, ok := objects[1].(*unstructured.Unstructured)
+		require.True(t, ok)
+		duration, found, err := unstructured.NestedString(caCert.Object, "spec", "duration")
+		require.NoError(t, err)
+		assert.True(t, found)
+		assert.Equal(t, fmt.Sprintf("%dh", certificate.GetValidCADays(spec)*24), duration)
+	})
+
+	t.Run("custom", func(t *testing.T) {
+		spec := certificate.TLSSpec{SecretName: "test-tls", CommonName: "test.example.com", CAValidityDays: 500}
+		objects, err := backend.DesiredObjects(context.Background(), o, spec)
+		require.NoError(t, err)
+		require.Len(t, objects, 3)
+		caCert, ok := objects[1].(*unstructured.Unstructured)
+		require.True(t, ok)
+		duration, found, err := unstructured.NestedString(caCert.Object, "spec", "duration")
+		require.NoError(t, err)
+		assert.True(t, found)
+		assert.Equal(t, fmt.Sprintf("%dh", certificate.GetValidCADays(spec)*24), duration)
+	})
+}
+
+func TestCertManagerBackendLeafValidityAbsentByDefault(t *testing.T) {
+	backend := certmanager.NewCertManagerBackend[*testCMObject]()
+	o := &testCMObject{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: "default",
+		},
+	}
+
+	spec := certificate.TLSSpec{
+		SecretName:       "test-tls",
+		CommonName:       "test.example.com",
+		LeafValidityDays: 0,
+	}
+
+	objects, err := backend.DesiredObjects(context.Background(), o, spec)
+	require.NoError(t, err)
+	require.Len(t, objects, 3)
+	leaf, ok := objects[2].(*unstructured.Unstructured)
+	require.True(t, ok)
+	_, found, err := unstructured.NestedString(leaf.Object, "spec", "duration")
+	require.NoError(t, err)
+	assert.False(t, found, "spec.duration must be absent when LeafValidityDays is 0")
 }

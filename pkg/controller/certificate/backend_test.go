@@ -7,28 +7,82 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGetValidTLSDaysDefault(t *testing.T) {
+func TestGetValidLeafDaysDefault(t *testing.T) {
 	spec := certificate.TLSSpec{}
-	days := certificate.GetValidTLSDays(spec)
+	days := certificate.GetValidLeafDays(spec)
 	assert.Equal(t, 365, days)
 }
 
-func TestGetValidTLSDaysCustom(t *testing.T) {
-	spec := certificate.TLSSpec{ValidityDays: 90}
-	days := certificate.GetValidTLSDays(spec)
+func TestGetValidLeafDaysCustom(t *testing.T) {
+	spec := certificate.TLSSpec{LeafValidityDays: 90}
+	days := certificate.GetValidLeafDays(spec)
 	assert.Equal(t, 90, days)
 }
 
-func TestGetValidTLSDaysZero(t *testing.T) {
-	spec := certificate.TLSSpec{ValidityDays: 0}
-	days := certificate.GetValidTLSDays(spec)
+func TestGetValidLeafDaysZero(t *testing.T) {
+	spec := certificate.TLSSpec{LeafValidityDays: 0}
+	days := certificate.GetValidLeafDays(spec)
 	assert.Equal(t, 365, days)
 }
 
-func TestGetValidTLSDaysNegative(t *testing.T) {
-	spec := certificate.TLSSpec{ValidityDays: -1}
-	days := certificate.GetValidTLSDays(spec)
+func TestGetValidLeafDaysNegative(t *testing.T) {
+	spec := certificate.TLSSpec{LeafValidityDays: -1}
+	days := certificate.GetValidLeafDays(spec)
 	assert.Equal(t, 365, days)
+}
+
+func TestGetValidCADaysDefault(t *testing.T) {
+	spec := certificate.TLSSpec{}
+	days := certificate.GetValidCADays(spec)
+	assert.Equal(t, 730, days)
+}
+
+func TestGetValidCADaysCustom(t *testing.T) {
+	spec := certificate.TLSSpec{CAValidityDays: 500}
+	days := certificate.GetValidCADays(spec)
+	assert.Equal(t, 500, days)
+}
+
+func TestGetValidCADaysZero(t *testing.T) {
+	spec := certificate.TLSSpec{LeafValidityDays: 90, CAValidityDays: 0}
+	days := certificate.GetValidCADays(spec)
+	assert.Equal(t, 180, days)
+}
+
+func TestGetValidCADaysNegative(t *testing.T) {
+	spec := certificate.TLSSpec{LeafValidityDays: 30, CAValidityDays: -1}
+	days := certificate.GetValidCADays(spec)
+	assert.Equal(t, 60, days)
+}
+
+func TestGetValidLeafDaysClampsOverflow(t *testing.T) {
+	// Values above MaxValidityDays are clamped to prevent time.Duration
+	// overflow in `LeafValidityDays * 24 * time.Hour`.
+	spec := certificate.TLSSpec{LeafValidityDays: certificate.MaxValidityDays + 1}
+	days := certificate.GetValidLeafDays(spec)
+	assert.Equal(t, certificate.MaxValidityDays, days)
+
+	// A wildly large value (near max int) must also clamp, not overflow.
+	spec = certificate.TLSSpec{LeafValidityDays: 1 << 62}
+	days = certificate.GetValidLeafDays(spec)
+	assert.Equal(t, certificate.MaxValidityDays, days)
+}
+
+func TestGetValidCADaysClampsOverflow(t *testing.T) {
+	// Explicit CAValidityDays above the cap must clamp.
+	spec := certificate.TLSSpec{CAValidityDays: certificate.MaxValidityDays + 1}
+	days := certificate.GetValidCADays(spec)
+	assert.Equal(t, certificate.MaxValidityDays, days)
+
+	// Default 2× leaf must also clamp when the leaf is at the cap.
+	spec = certificate.TLSSpec{LeafValidityDays: certificate.MaxValidityDays}
+	days = certificate.GetValidCADays(spec)
+	assert.Equal(t, certificate.MaxValidityDays, days)
+
+	// A wildly large explicit value must clamp, not overflow the 2× path.
+	spec = certificate.TLSSpec{CAValidityDays: 1 << 62}
+	days = certificate.GetValidCADays(spec)
+	assert.Equal(t, certificate.MaxValidityDays, days)
 }
 
 func TestGetValidRenewalDaysDefault(t *testing.T) {

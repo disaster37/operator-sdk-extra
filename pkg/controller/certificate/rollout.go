@@ -13,7 +13,80 @@ const (
 	// hash of the certificate Secret contents on pod templates. When the
 	// Secret changes, the hash changes, triggering a natural rolling restart.
 	AnnotationSecretHash = "operator-sdk-extra.webcenter.fr/certificate-hash"
+
+	// AnnotationForceRegenerateAll triggers a full CA+leaf rotation + rollout.
+	// Read as == "true" (the ignoreReconcile convention). Overridable via
+	// rotation.WithForceRegenerateAllAnnotation.
+	AnnotationForceRegenerateAll = "operator-sdk-extra.webcenter.fr/force-regenerate-tls"
+
+	// AnnotationForceRegenerateLeaf triggers a leaf-only regen + rollout.
+	AnnotationForceRegenerateLeaf = "operator-sdk-extra.webcenter.fr/force-regenerate-certificates"
 )
+
+// LayerSignals is the per-layer change-delta signal a TLS step publishes under
+// data["tls.<phaseName>"] for the STS step to gate rollout.
+type LayerSignals struct {
+	CARotated       bool        // a CA-saga started this cycle
+	LeafRegenerated bool        // leaf regenerated (CA saga OR leaf-only)
+	LeafChange      *LeafChange // drift/expiry detail (SAN/IP/node deltas)
+	Forced          bool        // a force annotation was honored this cycle
+}
+
+// RolloutPolicy selects which change-delta signals trigger a rollout.
+type RolloutPolicy string
+
+const (
+	RolloutAlways     RolloutPolicy = "Always"
+	RolloutOnCAChange RolloutPolicy = "OnCAChange"
+	RolloutOnAdditive RolloutPolicy = "OnAdditive" // recommended default
+	RolloutNever      RolloutPolicy = "Never"
+)
+
+// ShouldRollout decides whether a pod rollout is needed for one layer's
+// signals. Forced overrides everything, including RolloutNever.
+func ShouldRollout(policy RolloutPolicy, sig *LayerSignals) bool {
+	if sig == nil {
+		return false
+	}
+	if sig.Forced {
+		return true
+	}
+	switch policy {
+	case RolloutAlways:
+		return sig.CARotated || sig.LeafRegenerated
+	case RolloutOnCAChange:
+		return sig.CARotated
+	case RolloutNever:
+		return false
+	default: // RolloutOnAdditive (unknown values treated as additive)
+		if sig.CARotated {
+			return true
+		}
+		lc := sig.LeafChange
+		if lc == nil {
+			return false
+		}
+		switch lc.Reason {
+		case LeafExpiring, LeafCNChanged, LeafOrgChanged, LeafMissing, LeafForceRegen:
+			return true
+		case LeafSANsChanged, LeafIPsChanged:
+			return len(lc.SANsAdded) > 0 || len(lc.IPsAdded) > 0
+		default: // LeafNone, LeafNodesChanged
+			return false
+		}
+	}
+}
+
+// RolloutAnnotation builds the pod-template annotation map entry.
+//   - shouldRollout=true: fresh hash of secret (SecretHashAnnotation).
+//   - shouldRollout=false and currentHash!="": keep currentHash (no restart).
+//   - shouldRollout=false and currentHash=="" (first run): initialize hash.
+func RolloutAnnotation(shouldRollout bool, secret *corev1.Secret, currentHash string) (map[string]string, error) {
+	if !shouldRollout && currentHash != "" {
+		return map[string]string{AnnotationSecretHash: currentHash}, nil
+	}
+	return SecretHashAnnotation(secret)
+}
 
 // SecretHash computes a stable SHA-256 hash of a Secret's data fields.
 // This hash is used as a pod-template annotation so that any change to the

@@ -67,7 +67,7 @@ func (b *CertManagerBackend[T]) DesiredObjects(ctx context.Context, o T, spec ce
 		}
 		objects = append(objects, caIssuer)
 
-		caCert, err := b.buildCACertificate(spec.SecretName, spec.SecretName+caIssuerSuffix, namespace)
+		caCert, err := b.buildCACertificate(spec, spec.SecretName, spec.SecretName+caIssuerSuffix, namespace)
 		if err != nil {
 			return nil, err
 		}
@@ -114,7 +114,7 @@ func (b *CertManagerBackend[T]) buildSelfSignedIssuer(name, namespace string) (*
 	return u, nil
 }
 
-func (b *CertManagerBackend[T]) buildCACertificate(name, issuerName, namespace string) (*unstructured.Unstructured, error) {
+func (b *CertManagerBackend[T]) buildCACertificate(spec certificate.TLSSpec, name, issuerName, namespace string) (*unstructured.Unstructured, error) {
 	u := &unstructured.Unstructured{}
 	u.SetGroupVersionKind(certificateGVK)
 	u.SetName(name + "-ca")
@@ -130,6 +130,7 @@ func (b *CertManagerBackend[T]) buildCACertificate(name, issuerName, namespace s
 		"subject": map[string]interface{}{
 			"organizations": []interface{}{"operator-sdk-extra"},
 		},
+		"duration": fmt.Sprintf("%dh", certificate.GetValidCADays(spec)*24),
 	}, "spec"); err != nil {
 		return nil, fmt.Errorf("set spec on CA Certificate %q: %w", name+"-ca", err)
 	}
@@ -159,10 +160,6 @@ func (b *CertManagerBackend[T]) buildLeafCertificate(spec certificate.TLSSpec, c
 
 	setCommonCertificateSpec(specMap, spec)
 
-	if spec.ValidityDays > 0 {
-		specMap["duration"] = fmt.Sprintf("%dh", spec.ValidityDays*24)
-	}
-
 	if err := unstructured.SetNestedField(u.Object, specMap, "spec"); err != nil {
 		return nil, fmt.Errorf("set spec on leaf Certificate %q: %w", spec.SecretName, err)
 	}
@@ -191,8 +188,8 @@ func (b *CertManagerBackend[T]) buildLeafCertificateWithIssuer(spec certificate.
 	return u, nil
 }
 
-// setCommonCertificateSpec populates the DNS/IP SAN and renewal fields shared
-// by both leaf Certificate builders onto specMap.
+// setCommonCertificateSpec populates the DNS/IP SAN, renewal, and validity
+// fields shared by both leaf Certificate builders onto specMap.
 func setCommonCertificateSpec(specMap map[string]interface{}, spec certificate.TLSSpec) {
 	if len(spec.DNSNames) > 0 {
 		specMap["dnsNames"] = toStringInterfaceSlice(spec.DNSNames)
@@ -202,6 +199,9 @@ func setCommonCertificateSpec(specMap map[string]interface{}, spec certificate.T
 	}
 	if spec.RenewalDays > 0 {
 		specMap["renewBefore"] = fmt.Sprintf("%dh", certificate.GetValidRenewalDays(spec)*24)
+	}
+	if spec.LeafValidityDays > 0 {
+		specMap["duration"] = fmt.Sprintf("%dh", spec.LeafValidityDays*24)
 	}
 }
 

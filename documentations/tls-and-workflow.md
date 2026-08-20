@@ -69,27 +69,39 @@ type TLSBackend[T object.MultiPhaseObject] interface {
 
 ```go
 type TLSSpec struct {
-    SecretName   string   // Name of the resulting Secret
-    SelfSigned   bool     // Enable self-managed CA backend
-    CertManager  bool     // Enable cert-manager backend
-    IssuerRef    string   // Existing Issuer/ClusterIssuer name (cert-manager only)
-    CommonName   string   // Certificate CN
-    DNSNames     []string // SAN DNS names
-    Organization string   // Certificate O field
-    ValidityDays int      // Validity in days (default 365)
-    Curve        string   // ECDSA curve (P-256/P-384/P-521)
-    IPAddresses  []string // SAN IP addresses
-    RenewalDays  int      // Renewal window before NotAfter (default 30)
-    GenerateCRL  bool     // Add ca.crl to the CA Secret (selfmanaged)
+    SecretName       string   // Name of the resulting Secret
+    IssuerRef        string   // Existing Issuer/ClusterIssuer name (cert-manager only)
+    CommonName       string   // Certificate CN
+    DNSNames         []string // SAN DNS names
+    Organization     string   // Certificate O field
+    LeafValidityDays int      // Leaf validity in days (default 365)
+    CAValidityDays   int      // CA validity in days (default 2× leaf)
+    Curve            string   // ECDSA curve (P-256/P-384/P-521)
+    IPAddresses      []string // SAN IP addresses
+    RenewalDays      int      // Renewal window before NotAfter (default 30)
+    GenerateCRL      bool     // Add ca.crl to the CA Secret (selfmanaged)
 }
 ```
 
 | Field | Type | Default | Applies to | Description |
 |---|---|---|---|---|
+| `LeafValidityDays` | int | 365 | selfmanaged, certmanager | Leaf validity; `GetValidLeafDays(spec)`. |
+| `CAValidityDays` | int | 2× leaf | selfmanaged, certmanager | CA validity; `GetValidCADays(spec)`. |
 | `Curve` | string | `P-256` | selfmanaged | ECDSA curve: `P-256`, `P-384`, `P-521`. Unknown → error. |
 | `IPAddresses` | []string | none | selfmanaged, certmanager | SAN IPs (parsed via `net.ParseIP`). |
-| `RenewalDays` | int | 30 | selfmanaged (NeedRenewal), certmanager (renewBefore) | Renewal window before `NotAfter`. |
+| `RenewalDays` | int | 30 | selfmanaged (renewal window), certmanager (renewBefore) | Renewal window before `NotAfter`. |
 | `GenerateCRL` | bool | false | selfmanaged | Adds `ca.crl` (DER) to the CA Secret. |
+
+Backend selection is an **operator decision** (which backend type to construct), not
+spec data: the old `SelfSigned`/`CertManager` booleans have been removed. The
+computed `TLSSpec` is supplied to the library via a `TLSSpecProvider`:
+
+```go
+type TLSSpecProvider[T object.MultiPhaseObject] interface {
+    TLSSpec(o T) TLSSpec
+}
+// certificate.TLSSpecProviderFunc[T] adapts a bare func(o T) TLSSpec.
+```
 
 ### Self-managed backend
 
@@ -110,12 +122,15 @@ It returns two Secrets:
 2. `<secretName>` — contains `tls.crt`, `tls.key`, and `ca.crt`
    (Type: `kubernetes.io/tls`).
 
-The CA validity remains 2× the leaf validity (`GetValidTLSDays`). Renewal is
-gated by the renewal window: `TLSSpec.RenewalDays` (default 30 via
-`certificate.GetValidRenewalDays(spec)`) determines when
-`selfmanaged.NeedRenewal(secret, spec, now)` reports that a certificate is due
-(within the window of its `NotAfter`, which also covers already-expired
-certs).
+The CA validity defaults to 2× the leaf validity (`certificate.GetValidCADays`,
+leaf via `certificate.GetValidLeafDays`). Regeneration is split by layer:
+
+- **CA renewal** is gated by `selfmanaged.CANeedsRenewal(caSecret, spec, now)`,
+  using the renewal window `certificate.GetValidRenewalDays(spec)`.
+- **Leaf drift/expiry** is reported by the optional `LeafManager` capability
+  (`DesiredLeafWithCA` re-signs against an existing CA; `LeafNeedsChange`
+  reports a `LeafChange`). The selfmanaged (single-leaf) and selfmanaged/pernode
+  backends both implement it.
 
 The static `RequiresRotationSaga() == true` signals that the operator should
 run the multi-cycle CA rotation workflow.
@@ -123,8 +138,26 @@ run the multi-cycle CA rotation workflow.
 ### BYO backend
 
 The BYO backend validates that `TLSSpec.SecretName` is non-empty and returns
-no child objects. It is the default when neither `SelfSigned` nor `CertManager`
-is set. The user manages the secret lifecycle out of band.
+no child objects. The user manages the secret lifecycle out of band.
+
+### Per-node backend (`selfmanaged/pernode`)
+
+The per-node backend keeps one certificate per node in a single Opaque leaf
+Secret (`<secretName>`), alongside a CA Secret (`<secretName>-ca`). The leaf
+Secret carries `ca.crt` plus one `<node>.crt` / `<node>.key` pair per expected
+node (multi-cert transport TLS, e.g. Elasticsearch transport). Operators
+supply a `NodeSpecProvider`:
+
+```go
+type NodeSpecProvider[T object.MultiPhaseObject] interface {
+    ExpectedNodeNames(o T) ([]string, error)
+    NodeCertSpec(o T, nodeName string) (cn string, dnsNames []string, ips []string, err error)
+}
+```
+
+Per-node steps implement `NodeSetTLSBackend` and therefore never publish
+`tlsSecret`/`leafCert` into the data map (their private keys use dynamic
+`<node>.key` names); `caSecret`/`caCert` are still published.
 
 ### cert-manager backend (optional subpackage)
 
@@ -140,6 +173,12 @@ The cert-manager backend emits `Issuer` and `Certificate` CRs from the
 
 Requires `cert-manager` to be installed in the cluster. The cert-manager
 operator handles renewal; `RequiresRotationSaga() == false`.
+
+> **Behavior note (v3)**: the leaf `Certificate` now sets `spec.duration` from
+> `LeafValidityDays` in **both** dedicated-CA and existing-CA modes (existing-CA
+> previously omitted it, so cert-manager used its 90-day default), and the CA
+> `Certificate` sets `spec.duration` from `GetValidCADays(spec)` (previously
+> omitted, so cert-manager used its default).
 
 ### Import isolation
 
@@ -257,11 +296,12 @@ with the following keys:
 | Key | Type | Meaning |
 |---|---|---|
 | `rotationStartPhase` | `workflow.WorkflowPhase` | Phase at cycle start (before any advance) |
-| `rotationRenewed` | `bool` | `true` when phase `""` triggered a renewal this cycle |
-| `tlsSecret` | `*corev1.Secret` | Current leaf secret (if present) — sanitized copy |
+| `rotationRenewed` | `bool` | `true` when phase `""` triggered a CA saga this cycle |
+| `tlsSecret` | `*corev1.Secret` | Current leaf secret (if present, non-per-node) — sanitized copy |
 | `caSecret` | `*corev1.Secret` | Current CA secret (if present) — sanitized copy |
-| `leafCert` | `*x509.Certificate` | First cert parsed from the leaf's `tls.crt` (if parseable) |
+| `leafCert` | `*x509.Certificate` | First cert parsed from the leaf's `tls.crt` (if parseable, non-per-node) |
 | `caCert` | `*x509.Certificate` | First cert parsed from the CA secret's `ca.crt` (if parseable) |
+| `tls.<phaseName>` | `*certificate.LayerSignals` | Change-delta signal for the STS step (only on a change at phase `""`) |
 
 `tlsSecret` and `caSecret` are **sanitized deep copies** of the current
 Secrets: the private-key entries (`tls.key` from the leaf copy, `ca.key` from
@@ -271,6 +311,47 @@ are retained. This lets injected convergence checks inspect certificates and
 identities without exposing private-key material to the data map, which is
 handed to `OnDiff`/`OnSuccess`/`OnError` and could be debug-logged. The
 original Secrets are not mutated.
+
+Per-node (`NodeSetTLSBackend`) steps omit `tlsSecret`/`leafCert` entirely: their
+leaf private keys use dynamic `<node>.key` names that `sanitizedSecret` would
+not strip.
+
+Each saga TLS step publishes exactly one `*certificate.LayerSignals` under
+`data["tls.<phaseName>"]` **only when a change occurs at phase `""`** (CA saga,
+leaf-only, or force). Steady/Rotate/Converge publish no signal (→ no rollout).
+The flat `rotationStartPhase`/`rotationRenewed`/`tlsSecret`/`caSecret` keys are
+transient per-step; cross-step consumers (the STS step) must use only the
+namespaced `tls.<phaseName>` signals.
+
+### Regeneration model
+
+At phase `""` the step evaluates three conditions:
+
+1. **Force annotations** (honored at phase `""` only; see below).
+2. **CA need**: `!caExists || forceAll || CANeedsRenewal(currentCA, spec, now)`.
+3. **Leaf change**: `LeafManager.LeafNeedsChange(...)` (drift/expiry/missing).
+
+- `caNeed` → **full CA saga** (bundle + Rotate/Converge phases) and
+  `rotationRenewed=true`.
+- otherwise a non-zero `LeafChange` → **leaf-only** regeneration via
+  `LeafManager.DesiredLeafWithCA` (no phase writes, no `rotationRenewed`).
+- otherwise → steady state (with stale-bundle recovery to Rotate).
+
+### Force-regenerate annotations
+
+Two one-shot annotations trigger regeneration at phase `""`:
+
+| Annotation | Constant | Effect |
+|---|---|---|
+| `operator-sdk-extra.webcenter.fr/force-regenerate-tls` | `AnnotationForceRegenerateAll` | Full CA+leaf rotation. |
+| `operator-sdk-extra.webcenter.fr/force-regenerate-certificates` | `AnnotationForceRegenerateLeaf` | Leaf-only regeneration (falls back to full saga if the CA is missing). |
+
+Read as `== "true"`. force-all wins when both are set. The honored annotation
+is removed in `OnSuccess` (saga backends) after a successful Apply; on Apply
+failure it is left in place and retried next cycle. Non-saga backends record a
+`TLSForceUnsupported` warning Event and remove the annotation without
+regenerating. The annotation names are overridable via
+`WithForceRegenerateAllAnnotation` / `WithForceRegenerateLeafAnnotation`.
 
 ### Constructor
 
@@ -282,19 +363,20 @@ func NewTLSStep[T object.MultiPhaseObject](
     recorder record.EventRecorder,
     fieldManager string,
     backend certificate.TLSBackend[T],
-    specBuilder func(o T) certificate.TLSSpec,
+    provider certificate.TLSSpecProvider[T],
     opts ...Option[T],
 ) workflow.WorkflowStepReconcilerActionWithDiff[T, client.Object]
 ```
 
 Options: `WithConvergenceCheck`, `WithLabelsDecorator`,
-`WithAnnotationsDecorator`.
+`WithAnnotationsDecorator`, `WithForceRegenerateAllAnnotation`,
+`WithForceRegenerateLeafAnnotation`.
 
 ```go
 step := rotation.NewTLSStep[*MyCRD](
     r.Client(), "tls", "TLSCertificatesReady", r.Recorder, "my-operator",
     selfmanaged.NewSelfManagedBackend[*MyCRD](),
-    func(o *MyCRD) certificate.TLSSpec { return o.Spec.TLS },
+    certificate.TLSSpecProviderFunc[*MyCRD](func(o *MyCRD) certificate.TLSSpec { return o.Spec.TLS }),
     rotation.WithConvergenceCheck(func(ctx context.Context, o *MyCRD, data map[string]any) (bool, error) {
         return workflow.WaitForOwnedObjects[*appv1.StatefulSet](
             ctx, r.Client(), o, &appv1.StatefulSetList{},
@@ -327,6 +409,26 @@ hash, err := certificate.SecretHash(secret)
 annotations, err := certificate.SecretHashAnnotation(secret)
 // Merge into pod template annotations
 ```
+
+For saga TLS steps, prefer the signal-driven helpers: aggregate
+`ShouldRollout(policy, sig)` over every `data["tls.<phaseName>"]` layer, then
+build the annotation with `RolloutAnnotation(shouldRollout, secret, currentHash)`.
+
+```go
+type LayerSignals struct {
+    CARotated       bool
+    LeafRegenerated bool
+    LeafChange      *LeafChange // SAN/IP/node deltas, expiry, reason
+    Forced          bool
+}
+
+type RolloutPolicy string // RolloutAlways | RolloutOnCAChange | RolloutOnAdditive | RolloutNever
+```
+
+`RolloutOnAdditive` (recommended default) rolls out on CA rotation, or on
+leaf regeneration whose `LeafChange` is additive-only (missing/expiring/
+CN/Org/Forced reasons, or added SANs/IPs) but **not** on pure removals or
+node-set changes. `Forced` overrides everything, including `RolloutNever`.
 
 This decouples "certificate changed" from "must restart" without bespoke
 polling of `StatefulSet.Status.CurrentReplicas`.
