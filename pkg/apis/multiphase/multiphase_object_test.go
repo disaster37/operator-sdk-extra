@@ -46,7 +46,7 @@ func TestDefaultMultiPhaseObjectStatusDeepCopyNilReceiver(t *testing.T) {
 func TestDefaultMultiPhaseObjectStatusDeepCopyWithNilPointer(t *testing.T) {
 	o := &DefaultMultiPhaseObjectStatus{
 		PhaseName: "phase-1",
-}
+	}
 
 	copy := o.DeepCopy()
 	assert.NotNil(t, copy)
@@ -73,12 +73,12 @@ func TestDefaultMultiPhaseObjectStatusMethods(t *testing.T) {
 	assert.Empty(t, o.GetLastErrorMessage())
 	o.SetLastErrorMessage("some error")
 	assert.Equal(t, "some error", o.GetLastErrorMessage())
-	
+
 	// Test observed generation
 	assert.Equal(t, int64(0), o.GetObservedGeneration())
 	o.SetObservedGeneration(42)
 	assert.Equal(t, int64(42), o.GetObservedGeneration())
-	
+
 	// Test phase name methods
 	var emptyPhase shared.PhaseName = ""
 	assert.Equal(t, emptyPhase, o.GetPhaseName())

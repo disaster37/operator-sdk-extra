@@ -15,8 +15,7 @@ func TestDefaultControllerRateLimiterUnit(t *testing.T) {
 
 	t.Run("returns correct type", func(t *testing.T) {
 		limiter := DefaultControllerRateLimiter[string]()
-		_, ok := limiter.(workqueue.TypedRateLimiter[string])
-		assert.True(t, ok)
+		assert.IsType(t, &workqueue.TypedMaxOfRateLimiter[string]{}, limiter)
 	})
 
 	t.Run("rate limiter works correctly", func(t *testing.T) {

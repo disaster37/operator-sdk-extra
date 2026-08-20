@@ -51,7 +51,7 @@ func TestGetObjectWithMeta(t *testing.T) {
 	})
 
 	t.Run("panics when object is nil typed pointer", func(t *testing.T) {
-		var obj *mockObject = (*mockObject)(nil)
+		obj := (*mockObject)(nil)
 
 		assert.Panics(t, func() {
 			GetObjectWithMeta[*mockObject](obj, scheme)
@@ -97,7 +97,7 @@ func TestCloneObject(t *testing.T) {
 	})
 
 	t.Run("panics when object is nil typed pointer", func(t *testing.T) {
-		var obj *mockObject = (*mockObject)(nil)
+		obj := (*mockObject)(nil)
 
 		assert.Panics(t, func() {
 			CloneObject[*mockObject](obj)

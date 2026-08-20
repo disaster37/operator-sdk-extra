@@ -44,7 +44,7 @@ func TestEqualFromYamlFileNonExistentFile(t *testing.T) {
 func TestEqualFromYamlFileInvalidYaml(t *testing.T) {
 	tmpDir := t.TempDir()
 	badYamlFile := filepath.Join(tmpDir, "invalid.yaml")
-	err := os.WriteFile(badYamlFile, []byte("{{invalid yaml content}}"), 0644)
+	err := os.WriteFile(badYamlFile, []byte("{{invalid yaml content}}"), 0o644)
 	assert.NoError(t, err)
 
 	defer func() {

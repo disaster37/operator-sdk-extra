@@ -13,16 +13,16 @@ import (
 type InterceptorClient struct {
 	client.Client
 
-	GetInterceptor           func(ctx context.Context, key types.NamespacedName, obj client.Object, opts ...client.GetOption) error
-	ListInterceptor          func(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error
-	CreateInterceptor        func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error
-	DeleteInterceptor        func(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error
-	UpdateInterceptor        func(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error
-	PatchInterceptor         func(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error
-	DeleteAllOfInterceptor   func(ctx context.Context, obj client.Object, opts ...client.DeleteAllOfOption) error
-	StatusUpdateInterceptor  func(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error
-	StatusPatchInterceptor   func(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error
-	StatusCreateInterceptor  func(ctx context.Context, obj client.Object, subResource client.Object, opts ...client.SubResourceCreateOption) error
+	GetInterceptor          func(ctx context.Context, key types.NamespacedName, obj client.Object, opts ...client.GetOption) error
+	ListInterceptor         func(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error
+	CreateInterceptor       func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error
+	DeleteInterceptor       func(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error
+	UpdateInterceptor       func(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error
+	PatchInterceptor        func(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error
+	DeleteAllOfInterceptor  func(ctx context.Context, obj client.Object, opts ...client.DeleteAllOfOption) error
+	StatusUpdateInterceptor func(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error
+	StatusPatchInterceptor  func(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error
+	StatusCreateInterceptor func(ctx context.Context, obj client.Object, subResource client.Object, opts ...client.SubResourceCreateOption) error
 }
 
 func NewInterceptorClient(c client.Client) *InterceptorClient {
@@ -80,10 +80,10 @@ func (c *InterceptorClient) DeleteAllOf(ctx context.Context, obj client.Object, 
 
 func (c *InterceptorClient) Status() client.SubResourceWriter {
 	return &InterceptorStatusClient{
-		client:                  c.Client,
-		updateInterceptor:       c.StatusUpdateInterceptor,
-		patchInterceptor:        c.StatusPatchInterceptor,
-		createInterceptor:       c.StatusCreateInterceptor,
+		client:            c.Client,
+		updateInterceptor: c.StatusUpdateInterceptor,
+		patchInterceptor:  c.StatusPatchInterceptor,
+		createInterceptor: c.StatusCreateInterceptor,
 	}
 }
 

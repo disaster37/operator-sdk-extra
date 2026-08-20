@@ -26,7 +26,7 @@ func (o *testCMObject) GetStatus() object.MultiPhaseObjectStatus {
 func (o *testCMObject) DeepCopyObject() runtime.Object {
 	return &testCMObject{
 		TypeMeta:   o.TypeMeta,
-		ObjectMeta: *o.ObjectMeta.DeepCopy(),
+		ObjectMeta: *o.DeepCopy(),
 	}
 }
 
@@ -89,6 +89,11 @@ func TestCertManagerBackendDedicatedCA(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, found)
 	assert.Equal(t, "test.example.com", commonName)
+
+	organizations, found, err := unstructured.NestedStringSlice(leaf.Object, "spec", "subject", "organizations")
+	require.NoError(t, err)
+	assert.True(t, found, "expected spec.subject.organizations to exist")
+	assert.Equal(t, []string{"TestOrg"}, organizations)
 }
 
 func TestCertManagerBackendExistingCA(t *testing.T) {
@@ -101,10 +106,10 @@ func TestCertManagerBackendExistingCA(t *testing.T) {
 	}
 
 	spec := certificate.TLSSpec{
-		SecretName:   "test-tls",
-		CommonName:   "test.example.com",
-		DNSNames:     []string{"test.example.com"},
-		IssuerRef:    "my-cluster-issuer",
+		SecretName: "test-tls",
+		CommonName: "test.example.com",
+		DNSNames:   []string{"test.example.com"},
+		IssuerRef:  "my-cluster-issuer",
 	}
 
 	objects, err := backend.DesiredObjects(context.Background(), o, spec)
@@ -151,4 +156,205 @@ func TestCertManagerCertificateSecretName(t *testing.T) {
 func TestCertManagerRequiresRotationSaga(t *testing.T) {
 	backend := certmanager.NewCertManagerBackend[*testCMObject]()
 	assert.False(t, backend.RequiresRotationSaga())
+}
+
+func TestCertManagerBackendIPSANsDedicatedCA(t *testing.T) {
+	backend := certmanager.NewCertManagerBackend[*testCMObject]()
+	o := &testCMObject{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: "default",
+		},
+	}
+
+	spec := certificate.TLSSpec{
+		SecretName:  "test-tls",
+		CommonName:  "test.example.com",
+		IPAddresses: []string{"10.0.0.1"},
+	}
+
+	objects, err := backend.DesiredObjects(context.Background(), o, spec)
+	require.NoError(t, err)
+	require.Len(t, objects, 3)
+
+	leaf, ok := objects[2].(*unstructured.Unstructured)
+	require.True(t, ok)
+	ips, found, err := unstructured.NestedStringSlice(leaf.Object, "spec", "ipAddresses")
+	require.NoError(t, err)
+	assert.True(t, found)
+	assert.Equal(t, []string{"10.0.0.1"}, ips)
+}
+
+func TestCertManagerBackendIPSANsExistingCA(t *testing.T) {
+	backend := certmanager.NewCertManagerBackend[*testCMObject]()
+	o := &testCMObject{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: "default",
+		},
+	}
+
+	spec := certificate.TLSSpec{
+		SecretName:  "test-tls",
+		CommonName:  "test.example.com",
+		IssuerRef:   "my-cluster-issuer",
+		IPAddresses: []string{"10.0.0.1"},
+	}
+
+	objects, err := backend.DesiredObjects(context.Background(), o, spec)
+	require.NoError(t, err)
+	require.Len(t, objects, 1)
+
+	leaf, ok := objects[0].(*unstructured.Unstructured)
+	require.True(t, ok)
+	ips, found, err := unstructured.NestedStringSlice(leaf.Object, "spec", "ipAddresses")
+	require.NoError(t, err)
+	assert.True(t, found)
+	assert.Equal(t, []string{"10.0.0.1"}, ips)
+}
+
+func TestCertManagerBackendIPSANsAbsentByDefault(t *testing.T) {
+	backend := certmanager.NewCertManagerBackend[*testCMObject]()
+	o := &testCMObject{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: "default",
+		},
+	}
+
+	spec := certificate.TLSSpec{
+		SecretName: "test-tls",
+		CommonName: "test.example.com",
+	}
+
+	objects, err := backend.DesiredObjects(context.Background(), o, spec)
+	require.NoError(t, err)
+	require.Len(t, objects, 3)
+
+	leaf, ok := objects[2].(*unstructured.Unstructured)
+	require.True(t, ok)
+	_, found, err := unstructured.NestedStringSlice(leaf.Object, "spec", "ipAddresses")
+	require.NoError(t, err)
+	assert.False(t, found)
+}
+
+func TestCertManagerBackendRenewBefore(t *testing.T) {
+	backend := certmanager.NewCertManagerBackend[*testCMObject]()
+	o := &testCMObject{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: "default",
+		},
+	}
+
+	spec := certificate.TLSSpec{
+		SecretName:  "test-tls",
+		CommonName:  "test.example.com",
+		RenewalDays: 20,
+	}
+
+	// Dedicated-CA mode.
+	objects, err := backend.DesiredObjects(context.Background(), o, spec)
+	require.NoError(t, err)
+	require.Len(t, objects, 3)
+
+	leaf, ok := objects[2].(*unstructured.Unstructured)
+	require.True(t, ok)
+	renewBefore, found, err := unstructured.NestedString(leaf.Object, "spec", "renewBefore")
+	require.NoError(t, err)
+	assert.True(t, found)
+	assert.Equal(t, "480h", renewBefore)
+
+	// Existing-CA mode.
+	spec.IssuerRef = "my-cluster-issuer"
+	objects, err = backend.DesiredObjects(context.Background(), o, spec)
+	require.NoError(t, err)
+	require.Len(t, objects, 1)
+
+	leaf, ok = objects[0].(*unstructured.Unstructured)
+	require.True(t, ok)
+	renewBefore, found, err = unstructured.NestedString(leaf.Object, "spec", "renewBefore")
+	require.NoError(t, err)
+	assert.True(t, found)
+	assert.Equal(t, "480h", renewBefore)
+}
+
+func TestCertManagerBackendRenewBeforeAbsent(t *testing.T) {
+	backend := certmanager.NewCertManagerBackend[*testCMObject]()
+	o := &testCMObject{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: "default",
+		},
+	}
+
+	spec := certificate.TLSSpec{
+		SecretName:  "test-tls",
+		CommonName:  "test.example.com",
+		RenewalDays: 0,
+	}
+
+	objects, err := backend.DesiredObjects(context.Background(), o, spec)
+	require.NoError(t, err)
+	require.Len(t, objects, 3)
+
+	leaf, ok := objects[2].(*unstructured.Unstructured)
+	require.True(t, ok)
+	_, found, err := unstructured.NestedString(leaf.Object, "spec", "renewBefore")
+	require.NoError(t, err)
+	assert.False(t, found)
+}
+
+func TestCertManagerBackendSubjectOrganizationsAbsent(t *testing.T) {
+	backend := certmanager.NewCertManagerBackend[*testCMObject]()
+	o := &testCMObject{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: "default",
+		},
+	}
+
+	spec := certificate.TLSSpec{
+		SecretName: "test-tls",
+		CommonName: "test.example.com",
+	}
+
+	objects, err := backend.DesiredObjects(context.Background(), o, spec)
+	require.NoError(t, err)
+	require.Len(t, objects, 3)
+
+	leaf, ok := objects[2].(*unstructured.Unstructured)
+	require.True(t, ok)
+	_, found, err := unstructured.NestedStringSlice(leaf.Object, "spec", "subject", "organizations")
+	require.NoError(t, err)
+	assert.False(t, found, "spec.subject.organizations should be absent when Organization is empty")
+}
+
+func TestCertManagerBackendRenewBeforeClamped(t *testing.T) {
+	backend := certmanager.NewCertManagerBackend[*testCMObject]()
+	o := &testCMObject{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: "default",
+		},
+	}
+
+	// A huge RenewalDays must be clamped to MaxRenewalDays instead of
+	// overflowing `RenewalDays * 24` (int overflow would corrupt renewBefore).
+	spec := certificate.TLSSpec{
+		SecretName:  "test-tls",
+		CommonName:  "test.example.com",
+		RenewalDays: certificate.MaxRenewalDays + 1000000,
+	}
+
+	objects, err := backend.DesiredObjects(context.Background(), o, spec)
+	require.NoError(t, err)
+	require.Len(t, objects, 3)
+
+	leaf, ok := objects[2].(*unstructured.Unstructured)
+	require.True(t, ok)
+	renewBefore, found, err := unstructured.NestedString(leaf.Object, "spec", "renewBefore")
+	require.NoError(t, err)
+	assert.True(t, found)
+	assert.Equal(t, "876000h", renewBefore)
 }

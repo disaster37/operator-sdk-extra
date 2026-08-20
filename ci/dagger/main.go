@@ -124,7 +124,6 @@ func (h *OperatorSdkExtra) CI(
 	// The codecov token
 	// +optional
 	codecovToken *dagger.Secret,
-
 ) (*dagger.Directory, error) {
 	var dir *dagger.Directory
 	var err error

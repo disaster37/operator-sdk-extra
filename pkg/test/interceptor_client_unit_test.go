@@ -23,11 +23,11 @@ type mockObject struct {
 }
 
 func (m *mockObject) GetName() string {
-	return m.ObjectMeta.Name
+	return m.Name
 }
 
 func (m *mockObject) GetNamespace() string {
-	return m.ObjectMeta.Namespace
+	return m.Namespace
 }
 
 func (m *mockObject) GetObjectKind() schema.ObjectKind {
@@ -76,7 +76,7 @@ func TestNewInterceptorClient(t *testing.T) {
 	t.Run("new interceptor client wraps the underlying client", func(t *testing.T) {
 		fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 		interceptor := NewInterceptorClient(fakeClient)
-		
+
 		assert.NotNil(t, interceptor)
 		assert.Equal(t, fakeClient, interceptor.Client)
 	})
@@ -91,20 +91,20 @@ func TestInterceptorClient_Get(t *testing.T) {
 	t.Run("get delegates to underlying client when no interceptor", func(t *testing.T) {
 		fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 		interceptor := NewInterceptorClient(fakeClient)
-		
+
 		ctx := context.Background()
 		key := types.NamespacedName{Namespace: "test-ns", Name: "test-name"}
 		obj := &mockObject{}
-		
+
 		err := interceptor.Get(ctx, key, obj)
 		// Should return not found error from the fake client
 		assert.Error(t, err)
 	})
-	
+
 	t.Run("get calls interceptor when provided", func(t *testing.T) {
 		fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 		interceptor := NewInterceptorClient(fakeClient)
-		
+
 		// Set up interceptor
 		intercepted := false
 		testErr := errors.New("intercepted error")
@@ -112,11 +112,11 @@ func TestInterceptorClient_Get(t *testing.T) {
 			intercepted = true
 			return testErr
 		}
-		
+
 		ctx := context.Background()
 		key := types.NamespacedName{Namespace: "test-ns", Name: "test-name"}
 		obj := &mockObject{}
-		
+
 		err := interceptor.Get(ctx, key, obj)
 		assert.True(t, intercepted)
 		assert.Equal(t, testErr, err)
@@ -132,19 +132,19 @@ func TestInterceptorClient_List(t *testing.T) {
 	t.Run("list delegates to underlying client when no interceptor", func(t *testing.T) {
 		fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 		interceptor := NewInterceptorClient(fakeClient)
-		
+
 		ctx := context.Background()
 		list := &mockObjectList{}
-		
+
 		err := interceptor.List(ctx, list)
 		// Should succeed with empty list
 		assert.NoError(t, err)
 	})
-	
+
 	t.Run("list calls interceptor when provided", func(t *testing.T) {
 		fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 		interceptor := NewInterceptorClient(fakeClient)
-		
+
 		// Set up interceptor
 		intercepted := false
 		testErr := errors.New("intercepted error")
@@ -152,10 +152,10 @@ func TestInterceptorClient_List(t *testing.T) {
 			intercepted = true
 			return testErr
 		}
-		
+
 		ctx := context.Background()
 		list := &mockObjectList{}
-		
+
 		err := interceptor.List(ctx, list)
 		assert.True(t, intercepted)
 		assert.Equal(t, testErr, err)
@@ -171,19 +171,19 @@ func TestInterceptorClient_Create(t *testing.T) {
 	t.Run("create delegates to underlying client when no interceptor", func(t *testing.T) {
 		fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 		interceptor := NewInterceptorClient(fakeClient)
-		
+
 		ctx := context.Background()
 		obj := &mockObject{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test-ns"}}
-		
+
 		err := interceptor.Create(ctx, obj)
 		// Should succeed
 		assert.NoError(t, err)
 	})
-	
+
 	t.Run("create calls interceptor when provided", func(t *testing.T) {
 		fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 		interceptor := NewInterceptorClient(fakeClient)
-		
+
 		// Set up interceptor
 		intercepted := false
 		testErr := errors.New("intercepted error")
@@ -191,10 +191,10 @@ func TestInterceptorClient_Create(t *testing.T) {
 			intercepted = true
 			return testErr
 		}
-		
+
 		ctx := context.Background()
 		obj := &mockObject{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test-ns"}}
-		
+
 		err := interceptor.Create(ctx, obj)
 		assert.True(t, intercepted)
 		assert.Equal(t, testErr, err)
@@ -211,18 +211,18 @@ func TestInterceptorClient_Delete(t *testing.T) {
 		obj := &mockObject{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test-ns"}}
 		fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(obj).Build()
 		interceptor := NewInterceptorClient(fakeClient)
-		
+
 		ctx := context.Background()
-		
+
 		err := interceptor.Delete(ctx, obj)
 		// Should succeed since object exists
 		assert.NoError(t, err)
 	})
-	
+
 	t.Run("delete calls interceptor when provided", func(t *testing.T) {
 		fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 		interceptor := NewInterceptorClient(fakeClient)
-		
+
 		// Set up interceptor
 		intercepted := false
 		testErr := errors.New("intercepted error")
@@ -230,10 +230,10 @@ func TestInterceptorClient_Delete(t *testing.T) {
 			intercepted = true
 			return testErr
 		}
-		
+
 		ctx := context.Background()
 		obj := &mockObject{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test-ns"}}
-		
+
 		err := interceptor.Delete(ctx, obj)
 		assert.True(t, intercepted)
 		assert.Equal(t, testErr, err)
@@ -250,18 +250,18 @@ func TestInterceptorClient_Update(t *testing.T) {
 		obj := &mockObject{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test-ns"}}
 		fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(obj).Build()
 		interceptor := NewInterceptorClient(fakeClient)
-		
+
 		ctx := context.Background()
-		
+
 		err := interceptor.Update(ctx, obj)
 		// Should succeed since object exists
 		assert.NoError(t, err)
 	})
-	
+
 	t.Run("update calls interceptor when provided", func(t *testing.T) {
 		fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 		interceptor := NewInterceptorClient(fakeClient)
-		
+
 		// Set up interceptor
 		intercepted := false
 		testErr := errors.New("intercepted error")
@@ -269,10 +269,10 @@ func TestInterceptorClient_Update(t *testing.T) {
 			intercepted = true
 			return testErr
 		}
-		
+
 		ctx := context.Background()
 		obj := &mockObject{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test-ns"}}
-		
+
 		err := interceptor.Update(ctx, obj)
 		assert.True(t, intercepted)
 		assert.Equal(t, testErr, err)
@@ -289,19 +289,19 @@ func TestInterceptorClient_Patch(t *testing.T) {
 		obj := &mockObject{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test-ns"}}
 		fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(obj).Build()
 		interceptor := NewInterceptorClient(fakeClient)
-		
+
 		ctx := context.Background()
 		patch := client.MergeFrom(obj.DeepCopyObject().(client.Object))
-		
+
 		err := interceptor.Patch(ctx, obj, patch)
 		// Should succeed since object exists
 		assert.NoError(t, err)
 	})
-	
+
 	t.Run("patch calls interceptor when provided", func(t *testing.T) {
 		fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 		interceptor := NewInterceptorClient(fakeClient)
-		
+
 		// Set up interceptor
 		intercepted := false
 		testErr := errors.New("intercepted error")
@@ -309,11 +309,11 @@ func TestInterceptorClient_Patch(t *testing.T) {
 			intercepted = true
 			return testErr
 		}
-		
+
 		ctx := context.Background()
 		obj := &mockObject{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test-ns"}}
 		patch := client.MergeFrom(obj)
-		
+
 		err := interceptor.Patch(ctx, obj, patch)
 		assert.True(t, intercepted)
 		assert.Equal(t, testErr, err)
@@ -331,18 +331,18 @@ func TestInterceptorClient_DeleteAllOf(t *testing.T) {
 		obj := &mockObject{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test-ns"}}
 		fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(obj).Build()
 		interceptor := NewInterceptorClient(fakeClient)
-		
+
 		ctx := context.Background()
-		
+
 		err := interceptor.DeleteAllOf(ctx, &mockObject{}, client.InNamespace("test-ns"))
 		// Should succeed
 		assert.NoError(t, err)
 	})
-	
+
 	t.Run("deleteallof calls interceptor when provided", func(t *testing.T) {
 		fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 		interceptor := NewInterceptorClient(fakeClient)
-		
+
 		// Set up interceptor
 		intercepted := false
 		testErr := errors.New("intercepted error")
@@ -350,10 +350,10 @@ func TestInterceptorClient_DeleteAllOf(t *testing.T) {
 			intercepted = true
 			return testErr
 		}
-		
+
 		ctx := context.Background()
 		obj := &mockObject{}
-		
+
 		err := interceptor.DeleteAllOf(ctx, obj)
 		assert.True(t, intercepted)
 		assert.Equal(t, testErr, err)
@@ -368,7 +368,7 @@ func TestInterceptorClient_Status(t *testing.T) {
 	t.Run("status returns interceptor status client", func(t *testing.T) {
 		fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 		interceptor := NewInterceptorClient(fakeClient)
-		
+
 		statusClient := interceptor.Status()
 		assert.NotNil(t, statusClient)
 		// Should be our interceptor status client
@@ -385,7 +385,7 @@ func TestInterceptorClient_Scheme(t *testing.T) {
 	t.Run("scheme returns underlying client scheme", func(t *testing.T) {
 		fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 		interceptor := NewInterceptorClient(fakeClient)
-		
+
 		result := interceptor.Scheme()
 		assert.Equal(t, scheme, result)
 	})
@@ -399,7 +399,7 @@ func TestInterceptorClient_RESTMapper(t *testing.T) {
 	t.Run("restmapper returns underlying client restmapper", func(t *testing.T) {
 		fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 		interceptor := NewInterceptorClient(fakeClient)
-		
+
 		result := interceptor.RESTMapper()
 		assert.NotNil(t, result)
 	})
@@ -413,7 +413,7 @@ func TestInterceptorClient_GroupVersionKindFor(t *testing.T) {
 	t.Run("groupversionkindfor returns underlying client result", func(t *testing.T) {
 		fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 		interceptor := NewInterceptorClient(fakeClient)
-		
+
 		obj := &mockObject{}
 		gvk, err := interceptor.GroupVersionKindFor(obj)
 		// Should return error since our mock isn't registered
@@ -430,7 +430,7 @@ func TestInterceptorClient_IsObjectNamespaced(t *testing.T) {
 	t.Run("isobjectnamespaced returns underlying client result", func(t *testing.T) {
 		fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 		interceptor := NewInterceptorClient(fakeClient)
-		
+
 		obj := &mockObject{}
 		namespaced, err := interceptor.IsObjectNamespaced(obj)
 		// Should return error since our mock isn't registered
@@ -447,7 +447,7 @@ func TestInterceptorClient_SubResource(t *testing.T) {
 	t.Run("subresource returns underlying client result", func(t *testing.T) {
 		fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 		interceptor := NewInterceptorClient(fakeClient)
-		
+
 		subResourceClient := interceptor.SubResource("status")
 		assert.NotNil(t, subResourceClient)
 	})

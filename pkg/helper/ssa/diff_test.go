@@ -172,7 +172,7 @@ func TestIsObjectDiff_AnnotationsNormalized(t *testing.T) {
 			Name:      "test",
 			Namespace: "default",
 			Annotations: map[string]string{
-				"keep":                       "me",
+				"keep":                      "me",
 				lastAppliedConfigAnnotation: "config1",
 			},
 		},
@@ -207,7 +207,6 @@ func TestIsObjectDiff_PredictedHasNoiseFields(t *testing.T) {
 	cm2.ManagedFields = []metav1.ManagedFieldsEntry{
 		{Manager: "some-operator", Operation: metav1.ManagedFieldsOperationApply},
 	}
-	
 
 	changed, _, err := IsObjectDiff(cm1, testUnstructured(cm2))
 	require.NoError(t, err)

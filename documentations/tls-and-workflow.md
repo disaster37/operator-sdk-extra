@@ -77,17 +77,45 @@ type TLSSpec struct {
     DNSNames     []string // SAN DNS names
     Organization string   // Certificate O field
     ValidityDays int      // Validity in days (default 365)
+    Curve        string   // ECDSA curve (P-256/P-384/P-521)
+    IPAddresses  []string // SAN IP addresses
+    RenewalDays  int      // Renewal window before NotAfter (default 30)
+    GenerateCRL  bool     // Add ca.crl to the CA Secret (selfmanaged)
 }
 ```
+
+| Field | Type | Default | Applies to | Description |
+|---|---|---|---|---|
+| `Curve` | string | `P-256` | selfmanaged | ECDSA curve: `P-256`, `P-384`, `P-521`. Unknown → error. |
+| `IPAddresses` | []string | none | selfmanaged, certmanager | SAN IPs (parsed via `net.ParseIP`). |
+| `RenewalDays` | int | 30 | selfmanaged (NeedRenewal), certmanager (renewBefore) | Renewal window before `NotAfter`. |
+| `GenerateCRL` | bool | false | selfmanaged | Adds `ca.crl` (DER) to the CA Secret. |
 
 ### Self-managed backend
 
 The self-managed backend generates a CA + leaf certificate pair using Go's
-`crypto/x509` with ECDSA P-256 keys. It returns two Secrets:
+`crypto/x509` with ECDSA keys. The curve is selectable via `TLSSpec.Curve`
+(`P-256` by default, or `P-384` / `P-521`); unknown values are rejected. IP
+SANs are added via `TLSSpec.IPAddresses` (each entry parsed with
+`net.ParseIP`). An optional CRL is emitted when `TLSSpec.GenerateCRL` is set:
+the CA Secret then also carries a `ca.crl` key (raw DER, parsed with
+`x509.ParseRevocationList`). The CRL is reissued fresh on each renewal with an
+empty revoked list — no incremental revocation maintenance is performed
+(documented limitation).
 
-1. `<secretName>-ca` — contains `ca.crt` and `ca.key` (CA private key).
+It returns two Secrets:
+
+1. `<secretName>-ca` — contains `ca.crt`, `ca.key` (CA private key), and
+   (when `GenerateCRL`) `ca.crl`.
 2. `<secretName>` — contains `tls.crt`, `tls.key`, and `ca.crt`
    (Type: `kubernetes.io/tls`).
+
+The CA validity remains 2× the leaf validity (`GetValidTLSDays`). Renewal is
+gated by the renewal window: `TLSSpec.RenewalDays` (default 30 via
+`certificate.GetValidRenewalDays(spec)`) determines when
+`selfmanaged.NeedRenewal(secret, spec, now)` reports that a certificate is due
+(within the window of its `NotAfter`, which also covers already-expired
+certs).
 
 The static `RequiresRotationSaga() == true` signals that the operator should
 run the multi-cycle CA rotation workflow.
@@ -200,6 +228,93 @@ if !done { return res, nil } // Requeue after 10s
 
 ---
 
+## Rotation saga (rotation package)
+
+The `rotation` package provides a reusable multi-cycle TLS rotation saga step
+built on `workflow.WorkflowStepReconcilerActionWithDiff`. It drives the CA
+rotation for saga-capable backends (`RequiresRotationSaga() == true`; only
+selfmanaged today).
+
+### Phase diagram
+
+```
+""       -> Rotate   : emit new CA + leaf with ca.crt = newCA||oldCA bundle.
+Rotate   -> Converge : hold desired state stable, gate on an operator-injected
+                       convergence check, then advance.
+Converge -> ""       : emit leaf with ca.crt = newCA only (strip old CA).
+```
+
+Phase advances happen in `OnSuccess` (after a successful Apply), except
+`Rotate → Converge` which advances in `OnDiff` — safe because Apply is a no-op
+during Rotate (expected == current). Advancing before Apply would persist a
+phase whose desired state was never applied.
+
+### Data-map contract
+
+The `Read` method populates the per-reconcile blackboard (`data map[string]any`)
+with the following keys:
+
+| Key | Type | Meaning |
+|---|---|---|
+| `rotationStartPhase` | `workflow.WorkflowPhase` | Phase at cycle start (before any advance) |
+| `rotationRenewed` | `bool` | `true` when phase `""` triggered a renewal this cycle |
+| `tlsSecret` | `*corev1.Secret` | Current leaf secret (if present) — sanitized copy |
+| `caSecret` | `*corev1.Secret` | Current CA secret (if present) — sanitized copy |
+| `leafCert` | `*x509.Certificate` | First cert parsed from the leaf's `tls.crt` (if parseable) |
+| `caCert` | `*x509.Certificate` | First cert parsed from the CA secret's `ca.crt` (if parseable) |
+
+`tlsSecret` and `caSecret` are **sanitized deep copies** of the current
+Secrets: the private-key entries (`tls.key` from the leaf copy, `ca.key` from
+the CA copy) are removed from `Data`, while certificate material (`tls.crt`,
+`ca.crt`, `ca.crl`) and all metadata (name, namespace, labels, annotations)
+are retained. This lets injected convergence checks inspect certificates and
+identities without exposing private-key material to the data map, which is
+handed to `OnDiff`/`OnSuccess`/`OnError` and could be debug-logged. The
+original Secrets are not mutated.
+
+### Constructor
+
+```go
+func NewTLSStep[T object.MultiPhaseObject](
+    c client.Client,
+    phaseName shared.PhaseName,
+    conditionName shared.ConditionName,
+    recorder record.EventRecorder,
+    fieldManager string,
+    backend certificate.TLSBackend[T],
+    specBuilder func(o T) certificate.TLSSpec,
+    opts ...Option[T],
+) workflow.WorkflowStepReconcilerActionWithDiff[T, client.Object]
+```
+
+Options: `WithConvergenceCheck`, `WithLabelsDecorator`,
+`WithAnnotationsDecorator`.
+
+```go
+step := rotation.NewTLSStep[*MyCRD](
+    r.Client(), "tls", "TLSCertificatesReady", r.Recorder, "my-operator",
+    selfmanaged.NewSelfManagedBackend[*MyCRD](),
+    func(o *MyCRD) certificate.TLSSpec { return o.Spec.TLS },
+    rotation.WithConvergenceCheck(func(ctx context.Context, o *MyCRD, data map[string]any) (bool, error) {
+        return workflow.WaitForOwnedObjects[*appv1.StatefulSet](
+            ctx, r.Client(), o, &appv1.StatefulSetList{},
+            func(sts *appv1.StatefulSet) bool { return sts.Status.CurrentReplicas == *sts.Spec.Replicas },
+            client.InNamespace(o.GetNamespace()), client.MatchingLabels{"app":"my-app"},
+        )
+    }),
+    rotation.WithLabelsDecorator(func(o *MyCRD, obj client.Object) { /* set labels */ }),
+)
+```
+
+Backends with `RequiresRotationSaga() == false` degrade to a single-cycle emit
+of `DesiredObjects` with no phase writes (identical to the previous
+operator-managed single-cycle flow).
+
+> **Migration note**: operators' CRD status must embed
+> `workflow.WorkflowStatus` (now DeepCopy-safe via the hand-written
+> `zz_generated.deepcopy.go`) and implement
+> `GetWorkflowStatus() *workflow.WorkflowStatus`.
+
 ## Rollout helper
 
 The rollout helper computes a stable SHA-256 hash of a certificate Secret's
@@ -258,3 +373,9 @@ Run tests for the new packages:
 ```bash
 go test ./pkg/apis/workflow/... ./pkg/controller/workflow/... ./pkg/controller/certificate/...
 ```
+
+The `./pkg/controller/certificate/rotation/` package is included above. Its
+tests call `Read`/`OnDiff`/`OnSuccess` directly rather than driving a full
+`Reconcile`, because the controller-runtime fake client does not support the
+SSA dry-run `Patch` that the inherited `Diff` step requires (the inherited
+`Diff`/`Apply` are covered by the `multiphase` package tests).

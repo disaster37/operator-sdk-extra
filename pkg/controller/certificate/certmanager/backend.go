@@ -61,17 +61,29 @@ func (b *CertManagerBackend[T]) DesiredObjects(ctx context.Context, o T, spec ce
 
 	if spec.IssuerRef == "" {
 		// Dedicated-CA mode: create a self-signed Issuer + CA Certificate + CA Issuer
-		caIssuer := b.buildSelfSignedIssuer(spec.SecretName+caIssuerSuffix, namespace)
+		caIssuer, err := b.buildSelfSignedIssuer(spec.SecretName+caIssuerSuffix, namespace)
+		if err != nil {
+			return nil, err
+		}
 		objects = append(objects, caIssuer)
 
-		caCert := b.buildCACertificate(spec.SecretName, spec.SecretName+caIssuerSuffix, namespace)
+		caCert, err := b.buildCACertificate(spec.SecretName, spec.SecretName+caIssuerSuffix, namespace)
+		if err != nil {
+			return nil, err
+		}
 		objects = append(objects, caCert)
 
-		leaf := b.buildLeafCertificate(spec, spec.SecretName+"-ca-issuer", namespace)
+		leaf, err := b.buildLeafCertificate(spec, spec.SecretName+"-ca-issuer", namespace)
+		if err != nil {
+			return nil, err
+		}
 		objects = append(objects, leaf)
 	} else {
 		// Existing-CA mode: leaf Certificate referencing an existing Issuer
-		leaf := b.buildLeafCertificateWithIssuer(spec, spec.IssuerRef, namespace)
+		leaf, err := b.buildLeafCertificateWithIssuer(spec, spec.IssuerRef, namespace)
+		if err != nil {
+			return nil, err
+		}
 		objects = append(objects, leaf)
 	}
 
@@ -89,23 +101,25 @@ func (b *CertManagerBackend[T]) RequiresRotationSaga() bool {
 	return false
 }
 
-func (b *CertManagerBackend[T]) buildSelfSignedIssuer(name, namespace string) *unstructured.Unstructured {
+func (b *CertManagerBackend[T]) buildSelfSignedIssuer(name, namespace string) (*unstructured.Unstructured, error) {
 	u := &unstructured.Unstructured{}
 	u.SetGroupVersionKind(issuerGVK)
 	u.SetName(name)
 	u.SetNamespace(namespace)
-	unstructured.SetNestedField(u.Object, map[string]interface{}{
+	if err := unstructured.SetNestedField(u.Object, map[string]interface{}{
 		"selfSigned": map[string]interface{}{},
-	}, "spec")
-	return u
+	}, "spec"); err != nil {
+		return nil, fmt.Errorf("set spec.selfSigned on self-signed Issuer %q: %w", name, err)
+	}
+	return u, nil
 }
 
-func (b *CertManagerBackend[T]) buildCACertificate(name, issuerName, namespace string) *unstructured.Unstructured {
+func (b *CertManagerBackend[T]) buildCACertificate(name, issuerName, namespace string) (*unstructured.Unstructured, error) {
 	u := &unstructured.Unstructured{}
 	u.SetGroupVersionKind(certificateGVK)
 	u.SetName(name + "-ca")
 	u.SetNamespace(namespace)
-	unstructured.SetNestedField(u.Object, map[string]interface{}{
+	if err := unstructured.SetNestedField(u.Object, map[string]interface{}{
 		"isCA":       true,
 		"commonName": name + "-ca",
 		"secretName": name + "-ca",
@@ -116,11 +130,13 @@ func (b *CertManagerBackend[T]) buildCACertificate(name, issuerName, namespace s
 		"subject": map[string]interface{}{
 			"organizations": []interface{}{"operator-sdk-extra"},
 		},
-	}, "spec")
-	return u
+	}, "spec"); err != nil {
+		return nil, fmt.Errorf("set spec on CA Certificate %q: %w", name+"-ca", err)
+	}
+	return u, nil
 }
 
-func (b *CertManagerBackend[T]) buildLeafCertificate(spec certificate.TLSSpec, caIssuerName, namespace string) *unstructured.Unstructured {
+func (b *CertManagerBackend[T]) buildLeafCertificate(spec certificate.TLSSpec, caIssuerName, namespace string) (*unstructured.Unstructured, error) {
 	u := &unstructured.Unstructured{}
 	u.SetGroupVersionKind(certificateGVK)
 	u.SetName(spec.SecretName)
@@ -136,26 +152,24 @@ func (b *CertManagerBackend[T]) buildLeafCertificate(spec certificate.TLSSpec, c
 	}
 
 	if spec.Organization != "" {
-		unstructured.SetNestedStringSlice(u.Object, []string{spec.Organization}, "spec", "subject", "organizations")
+		specMap["subject"] = map[string]interface{}{
+			"organizations": []interface{}{spec.Organization},
+		}
 	}
 
-	if len(spec.DNSNames) > 0 {
-		dnsNames := make([]interface{}, len(spec.DNSNames))
-		for i, dns := range spec.DNSNames {
-			dnsNames[i] = dns
-		}
-		specMap["dnsNames"] = dnsNames
-	}
+	setCommonCertificateSpec(specMap, spec)
 
 	if spec.ValidityDays > 0 {
 		specMap["duration"] = fmt.Sprintf("%dh", spec.ValidityDays*24)
 	}
 
-	unstructured.SetNestedField(u.Object, specMap, "spec")
-	return u
+	if err := unstructured.SetNestedField(u.Object, specMap, "spec"); err != nil {
+		return nil, fmt.Errorf("set spec on leaf Certificate %q: %w", spec.SecretName, err)
+	}
+	return u, nil
 }
 
-func (b *CertManagerBackend[T]) buildLeafCertificateWithIssuer(spec certificate.TLSSpec, issuerRef, namespace string) *unstructured.Unstructured {
+func (b *CertManagerBackend[T]) buildLeafCertificateWithIssuer(spec certificate.TLSSpec, issuerRef, namespace string) (*unstructured.Unstructured, error) {
 	u := &unstructured.Unstructured{}
 	u.SetGroupVersionKind(certificateGVK)
 	u.SetName(spec.SecretName)
@@ -169,14 +183,34 @@ func (b *CertManagerBackend[T]) buildLeafCertificateWithIssuer(spec certificate.
 		},
 	}
 
-	if len(spec.DNSNames) > 0 {
-		dnsNames := make([]interface{}, len(spec.DNSNames))
-		for i, dns := range spec.DNSNames {
-			dnsNames[i] = dns
-		}
-		specMap["dnsNames"] = dnsNames
-	}
+	setCommonCertificateSpec(specMap, spec)
 
-	unstructured.SetNestedField(u.Object, specMap, "spec")
-	return u
+	if err := unstructured.SetNestedField(u.Object, specMap, "spec"); err != nil {
+		return nil, fmt.Errorf("set spec on leaf Certificate %q: %w", spec.SecretName, err)
+	}
+	return u, nil
+}
+
+// setCommonCertificateSpec populates the DNS/IP SAN and renewal fields shared
+// by both leaf Certificate builders onto specMap.
+func setCommonCertificateSpec(specMap map[string]interface{}, spec certificate.TLSSpec) {
+	if len(spec.DNSNames) > 0 {
+		specMap["dnsNames"] = toStringInterfaceSlice(spec.DNSNames)
+	}
+	if len(spec.IPAddresses) > 0 {
+		specMap["ipAddresses"] = toStringInterfaceSlice(spec.IPAddresses)
+	}
+	if spec.RenewalDays > 0 {
+		specMap["renewBefore"] = fmt.Sprintf("%dh", certificate.GetValidRenewalDays(spec)*24)
+	}
+}
+
+// toStringInterfaceSlice converts a []string to []interface{} for cert-manager
+// Certificate spec fields (unstructured nested values).
+func toStringInterfaceSlice(values []string) []interface{} {
+	out := make([]interface{}, len(values))
+	for i, v := range values {
+		out[i] = v
+	}
+	return out
 }

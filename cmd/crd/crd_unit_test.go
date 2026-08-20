@@ -15,7 +15,7 @@ func TestCleanCrd(t *testing.T) {
 	t.Run("nominal case with @clean tag", func(t *testing.T) {
 		// Create a temporary directory
 		tempDir := t.TempDir()
-		
+
 		// Create a sample CRD with @clean tag
 		crdContent := `
 apiVersion: apiextensions.k8s.io/v1
@@ -40,9 +40,9 @@ spec:
     kind: Test
     plural: tests
 `
-		
+
 		tempFile := filepath.Join(tempDir, "test_crd.yaml")
-		err := os.WriteFile(tempFile, []byte(crdContent), 0644)
+		err := os.WriteFile(tempFile, []byte(crdContent), 0o644)
 		assert.NoError(t, err)
 
 		// Create a CLI context with the temp file
@@ -61,11 +61,11 @@ spec:
 		// Read the modified file to check if it was cleaned
 		modifiedContent, err := os.ReadFile(tempFile)
 		assert.NoError(t, err)
-		
+
 		var modifiedCrd apiv1.CustomResourceDefinition
 		err = yaml.Unmarshal(modifiedContent, &modifiedCrd)
 		assert.NoError(t, err)
-		
+
 		// Check that the @clean tag was removed and properties were cleaned
 		prop := modifiedCrd.Spec.Versions[0].Schema.OpenAPIV3Schema.Properties["testProperty"]
 		assert.NotContains(t, prop.Description, "@clean")
@@ -81,8 +81,7 @@ spec:
 				&cli.StringFlag{Name: "crd-file"},
 			},
 			Action: func(c *cli.Context) error {
-				CleanCrd(c)
-				return nil
+				return CleanCrd(c)
 			},
 		}
 
@@ -95,7 +94,7 @@ spec:
 	t.Run("invalid YAML file", func(t *testing.T) {
 		tempDir := t.TempDir()
 		invalidYAMLFile := filepath.Join(tempDir, "invalid.yaml")
-		err := os.WriteFile(invalidYAMLFile, []byte("invalid: ["), 0644) // Invalid YAML
+		err := os.WriteFile(invalidYAMLFile, []byte("invalid: ["), 0o644) // Invalid YAML
 		assert.NoError(t, err)
 
 		app := &cli.App{
@@ -103,8 +102,7 @@ spec:
 				&cli.StringFlag{Name: "crd-file"},
 			},
 			Action: func(c *cli.Context) error {
-				CleanCrd(c)
-				return nil
+				return CleanCrd(c)
 			},
 		}
 
@@ -114,4 +112,3 @@ spec:
 		})
 	})
 }
-

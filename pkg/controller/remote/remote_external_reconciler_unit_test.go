@@ -14,13 +14,13 @@ import (
 // Mock for RemoteObject
 type mockRemoteObject struct {
 	object.RemoteObject
-	name string
-	namespace string
-	generation int64
-	annotations map[string]string
+	name              string
+	namespace         string
+	generation        int64
+	annotations       map[string]string
 	deletionTimestamp *metav1.Time
-	status mockRemoteStatus
-	Status interface{}
+	status            mockRemoteStatus
+	Status            interface{}
 }
 
 func (m *mockRemoteObject) GetName() string {
@@ -33,10 +33,10 @@ func (m *mockRemoteObject) GetNamespace() string {
 
 func (m *mockRemoteObject) GetObjectMeta() metav1.ObjectMeta {
 	return metav1.ObjectMeta{
-		Name: m.name,
-		Namespace: m.namespace,
-		Generation: m.generation,
-		Annotations: m.annotations,
+		Name:              m.name,
+		Namespace:         m.namespace,
+		Generation:        m.generation,
+		Annotations:       m.annotations,
 		DeletionTimestamp: m.deletionTimestamp,
 	}
 }
@@ -56,12 +56,12 @@ func (m *mockRemoteObject) GetStatus() object.RemoteObjectStatus {
 // Mock for RemoteObjectStatus
 type mockRemoteStatus struct {
 	object.RemoteObjectStatus
-	isOnError bool
-	isSync bool
-	lastErrorMessage string
+	isOnError                bool
+	isSync                   bool
+	lastErrorMessage         string
 	lastAppliedConfiguration string
-	observedGeneration int64
-	conditions []metav1.Condition
+	observedGeneration       int64
+	conditions               []metav1.Condition
 }
 
 func (m *mockRemoteStatus) GetIsOnError() bool {
@@ -114,8 +114,8 @@ func (m *mockRemoteStatus) SetConditions(conditions []metav1.Condition) {
 
 // Mock API object
 type mockAPIObject struct {
-	ID   string
-	Name string
+	ID    string
+	Name  string
 	Value int
 }
 
@@ -130,7 +130,7 @@ func TestDefaultRemoteExternalReconciler_Diff(t *testing.T) {
 	assert.NoError(t, err)
 
 	_ = fake.NewClientBuilder().WithScheme(scheme).Build()
-	
+
 	handler := mockAPIClient{name: "test-client"}
 	remoteRec := NewRemoteExternalReconciler[*mockRemoteObject, mockAPIObject, mockAPIClient](handler)
 
@@ -145,7 +145,7 @@ func TestDefaultRemoteExternalReconciler_Diff(t *testing.T) {
 		patchResult, err := remoteRec.Diff(mockAPIObject{}, obj, mockAPIObject{}, k8sObj)
 		assert.NoError(t, err)
 		assert.NotNil(t, patchResult)
-		
+
 		// Verify the patch result has the expected content
 		assert.Equal(t, obj, patchResult.Patched)
 		assert.NotNil(t, patchResult.Modified)
@@ -155,23 +155,23 @@ func TestDefaultRemoteExternalReconciler_Diff(t *testing.T) {
 
 	t.Run("diff panics for unimplemented methods", func(t *testing.T) {
 		obj := &mockRemoteObject{name: "test", namespace: "test-ns"}
-		
+
 		assert.Panics(t, func() {
 			_, _ = remoteRec.Build(obj)
 		})
-		
+
 		assert.Panics(t, func() {
 			_, _ = remoteRec.Get(obj)
 		})
-		
+
 		assert.Panics(t, func() {
 			_ = remoteRec.Create(mockAPIObject{}, obj)
 		})
-		
+
 		assert.Panics(t, func() {
 			_ = remoteRec.Update(mockAPIObject{}, obj)
 		})
-		
+
 		assert.Panics(t, func() {
 			_ = remoteRec.Delete(obj)
 		})
@@ -191,7 +191,7 @@ func TestDefaultRemoteExternalReconciler_EdgeCases(t *testing.T) {
 	handler := mockAPIClient{name: "test-client"}
 	remoteRec := NewRemoteExternalReconciler[*mockRemoteObject, mockAPIObject, mockAPIClient](handler)
 
-t.Run("diff with nil pointer typed value", func(t *testing.T) {
+	t.Run("diff with nil pointer typed value", func(t *testing.T) {
 		k8sObj := &mockRemoteObject{name: "test-k8s", namespace: "test-ns"}
 
 		val := mockAPIObject{}

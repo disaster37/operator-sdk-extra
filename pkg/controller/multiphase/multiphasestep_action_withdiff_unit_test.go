@@ -136,9 +136,6 @@ func TestNewObjectMultiPhaseStepReconcilerActionWithDiff(t *testing.T) {
 	wrapped := NewObjectMultiPhaseStepReconcilerActionWithDiff[*mockMultiPhaseObject, *mockStepObject, client.Object](inner)
 	require.NotNil(t, wrapped)
 
-	// The wrapper must satisfy the WithDiff interface for the destination type.
-	var _ MultiPhaseStepReconcilerActionWithDiff[*mockMultiPhaseObject, client.Object] = wrapped
-
 	// OnDiff forwards to the inner action.
 	diff := NewMultiPhaseDiff[client.Object]()
 	res, err := wrapped.OnDiff(context.Background(), &mockMultiPhaseObject{name: "parent", namespace: "test-ns"}, map[string]any{}, diff, logrus.NewEntry(logrus.New()))

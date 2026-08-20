@@ -21,10 +21,10 @@ import (
 
 const (
 	name               string               = "test"
-	finalizer          shared.FinalizerName  = "test.operator.webcenter.fr/finalizer"
-	ConfigmapCondition shared.ConditionName  = "ConfigmapReady"
-	ConfigmapPhase     shared.PhaseName      = "Configmap"
-	fieldManagerName   string                = "test-operator"
+	finalizer          shared.FinalizerName = "test.operator.webcenter.fr/finalizer"
+	ConfigmapCondition shared.ConditionName = "ConfigmapReady"
+	ConfigmapPhase     shared.PhaseName     = "Configmap"
+	fieldManagerName   string               = "test-operator"
 )
 
 /*************

@@ -158,7 +158,7 @@ spec:
     plural: tests
 `
 		crdFile := filepath.Join(tempDir, "test.yaml")
-		err := os.WriteFile(crdFile, []byte(crdContent), 0644)
+		err := os.WriteFile(crdFile, []byte(crdContent), 0o644)
 		assert.NoError(t, err)
 
 		err = run([]string{"cmd", "--debug", "clean-crd", "--crd-file", crdFile})
@@ -190,7 +190,7 @@ spec:
     plural: tests
 `, i, i)
 		crdFile := filepath.Join(tempDir, fmt.Sprintf("test_%d.yaml", i))
-		err := os.WriteFile(crdFile, []byte(crdContent), 0644)
+		err := os.WriteFile(crdFile, []byte(crdContent), 0o644)
 		assert.NoError(t, err)
 	}
 
@@ -213,7 +213,7 @@ func TestCleanCrdPanicsOnInvalidGlob(t *testing.T) {
 	t.Run("invalid yaml file panics", func(t *testing.T) {
 		tempDir := t.TempDir()
 		invalidFile := filepath.Join(tempDir, "invalid.yaml")
-		err := os.WriteFile(invalidFile, []byte("invalid: ["), 0644)
+		err := os.WriteFile(invalidFile, []byte("invalid: ["), 0o644)
 		assert.NoError(t, err)
 
 		assert.Panics(t, func() {
@@ -249,7 +249,7 @@ spec:
     plural: tests
 `
 		crdFile := filepath.Join(tempDir, "test.yaml")
-		err := os.WriteFile(crdFile, []byte(crdContent), 0644)
+		err := os.WriteFile(crdFile, []byte(crdContent), 0o644)
 		assert.NoError(t, err)
 
 		err = run([]string{"cmd", "clean-crd", "--crd-file", crdFile})

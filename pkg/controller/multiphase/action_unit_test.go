@@ -32,32 +32,51 @@ func (h *MockMultiPhaseObject) GetStatus() object.MultiPhaseObjectStatus {
 	return &h.Status
 }
 
-func (h *MockMultiPhaseObject) GetGenerateName() string { return "" }
-func (h *MockMultiPhaseObject) SetGenerateName(string)  {}
-func (h *MockMultiPhaseObject) GetNamespace() string    { return h.Namespace }
-func (h *MockMultiPhaseObject) SetNamespace(ns string)  { h.Namespace = ns }
-func (h *MockMultiPhaseObject) GetName() string         { return h.Name }
-func (h *MockMultiPhaseObject) SetName(name string)     { h.Name = name }
-func (h *MockMultiPhaseObject) GetUID() types.UID       { return h.UID }
-func (h *MockMultiPhaseObject) SetUID(uid types.UID)    { h.UID = uid }
-func (h *MockMultiPhaseObject) GetSelfLink() string     { return "" }
-func (h *MockMultiPhaseObject) SetSelfLink(_ string)    {}
-func (h *MockMultiPhaseObject) GetCreationTimestamp() metav1.Time { return h.CreationTimestamp }
+func (h *MockMultiPhaseObject) GetGenerateName() string            { return "" }
+func (h *MockMultiPhaseObject) SetGenerateName(string)             {}
+func (h *MockMultiPhaseObject) GetNamespace() string               { return h.Namespace }
+func (h *MockMultiPhaseObject) SetNamespace(ns string)             { h.Namespace = ns }
+func (h *MockMultiPhaseObject) GetName() string                    { return h.Name }
+func (h *MockMultiPhaseObject) SetName(name string)                { h.Name = name }
+func (h *MockMultiPhaseObject) GetUID() types.UID                  { return h.UID }
+func (h *MockMultiPhaseObject) SetUID(uid types.UID)               { h.UID = uid }
+func (h *MockMultiPhaseObject) GetSelfLink() string                { return "" }
+func (h *MockMultiPhaseObject) SetSelfLink(_ string)               {}
+func (h *MockMultiPhaseObject) GetCreationTimestamp() metav1.Time  { return h.CreationTimestamp }
 func (h *MockMultiPhaseObject) SetCreationTimestamp(_ metav1.Time) {}
 func (h *MockMultiPhaseObject) GetDeletionTimestamp() *metav1.Time { return h.DeletionTimestamp }
-func (h *MockMultiPhaseObject) SetDeletionTimestamp(timestamp *metav1.Time) { h.DeletionTimestamp = timestamp }
-func (h *MockMultiPhaseObject) GetDeletionGracePeriodSeconds() *int64 { return h.DeletionGracePeriodSeconds }
-func (h *MockMultiPhaseObject) SetDeletionGracePeriodSeconds(period *int64) { h.DeletionGracePeriodSeconds = period }
-func (h *MockMultiPhaseObject) GetLabels() map[string]string     { return h.Labels }
+func (h *MockMultiPhaseObject) SetDeletionTimestamp(timestamp *metav1.Time) {
+	h.DeletionTimestamp = timestamp
+}
+
+func (h *MockMultiPhaseObject) GetDeletionGracePeriodSeconds() *int64 {
+	return h.DeletionGracePeriodSeconds
+}
+
+func (h *MockMultiPhaseObject) SetDeletionGracePeriodSeconds(period *int64) {
+	h.DeletionGracePeriodSeconds = period
+}
+func (h *MockMultiPhaseObject) GetLabels() map[string]string       { return h.Labels }
 func (h *MockMultiPhaseObject) SetLabels(labels map[string]string) { h.Labels = labels }
-func (h *MockMultiPhaseObject) GetAnnotations() map[string]string { return h.Annotations }
-func (h *MockMultiPhaseObject) SetAnnotations(annotations map[string]string) { h.Annotations = annotations }
+func (h *MockMultiPhaseObject) GetAnnotations() map[string]string  { return h.Annotations }
+func (h *MockMultiPhaseObject) SetAnnotations(annotations map[string]string) {
+	h.Annotations = annotations
+}
 func (h *MockMultiPhaseObject) GetFinalizers() []string           { return h.Finalizers }
 func (h *MockMultiPhaseObject) SetFinalizers(finalizers []string) { h.Finalizers = finalizers }
+
 func (h *MockMultiPhaseObject) GetOwnerReferences() []metav1.OwnerReference { return h.OwnerReferences }
-func (h *MockMultiPhaseObject) SetOwnerReferences(references []metav1.OwnerReference) { h.OwnerReferences = references }
+
+func (h *MockMultiPhaseObject) SetOwnerReferences(references []metav1.OwnerReference) {
+	h.OwnerReferences = references
+}
+
 func (h *MockMultiPhaseObject) GetManagedFields() []metav1.ManagedFieldsEntry { return h.ManagedFields }
-func (h *MockMultiPhaseObject) SetManagedFields(managedFields []metav1.ManagedFieldsEntry) { h.ManagedFields = managedFields }
+
+func (h *MockMultiPhaseObject) SetManagedFields(managedFields []metav1.ManagedFieldsEntry) {
+	h.ManagedFields = managedFields
+}
+
 func (h *MockMultiPhaseObject) DeepCopyObject() runtime.Object {
 	return h
 }
@@ -107,7 +126,7 @@ func TestNewMultiPhaseReconciler(t *testing.T) {
 func TestNewMultiPhaseStepReconcilerAction(t *testing.T) {
 	client := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
 	recorder := &mockEventRecorder{}
-	
+
 	action := NewMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap](client, "phase", "condition", recorder, "fieldManager")
 	assert.NotNil(t, action)
 }
@@ -117,7 +136,7 @@ func TestNewMultiPhaseStepReconciler(t *testing.T) {
 	client := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
 	logger := logrus.NewEntry(logrus.StandardLogger())
 	recorder := &mockEventRecorder{}
-	
+
 	reconciler := NewMultiPhaseStepReconciler[*MockMultiPhaseObject, *corev1.ConfigMap](client, logger, recorder)
 	assert.NotNil(t, reconciler)
 }
@@ -227,35 +246,35 @@ func TestObjectMultiPhaseRead(t *testing.T) {
 	t.Run("NewObjectMultiphaseRead should create wrapper", func(t *testing.T) {
 		innerRead := NewMultiPhaseRead[*corev1.ConfigMap]()
 		wrapper := NewObjectMultiphaseRead[*corev1.ConfigMap, client.Object](innerRead)
-		
+
 		assert.NotNil(t, wrapper)
 	})
 
 	t.Run("ObjectMultiPhaseRead methods should delegate to inner read", func(t *testing.T) {
 		innerRead := NewMultiPhaseRead[*corev1.ConfigMap]()
 		wrapper := NewObjectMultiphaseRead[*corev1.ConfigMap, client.Object](innerRead)
-		
+
 		cm := &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test",
 			},
 		}
-		
+
 		// Test AddCurrentObject
 		wrapper.AddCurrentObject(cm)
 		currentObjs := wrapper.GetCurrentObjects()
 		assert.Len(t, currentObjs, 1)
-		
+
 		// Test AddExpectedObject
 		wrapper.AddExpectedObject(cm)
 		expectedObjs := wrapper.GetExpectedObjects()
 		assert.Len(t, expectedObjs, 1)
-		
+
 		// Test Set methods
 		newObjs := []client.Object{cm}
 		wrapper.SetCurrentObjects(newObjs)
 		assert.Len(t, wrapper.GetCurrentObjects(), 2) // already had 1, now adding 1 more
-		
+
 		wrapper.SetExpectedObjects(newObjs)
 		assert.Len(t, wrapper.GetExpectedObjects(), 2) // already had 1, now adding 1 more
 	})
@@ -266,56 +285,56 @@ func TestObjectMultiPhaseDiff(t *testing.T) {
 	t.Run("NewObjectMultiphaseDiff should create wrapper", func(t *testing.T) {
 		innerDiff := NewMultiPhaseDiff[*corev1.ConfigMap]()
 		wrapper := NewObjectMultiphaseDiff[*corev1.ConfigMap, client.Object](innerDiff)
-		
+
 		assert.NotNil(t, wrapper)
 	})
 
 	t.Run("ObjectMultiPhaseDiff methods should delegate to inner diff", func(t *testing.T) {
 		innerDiff := NewMultiPhaseDiff[*corev1.ConfigMap]()
 		wrapper := NewObjectMultiphaseDiff[*corev1.ConfigMap, client.Object](innerDiff)
-		
+
 		cm := &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test",
 			},
 		}
-		
+
 		// Test initial state
 		assert.False(t, wrapper.NeedCreate())
 		assert.False(t, wrapper.NeedUpdate())
 		assert.False(t, wrapper.NeedDelete())
 		assert.False(t, wrapper.IsDiff())
 		assert.Empty(t, wrapper.Diff())
-		
+
 		// Test AddObjectToCreate
 		wrapper.AddObjectToCreate(cm)
 		assert.True(t, wrapper.NeedCreate())
 		assert.Len(t, wrapper.GetObjectsToCreate(), 1)
 		assert.Len(t, wrapper.GetObjectsToApply(), 1)
-		
+
 		// Test AddObjectToUpdate
 		wrapper.AddObjectToUpdate(cm)
 		assert.True(t, wrapper.NeedUpdate())
 		assert.Len(t, wrapper.GetObjectsToUpdate(), 1)
-		
+
 		// Test AddObjectToDelete
 		wrapper.AddObjectToDelete(cm)
 		assert.True(t, wrapper.NeedDelete())
 		assert.Len(t, wrapper.GetObjectsToDelete(), 1)
-		
+
 		// Test AddDiff
 		wrapper.AddDiff("test diff")
 		assert.True(t, wrapper.IsDiff())
 		assert.Contains(t, wrapper.Diff(), "test diff")
-		
+
 		// Test Set methods
 		newObjs := []client.Object{cm}
 		wrapper.SetObjectsToCreate(newObjs)
 		assert.Len(t, wrapper.GetObjectsToCreate(), 2) // already had 1, now adding 1 more
-		
+
 		wrapper.SetObjectsToUpdate(newObjs)
 		assert.Len(t, wrapper.GetObjectsToUpdate(), 2) // already had 1, now adding 1 more
-		
+
 		wrapper.SetObjectsToDelete(newObjs)
 		assert.Len(t, wrapper.GetObjectsToDelete(), 2) // already had 1, now adding 1 more
 	})
@@ -357,9 +376,9 @@ func TestObjectMultiPhaseDiffEmptySliceHandling(t *testing.T) {
 func TestMultiPhaseStepReconcilerAction(t *testing.T) {
 	client := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
 	recorder := &mockEventRecorder{}
-	
+
 	action := NewMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap](client, "phase", "condition", recorder, "fieldManager")
-	
+
 	// Test GetPhaseName
 	phaseName := action.GetPhaseName()
 	assert.Equal(t, shared.PhaseName("phase"), phaseName)
@@ -369,12 +388,12 @@ func TestMultiPhaseStepReconcilerAction(t *testing.T) {
 func TestNewObjectMultiPhaseStepReconcilerAction(t *testing.T) {
 	client := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
 	recorder := &mockEventRecorder{}
-	
+
 	innerAction := NewMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap](client, "phase", "condition", recorder, "fieldManager")
 	objectAction := NewObjectMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap, *corev1.Secret](innerAction)
-	
+
 	assert.NotNil(t, objectAction)
-	
+
 	// Test GetPhaseName on objectAction
 	phaseName := objectAction.GetPhaseName()
 	assert.Equal(t, shared.PhaseName("phase"), phaseName)
@@ -384,7 +403,7 @@ func TestNewObjectMultiPhaseStepReconcilerAction(t *testing.T) {
 func TestMultiPhaseStepReconcilerActionImplementations(t *testing.T) {
 	client := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
 	recorder := &mockEventRecorder{}
-	
+
 	action := NewMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap](client, "phase", "condition", recorder, "fieldManager")
 	logger := logrus.NewEntry(logrus.StandardLogger())
 
@@ -440,7 +459,7 @@ func TestMultiPhaseStepReconcilerActionImplementations(t *testing.T) {
 	}
 	read.AddExpectedObject(cm1)
 	read.AddCurrentObject(cm2)
-	
+
 	diffResult, res, err := action.Diff(context.Background(), mockObj, read, map[string]any{}, logger)
 	assert.NoError(t, err)
 	assert.Equal(t, reconcile.Result{}, res)
@@ -454,7 +473,7 @@ func TestMultiPhaseStepReconcilerActionImplementations(t *testing.T) {
 func TestObjectMultiPhaseStepReconcilerActionImplementations(t *testing.T) {
 	client := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
 	recorder := &mockEventRecorder{}
-	
+
 	innerAction := NewMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap](client, "phase", "condition", recorder, "fieldManager")
 	objectAction := NewObjectMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap, *corev1.Secret](innerAction)
 	logger := logrus.NewEntry(logrus.StandardLogger())

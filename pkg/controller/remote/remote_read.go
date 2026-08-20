@@ -34,7 +34,7 @@ func (h *DefaultRemoteRead[apiObject]) GetCurrentObject() apiObject {
 
 func (h *DefaultRemoteRead[apiObject]) SetCurrentObject(object apiObject) {
 	v := reflect.ValueOf(object)
-	if v.Kind() == reflect.Ptr && v.IsNil() {
+	if v.Kind() == reflect.Pointer && v.IsNil() {
 		return
 	}
 	h.currentObject = object
@@ -46,7 +46,7 @@ func (h *DefaultRemoteRead[apiObject]) GetExpectedObject() apiObject {
 
 func (h *DefaultRemoteRead[apiObject]) SetExpectedObject(object apiObject) {
 	v := reflect.ValueOf(object)
-	if v.Kind() == reflect.Ptr && v.IsNil() {
+	if v.Kind() == reflect.Pointer && v.IsNil() {
 		return
 	}
 	h.expectedObject = object

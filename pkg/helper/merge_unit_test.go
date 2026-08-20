@@ -32,7 +32,7 @@ func TestMergeUnit(t *testing.T) {
 
 	t.Run("src is nil pointer - should skip and not return error", func(t *testing.T) {
 		dst := &testStruct{Name: "original", Value: 1}
-		var src *testStruct = (*testStruct)(nil)
+		src := (*testStruct)(nil)
 
 		err := Merge(dst, src)
 		assert.NoError(t, err)

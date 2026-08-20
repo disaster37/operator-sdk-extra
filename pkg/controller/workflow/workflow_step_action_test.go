@@ -40,16 +40,23 @@ func (s *testWorkflowStatus) GetWorkflowStatus() *apworkflow.WorkflowStatus {
 	return s.Ws
 }
 
-func (s *testWorkflowStatus) GetConditions() []metav1.Condition                   { return s.Conditions }
-func (s *testWorkflowStatus) SetConditions(c []metav1.Condition)                  { s.Conditions = c }
-func (s *testWorkflowStatus) GetIsOnError() bool                                  { return s.IsOnError != nil && *s.IsOnError }
-func (s *testWorkflowStatus) SetIsOnError(b bool)                                 { s.IsOnError = &b }
-func (s *testWorkflowStatus) GetLastErrorMessage() string                         { return s.LastError }
-func (s *testWorkflowStatus) SetLastErrorMessage(m string)                        { s.LastError = m }
-func (s *testWorkflowStatus) GetObservedGeneration() int64                        { return s.ObsGen }
-func (s *testWorkflowStatus) SetObservedGeneration(v int64)                       { s.ObsGen = v }
-func (s *testWorkflowStatus) GetPhaseName() shared.PhaseName                      { return s.PhaseName }
-func (s *testWorkflowStatus) SetPhaseName(n shared.PhaseName)                     { s.PhaseName = n }
+func (s *testWorkflowStatus) GetConditions() []metav1.Condition { return s.Conditions }
+
+func (s *testWorkflowStatus) SetConditions(c []metav1.Condition) { s.Conditions = c }
+
+func (s *testWorkflowStatus) GetIsOnError() bool { return s.IsOnError != nil && *s.IsOnError }
+
+func (s *testWorkflowStatus) SetIsOnError(b bool) { s.IsOnError = &b }
+
+func (s *testWorkflowStatus) GetLastErrorMessage() string { return s.LastError }
+
+func (s *testWorkflowStatus) SetLastErrorMessage(m string) { s.LastError = m }
+
+func (s *testWorkflowStatus) GetObservedGeneration() int64   { return s.ObsGen }
+func (s *testWorkflowStatus) SetObservedGeneration(v int64)  { s.ObsGen = v }
+func (s *testWorkflowStatus) GetPhaseName() shared.PhaseName { return s.PhaseName }
+
+func (s *testWorkflowStatus) SetPhaseName(n shared.PhaseName) { s.PhaseName = n }
 
 type testMultiPhaseObject struct {
 	metav1.TypeMeta
@@ -64,7 +71,7 @@ func (o *testMultiPhaseObject) GetStatus() object.MultiPhaseObjectStatus {
 func (o *testMultiPhaseObject) DeepCopyObject() runtime.Object {
 	return &testMultiPhaseObject{
 		TypeMeta:   o.TypeMeta,
-		ObjectMeta: *o.ObjectMeta.DeepCopy(),
+		ObjectMeta: *o.DeepCopy(),
 		Status:     o.Status,
 	}
 }
@@ -113,7 +120,8 @@ func TestCurrentPhase(t *testing.T) {
 	assert.True(t, action.IsPhaseEmpty(o))
 	assert.Equal(t, apworkflow.WorkflowPhase(""), action.CurrentPhase(o))
 
-	action.AdvancePhase(context.Background(), o, "phase-1", logrus.NewEntry(logrus.StandardLogger()))
+	_, err := action.AdvancePhase(context.Background(), o, "phase-1", logrus.NewEntry(logrus.StandardLogger()))
+	require.NoError(t, err)
 	assert.Equal(t, apworkflow.WorkflowPhase("phase-1"), action.CurrentPhase(o))
 	assert.False(t, action.IsPhaseEmpty(o))
 	assert.True(t, action.IsPhase(o, "phase-1"))
@@ -162,7 +170,8 @@ func TestIsPhaseEmpty(t *testing.T) {
 	o.Status.Ws = &apworkflow.WorkflowStatus{}
 	assert.True(t, action.IsPhaseEmpty(o))
 
-	action.AdvancePhase(context.Background(), o, "phase-1", logrus.NewEntry(logrus.StandardLogger()))
+	_, err := action.AdvancePhase(context.Background(), o, "phase-1", logrus.NewEntry(logrus.StandardLogger()))
+	require.NoError(t, err)
 	assert.False(t, action.IsPhaseEmpty(o))
 }
 
@@ -215,7 +224,8 @@ func TestNewWorkflowStepReconcilerActionWithDiff(t *testing.T) {
 		Status:     testWorkflowStatus{Ws: &apworkflow.WorkflowStatus{}},
 	}
 	assert.True(t, action.IsPhaseEmpty(o))
-	action.AdvancePhase(context.Background(), o, "phase-1", logrus.NewEntry(logrus.StandardLogger()))
+	_, err := action.AdvancePhase(context.Background(), o, "phase-1", logrus.NewEntry(logrus.StandardLogger()))
+	require.NoError(t, err)
 	assert.Equal(t, apworkflow.WorkflowPhase("phase-1"), action.CurrentPhase(o))
 	assert.True(t, action.IsPhase(o, "phase-1"))
 	assert.False(t, action.IsPhase(o, "phase-2"))

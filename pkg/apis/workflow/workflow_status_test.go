@@ -5,6 +5,7 @@ import (
 
 	"github.com/disaster37/operator-sdk-extra/v3/pkg/apis/workflow"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -56,4 +57,62 @@ func TestWorkflowStatusPhaseConditions(t *testing.T) {
 	}
 	assert.Len(t, ws.PhaseConditions, 1)
 	assert.Equal(t, metav1.ConditionTrue, ws.PhaseConditions[0].Status)
+}
+
+func TestWorkflowStatusDeepCopyNil(t *testing.T) {
+	assert.Nil(t, (*workflow.WorkflowStatus)(nil).DeepCopy())
+}
+
+func TestWorkflowStatusDeepCopyEmpty(t *testing.T) {
+	ws := &workflow.WorkflowStatus{}
+	cp := ws.DeepCopy()
+	require.NotNil(t, cp)
+	assert.Equal(t, ws, cp)
+	assert.Nil(t, cp.PhaseConditions)
+}
+
+func TestWorkflowStatusDeepCopyPopulated(t *testing.T) {
+	lastTransition := metav1.Now()
+	ws := &workflow.WorkflowStatus{
+		CurrentPhase: "Rotate",
+		PhaseConditions: []metav1.Condition{
+			{
+				Type:               "Ready",
+				Status:             metav1.ConditionTrue,
+				Reason:             "Success",
+				Message:            "Ready",
+				LastTransitionTime: lastTransition,
+			},
+		},
+	}
+
+	cp := ws.DeepCopy()
+	require.NotNil(t, cp)
+	assert.Equal(t, ws, cp)
+
+	// Deep isolation: mutating the copy must not affect the original.
+	cp.PhaseConditions[0].Type = "Mutated"
+	assert.Equal(t, "Ready", ws.PhaseConditions[0].Type)
+
+	// Independent slice header: appending to the copy must not grow the original.
+	cp.PhaseConditions = append(cp.PhaseConditions, metav1.Condition{Type: "Extra", Status: metav1.ConditionFalse})
+	assert.Len(t, ws.PhaseConditions, 1)
+	assert.Len(t, cp.PhaseConditions, 2)
+}
+
+func TestWorkflowStatusDeepCopyInto(t *testing.T) {
+	ws := &workflow.WorkflowStatus{
+		CurrentPhase: "Converge",
+		PhaseConditions: []metav1.Condition{
+			{Type: "Ready", Status: metav1.ConditionTrue},
+		},
+	}
+
+	out := &workflow.WorkflowStatus{}
+	ws.DeepCopyInto(out)
+	assert.Equal(t, ws, out)
+
+	// Deep isolation for PhaseConditions.
+	out.PhaseConditions[0].Type = "Mutated"
+	assert.Equal(t, "Ready", ws.PhaseConditions[0].Type)
 }

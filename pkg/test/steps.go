@@ -14,7 +14,7 @@ func NewDeleteStep[T client.Object]() TestStep[T] {
 		Name: "delete",
 		Do: func(c client.Client, key types.NamespacedName, o T, data map[string]any) error {
 			v := reflect.ValueOf(o)
-			if any(o) == nil || (v.Kind() == reflect.Ptr && v.IsNil()) {
+			if any(o) == nil || (v.Kind() == reflect.Pointer && v.IsNil()) {
 				return errors.New("object is null")
 			}
 			wait := int64(0)

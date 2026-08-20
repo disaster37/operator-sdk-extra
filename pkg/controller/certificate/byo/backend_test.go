@@ -25,7 +25,7 @@ func (o *testBYOObject) GetStatus() object.MultiPhaseObjectStatus {
 func (o *testBYOObject) DeepCopyObject() runtime.Object {
 	return &testBYOObject{
 		TypeMeta:   o.TypeMeta,
-		ObjectMeta: *o.ObjectMeta.DeepCopy(),
+		ObjectMeta: *o.DeepCopy(),
 	}
 }
 

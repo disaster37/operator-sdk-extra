@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/tools/record"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -19,15 +19,15 @@ import (
 // Mock for RemoteExternalReconciler
 type mockRemoteExternalReconciler struct {
 	RemoteExternalReconciler[*mockRemoteObject, mockAPIObject, mockAPIClient]
-	buildResult   mockAPIObject
-	buildError    error
-	getResult     mockAPIObject  
-	getError      error
-	createError   error
-	updateError   error
-	deleteError   error
+	buildResult    mockAPIObject
+	buildError     error
+	getResult      mockAPIObject
+	getError       error
+	createError    error
+	updateError    error
+	deleteError    error
 	clientInstance mockAPIClient
-	diffResult    *patch.PatchResult
+	diffResult     *patch.PatchResult
 }
 
 func (m *mockRemoteExternalReconciler) Build(k8sO *mockRemoteObject) (mockAPIObject, error) {
@@ -68,7 +68,7 @@ func TestDefaultRemoteReconcilerAction_GetRemoteHandler(t *testing.T) {
 
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
 	recorder := record.NewFakeRecorder(10)
-	
+
 	action := NewRemoteReconcilerAction[*mockRemoteObject, mockAPIObject, mockAPIClient](client, recorder)
 
 	t.Run("GetRemoteHandler panics when not implemented", func(t *testing.T) {
@@ -78,7 +78,7 @@ func TestDefaultRemoteReconcilerAction_GetRemoteHandler(t *testing.T) {
 		}
 		obj := &mockRemoteObject{name: "test-name", namespace: "test-ns"}
 		logger := logrus.NewEntry(logrus.New())
-		
+
 		assert.Panics(t, func() {
 			_, _, _ = action.GetRemoteHandler(ctx, req, obj, logger)
 		})
@@ -92,19 +92,19 @@ func TestDefaultRemoteReconcilerAction_Configure(t *testing.T) {
 
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
 	recorder := record.NewFakeRecorder(10)
-	
+
 	action := NewRemoteReconcilerAction[*mockRemoteObject, mockAPIObject, mockAPIClient](client, recorder)
 
 	t.Run("configure initializes condition", func(t *testing.T) {
 		ctx := context.Background()
 		obj := &mockRemoteObject{
-			name: "test-name",
+			name:      "test-name",
 			namespace: "test-ns",
 		}
 		data := make(map[string]any)
 		handler := &mockRemoteExternalReconciler{}
 		logger := logrus.NewEntry(logrus.New())
-		
+
 		res, err := action.Configure(ctx, obj, data, handler, logger)
 		assert.NoError(t, err)
 		assert.Equal(t, reconcile.Result{}, res)
@@ -122,28 +122,28 @@ func TestDefaultRemoteReconcilerAction_Create(t *testing.T) {
 
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
 	recorder := record.NewFakeRecorder(10)
-	
+
 	action := NewRemoteReconcilerAction[*mockRemoteObject, mockAPIObject, mockAPIClient](client, recorder)
 
 	t.Run("create object successfully", func(t *testing.T) {
 		ctx := context.Background()
 		obj := &mockRemoteObject{
-			name: "test-name",
+			name:      "test-name",
 			namespace: "test-ns",
 		}
 		data := make(map[string]any)
 		apiObj := mockAPIObject{
-			ID: "new-id",
-			Name: "new-name",
+			ID:    "new-id",
+			Name:  "new-name",
 			Value: 200,
 		}
 		handler := &mockRemoteExternalReconciler{}
 		logger := logrus.NewEntry(logrus.New())
-		
+
 		res, err := action.Create(ctx, obj, data, handler, apiObj, logger)
 		assert.NoError(t, err)
 		assert.Equal(t, reconcile.Result{}, res)
-		
+
 		// Check that the last applied configuration was set
 		assert.NotEmpty(t, obj.GetStatus().GetLastAppliedConfiguration())
 	})
@@ -151,7 +151,7 @@ func TestDefaultRemoteReconcilerAction_Create(t *testing.T) {
 	t.Run("create returns error when handler Create fails", func(t *testing.T) {
 		ctx := context.Background()
 		obj := &mockRemoteObject{
-			name: "test-name",
+			name:      "test-name",
 			namespace: "test-ns",
 		}
 		data := make(map[string]any)
@@ -162,7 +162,7 @@ func TestDefaultRemoteReconcilerAction_Create(t *testing.T) {
 			createError: errors.New("create error"),
 		}
 		logger := logrus.NewEntry(logrus.New())
-		
+
 		res, err := action.Create(ctx, obj, data, handler, apiObj, logger)
 		assert.Error(t, err)
 		assert.Equal(t, reconcile.Result{}, res)
@@ -170,7 +170,7 @@ func TestDefaultRemoteReconcilerAction_Create(t *testing.T) {
 		assert.Contains(t, err.Error(), "create error")
 	})
 
-t.Run("create returns error when zipping fails", func(t *testing.T) {
+	t.Run("create returns error when zipping fails", func(t *testing.T) {
 		ctx := context.Background()
 		obj := &mockRemoteObject{
 			name:      "test-name",
@@ -195,28 +195,28 @@ func TestDefaultRemoteReconcilerAction_Update(t *testing.T) {
 
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
 	recorder := record.NewFakeRecorder(10)
-	
+
 	action := NewRemoteReconcilerAction[*mockRemoteObject, mockAPIObject, mockAPIClient](client, recorder)
 
 	t.Run("update object successfully", func(t *testing.T) {
 		ctx := context.Background()
 		obj := &mockRemoteObject{
-			name: "test-name",
+			name:      "test-name",
 			namespace: "test-ns",
 		}
 		data := make(map[string]any)
 		apiObj := mockAPIObject{
-			ID: "update-id",
-			Name: "update-name",
+			ID:    "update-id",
+			Name:  "update-name",
 			Value: 300,
 		}
 		handler := &mockRemoteExternalReconciler{}
 		logger := logrus.NewEntry(logrus.New())
-		
+
 		res, err := action.Update(ctx, obj, data, handler, apiObj, logger)
 		assert.NoError(t, err)
 		assert.Equal(t, reconcile.Result{}, res)
-		
+
 		// Check that the last applied configuration was set
 		assert.NotEmpty(t, obj.GetStatus().GetLastAppliedConfiguration())
 	})
@@ -224,7 +224,7 @@ func TestDefaultRemoteReconcilerAction_Update(t *testing.T) {
 	t.Run("update returns error when handler Update fails", func(t *testing.T) {
 		ctx := context.Background()
 		obj := &mockRemoteObject{
-			name: "test-name",
+			name:      "test-name",
 			namespace: "test-ns",
 		}
 		data := make(map[string]any)
@@ -235,7 +235,7 @@ func TestDefaultRemoteReconcilerAction_Update(t *testing.T) {
 			updateError: errors.New("update error"),
 		}
 		logger := logrus.NewEntry(logrus.New())
-		
+
 		res, err := action.Update(ctx, obj, data, handler, apiObj, logger)
 		assert.Error(t, err)
 		assert.Equal(t, reconcile.Result{}, res)
@@ -251,19 +251,19 @@ func TestDefaultRemoteReconcilerAction_Delete(t *testing.T) {
 
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
 	recorder := record.NewFakeRecorder(10)
-	
+
 	action := NewRemoteReconcilerAction[*mockRemoteObject, mockAPIObject, mockAPIClient](client, recorder)
 
 	t.Run("delete object successfully", func(t *testing.T) {
 		ctx := context.Background()
 		obj := &mockRemoteObject{
-			name: "test-name",
+			name:      "test-name",
 			namespace: "test-ns",
 		}
 		data := make(map[string]any)
 		handler := &mockRemoteExternalReconciler{}
 		logger := logrus.NewEntry(logrus.New())
-		
+
 		err := action.Delete(ctx, obj, data, handler, logger)
 		assert.NoError(t, err)
 	})
@@ -271,7 +271,7 @@ func TestDefaultRemoteReconcilerAction_Delete(t *testing.T) {
 	t.Run("delete returns error when handler Delete fails", func(t *testing.T) {
 		ctx := context.Background()
 		obj := &mockRemoteObject{
-			name: "test-name",
+			name:      "test-name",
 			namespace: "test-ns",
 		}
 		data := make(map[string]any)
@@ -279,7 +279,7 @@ func TestDefaultRemoteReconcilerAction_Delete(t *testing.T) {
 			deleteError: errors.New("delete error"),
 		}
 		logger := logrus.NewEntry(logrus.New())
-		
+
 		err := action.Delete(ctx, obj, data, handler, logger)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "Error when delete test-name on remote target")
@@ -294,24 +294,24 @@ func TestDefaultRemoteReconcilerAction_OnError(t *testing.T) {
 
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
 	recorder := record.NewFakeRecorder(10)
-	
+
 	action := NewRemoteReconcilerAction[*mockRemoteObject, mockAPIObject, mockAPIClient](client, recorder)
 
 	t.Run("on error updates status and condition", func(t *testing.T) {
 		ctx := context.Background()
 		obj := &mockRemoteObject{
-			name: "test-name",
+			name:      "test-name",
 			namespace: "test-ns",
 		}
 		data := make(map[string]any)
 		handler := &mockRemoteExternalReconciler{}
 		logger := logrus.NewEntry(logrus.New())
 		testErr := errors.New("test error")
-		
+
 		res, err := action.OnError(ctx, obj, data, handler, testErr, logger)
 		assert.Equal(t, testErr, err)
 		assert.Equal(t, reconcile.Result{}, res)
-		
+
 		// Check that status flags were updated
 		assert.True(t, obj.GetStatus().GetIsOnError())
 		assert.False(t, obj.GetStatus().GetIsSync())
@@ -326,30 +326,30 @@ func TestDefaultRemoteReconcilerAction_OnSuccess(t *testing.T) {
 
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
 	recorder := record.NewFakeRecorder(10)
-	
+
 	action := NewRemoteReconcilerAction[*mockRemoteObject, mockAPIObject, mockAPIClient](client, recorder)
 
 	t.Run("on success updates status and condition", func(t *testing.T) {
 		ctx := context.Background()
 		obj := &mockRemoteObject{
-			name: "test-name",
-			namespace: "test-ns",
+			name:       "test-name",
+			namespace:  "test-ns",
 			generation: 5,
 		}
 		data := make(map[string]any)
 		handler := &mockRemoteExternalReconciler{}
 		logger := logrus.NewEntry(logrus.New())
 		diff := NewRemoteDiff[mockAPIObject]()
-		
+
 		res, err := action.OnSuccess(ctx, obj, data, handler, diff, logger)
 		assert.NoError(t, err)
 		assert.Equal(t, reconcile.Result{}, res)
-		
+
 		// Check that status flags were updated
 		assert.False(t, obj.GetStatus().GetIsOnError())
 		assert.True(t, obj.GetStatus().GetIsSync())
 		assert.Equal(t, int64(5), obj.GetStatus().GetObservedGeneration())
-		
+
 		// Check that condition was updated
 		conditions := obj.GetStatus().GetConditions()
 		assert.Len(t, conditions, 1)
@@ -361,8 +361,8 @@ func TestDefaultRemoteReconcilerAction_OnSuccess(t *testing.T) {
 	t.Run("on success with already successful condition", func(t *testing.T) {
 		ctx := context.Background()
 		obj := &mockRemoteObject{
-			name: "test-name",
-			namespace: "test-ns",
+			name:       "test-name",
+			namespace:  "test-ns",
 			generation: 1,
 			status: mockRemoteStatus{
 				conditions: []metav1.Condition{
@@ -378,7 +378,7 @@ func TestDefaultRemoteReconcilerAction_OnSuccess(t *testing.T) {
 		handler := &mockRemoteExternalReconciler{}
 		logger := logrus.NewEntry(logrus.New())
 		diff := NewRemoteDiff[mockAPIObject]()
-		
+
 		res, err := action.OnSuccess(ctx, obj, data, handler, diff, logger)
 		assert.NoError(t, err)
 		assert.Equal(t, reconcile.Result{}, res)
@@ -392,29 +392,29 @@ func TestDefaultRemoteReconcilerAction_Diff(t *testing.T) {
 
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
 	recorder := record.NewFakeRecorder(10)
-	
+
 	action := NewRemoteReconcilerAction[*mockRemoteObject, mockAPIObject, mockAPIClient](client, recorder)
 
 	t.Run("diff returns create when current object is nil", func(t *testing.T) {
 		ctx := context.Background()
 		obj := &mockRemoteObject{
-			name: "test-name",
+			name:      "test-name",
 			namespace: "test-ns",
 		}
 		data := make(map[string]any)
 		handler := &mockRemoteExternalReconciler{}
 		logger := logrus.NewEntry(logrus.New())
-		
+
 		// Mock read with nil current object
 		read := NewRemoteRead[mockAPIObject]()
 		expectedObj := mockAPIObject{ID: "new-obj", Name: "new-name"}
 		read.SetExpectedObject(expectedObj)
 		// Current object is zero value by default, which is equivalent to nil in the check
-		
+
 		diff, res, err := action.Diff(ctx, obj, read, data, handler, logger)
 		assert.NoError(t, err)
 		assert.Equal(t, reconcile.Result{}, res)
-		
+
 		// Check that we should create the object
 		assert.Equal(t, expectedObj, diff.GetObjectToCreate())
 		assert.Empty(t, diff.GetObjectToUpdate())
@@ -425,7 +425,7 @@ func TestDefaultRemoteReconcilerAction_Diff(t *testing.T) {
 	t.Run("diff returns update when objects differ", func(t *testing.T) {
 		ctx := context.Background()
 		obj := &mockRemoteObject{
-			name: "test-name",
+			name:      "test-name",
 			namespace: "test-ns",
 		}
 		data := make(map[string]any)
@@ -433,18 +433,18 @@ func TestDefaultRemoteReconcilerAction_Diff(t *testing.T) {
 			diffResult: &patch.PatchResult{Patch: []byte("change")},
 		}
 		logger := logrus.NewEntry(logrus.New())
-		
+
 		// Mock read with both current and expected objects
 		read := NewRemoteRead[mockAPIObject]()
 		currentObj := mockAPIObject{ID: "current-obj", Name: "current-name", Value: 100}
 		expectedObj := mockAPIObject{ID: "expected-obj", Name: "expected-name", Value: 200}
 		read.SetCurrentObject(currentObj)
 		read.SetExpectedObject(expectedObj)
-		
+
 		diff, res, err := action.Diff(ctx, obj, read, data, handler, logger)
 		assert.NoError(t, err)
 		assert.Equal(t, reconcile.Result{}, res)
-		
+
 		// Check that we should update the object
 		assert.Equal(t, expectedObj, diff.GetObjectToUpdate())
 		assert.Equal(t, mockAPIObject{}, diff.GetObjectToCreate()) // Should be zero value
@@ -453,7 +453,7 @@ func TestDefaultRemoteReconcilerAction_Diff(t *testing.T) {
 	t.Run("diff with corrupted lastAppliedConfiguration", func(t *testing.T) {
 		ctx := context.Background()
 		obj := &mockRemoteObject{
-			name: "test-name",
+			name:      "test-name",
 			namespace: "test-ns",
 			status: mockRemoteStatus{
 				lastAppliedConfiguration: "invalid_base64_string!",
@@ -462,14 +462,14 @@ func TestDefaultRemoteReconcilerAction_Diff(t *testing.T) {
 		data := make(map[string]any)
 		handler := &mockRemoteExternalReconciler{}
 		logger := logrus.NewEntry(logrus.New())
-		
+
 		// Mock read with both current and expected objects
 		read := NewRemoteRead[mockAPIObject]()
 		currentObj := mockAPIObject{ID: "current-obj", Name: "current-name"}
 		expectedObj := mockAPIObject{ID: "expected-obj", Name: "expected-name"}
 		read.SetCurrentObject(currentObj)
 		read.SetExpectedObject(expectedObj)
-		
+
 		_, _, err := action.Diff(ctx, obj, read, data, handler, logger)
 		// Should return an error when unzipping the corrupted configuration
 		assert.Error(t, err)
@@ -484,7 +484,7 @@ func TestDefaultRemoteReconcilerAction_GetIgnoresDiff(t *testing.T) {
 
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
 	recorder := record.NewFakeRecorder(10)
-	
+
 	action := NewRemoteReconcilerAction[*mockRemoteObject, mockAPIObject, mockAPIClient](client, recorder)
 
 	t.Run("get ignores diff returns empty slice", func(t *testing.T) {

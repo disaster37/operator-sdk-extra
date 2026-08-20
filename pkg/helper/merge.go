@@ -10,7 +10,7 @@ import (
 // If some src are nil, it skip it
 // It return error if dst is nil
 func Merge(dst any, srcs ...any) (err error) {
-	if dst != nil && reflect.ValueOf(dst).Kind() != reflect.Ptr {
+	if dst != nil && reflect.ValueOf(dst).Kind() != reflect.Pointer {
 		return mergo.ErrNonPointerArgument
 	}
 

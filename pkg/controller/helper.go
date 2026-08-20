@@ -86,7 +86,7 @@ func UserFacingError(err error, maxLen int) string {
 // mustGetField returns the named field of a pointer to a struct client.Object.
 // It panics if the object is not a pointer or does not have the field.
 func mustGetField(r client.Object, name string) reflect.Value {
-	if reflect.TypeOf(r).Kind() != reflect.Ptr {
+	if reflect.TypeOf(r).Kind() != reflect.Pointer {
 		panic("Resource must be pointer")
 	}
 	f := reflect.ValueOf(r).Elem().FieldByName(name)
