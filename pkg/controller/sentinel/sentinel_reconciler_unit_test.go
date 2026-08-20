@@ -367,6 +367,58 @@ func TestDefaultSentinelReconciler_Reconcile_SimpleAction_OnDiffNotCalled(t *tes
 	assert.Equal(t, reconcile.Result{}, res)
 }
 
+func TestDefaultSentinelReconciler_Reconcile_CleansLastAppliedAnnotation(t *testing.T) {
+	scheme := runtime.NewScheme()
+	err := clientgoscheme.AddToScheme(scheme)
+	require.NoError(t, err)
+
+	cm := &corev1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "ConfigMap",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "child",
+			Namespace: "default",
+			Annotations: map[string]string{
+				"kubectl.kubernetes.io/last-applied-configuration": `{"kind":"ConfigMap"}`,
+			},
+		},
+	}
+	mockObj := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: "default",
+			UID:       types.UID("test-uid"),
+		},
+	}
+
+	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(mockObj, cm).Build()
+	logger := logrus.NewEntry(logrus.StandardLogger())
+	recorder := record.NewFakeRecorder(10)
+
+	reconciler := NewSentinelReconciler[*corev1.Pod](c, "test", logger, recorder)
+	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: "test", Namespace: "default"}}
+
+	read := NewSentinelRead(scheme)
+	read.AddCurrentObject(cm)
+	read.AddExpectedObject(cm)
+	diff := multiphase.NewMultiPhaseDiff[client.Object]()
+
+	mockAction := &mockSentinelReconcilerAction{
+		readObj: read,
+		diffObj: diff,
+	}
+
+	res, err := reconciler.Reconcile(context.Background(), req, mockObj, map[string]any{}, mockAction)
+	assert.NoError(t, err)
+	assert.Equal(t, reconcile.Result{}, res)
+
+	got := &corev1.ConfigMap{}
+	require.NoError(t, c.Get(context.Background(), types.NamespacedName{Name: "child", Namespace: "default"}, got))
+	assert.NotContains(t, got.Annotations, "kubectl.kubernetes.io/last-applied-configuration")
+}
+
 func TestDefaultSentinelReconciler_Reconcile_WithDiffAction_OnDiffError(t *testing.T) {
 	scheme := runtime.NewScheme()
 	err := clientgoscheme.AddToScheme(scheme)

@@ -2,6 +2,7 @@ package multiphase_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -30,6 +31,7 @@ func (t *ControllerMultiphaseTestSuite) TestController() {
 	testCase.Steps = []test.TestStep[*MultiPhaseObject]{
 		doCreateStep(),
 		doUpdateStep(),
+		doCleanupStep(),
 		doDeleteStep(),
 	}
 
@@ -145,6 +147,93 @@ func doUpdateStep() test.TestStep[*MultiPhaseObject] {
 				t.Fatal(err)
 			}
 			assert.NotEmpty(t, cm.OwnerReferences)
+			assert.Equal(t, "fu", cm.Labels["test"])
+
+			return nil
+		},
+	}
+}
+
+func doCleanupStep() test.TestStep[*MultiPhaseObject] {
+	return test.TestStep[*MultiPhaseObject]{
+		Name: "cleanup",
+		Do: func(c client.Client, key types.NamespacedName, o *MultiPhaseObject, data map[string]any) (err error) {
+			logrus.Infof("=== Add legacy last-applied annotation on ConfigMap %s/%s ===\n\n", key.Namespace, key.Name)
+
+			if o == nil {
+				return errors.New("MultiphaseObject is null")
+			}
+
+			cm := &corev1.ConfigMap{}
+			if err = c.Get(context.Background(), types.NamespacedName{Namespace: key.Namespace, Name: key.Name}, cm); err != nil {
+				return err
+			}
+
+			// Simulate a v2 leftover: the legacy client-side last-applied annotation.
+			// Build the payload with json.Marshal rather than string concatenation so
+			// the name/namespace are properly escaped (defense-in-depth against
+			// malformed JSON if the test object names ever contain special chars).
+			lastApplied, err := json.Marshal(map[string]any{
+				"kind":       "ConfigMap",
+				"apiVersion": "v1",
+				"metadata": map[string]any{
+					"name":      key.Name,
+					"namespace": key.Namespace,
+				},
+				"data": map[string]any{"foo": "bar"},
+			})
+			if err != nil {
+				return err
+			}
+			if cm.Annotations == nil {
+				cm.Annotations = map[string]string{}
+			}
+			cm.Annotations["kubectl.kubernetes.io/last-applied-configuration"] = string(lastApplied)
+			if err = c.Update(context.Background(), cm); err != nil {
+				return err
+			}
+
+			// Change spec to track generation and trigger a reconcile.
+			o.Spec.Test = "test3"
+			data["lastGeneration"] = o.GetStatus().GetObservedGeneration()
+
+			if err = c.Update(context.Background(), o); err != nil {
+				return err
+			}
+
+			return nil
+		},
+		Check: func(t *testing.T, c client.Client, key types.NamespacedName, o *MultiPhaseObject, data map[string]any) (err error) {
+			var cm *corev1.ConfigMap
+
+			generationRaw, ok := data["lastGeneration"]
+			require.True(t, ok, "lastGeneration not found in data")
+			lastGeneration, ok := generationRaw.(int64)
+			require.True(t, ok, "lastGeneration is not int64")
+
+			isTimeout, err := test.RunWithTimeout(func() error {
+				if err := c.Get(context.Background(), key, o); err != nil {
+					t.Fatal("MultiPhaseObject not found")
+				}
+
+				if lastGeneration < o.GetStatus().GetObservedGeneration() {
+					return nil
+				}
+
+				return errors.New("Not yet cleaned")
+			}, time.Second*30, time.Second*1)
+			if err != nil || isTimeout {
+				t.Fatalf("All MultiPhaseObject step cleanup not finished: %s", err.Error())
+			}
+
+			// The legacy annotation must be gone while the other fields stay intact.
+			cm = &corev1.ConfigMap{}
+			if err = c.Get(context.Background(), types.NamespacedName{Namespace: key.Namespace, Name: key.Name}, cm); err != nil {
+				t.Fatal(err)
+			}
+			assert.NotContains(t, cm.Annotations, "kubectl.kubernetes.io/last-applied-configuration")
+			assert.NotEmpty(t, cm.OwnerReferences)
+			assert.Equal(t, "bar", cm.Data["foo"])
 			assert.Equal(t, "fu", cm.Labels["test"])
 
 			return nil

@@ -66,6 +66,12 @@ func (h *DefaultMultiPhaseStepReconciler[k8sObject, k8sStepObject]) Reconcile(ct
 		return res, nil
 	}
 
+	// Clean up legacy v2 last-applied-configuration annotations (auto mode).
+	// Best-effort; runs before Diff so unchanged objects are also covered.
+	if cleaned := CleanupReadLastAppliedAnnotations(ctx, h.Client(), read, logger); cleaned > 0 {
+		logger.Debugf("Cleaned legacy last-applied-configuration annotation from %d managed object(s)", cleaned)
+	}
+
 	// Compute diff (orphan detection + classified create/update/delete)
 	diff, res, err = reconcilerAction.Diff(ctx, o, read, data, logger)
 	if err != nil {

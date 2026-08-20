@@ -109,6 +109,14 @@ func (h *DefaultSentinelReconciler[k8sObject]) Reconcile(ctx context.Context, re
 		return res, nil
 	}
 
+	// Clean up legacy v2 last-applied-configuration annotations (auto mode).
+	// Best-effort; runs before Diff so unchanged objects are also covered.
+	for objectType, r := range read.GetReads() {
+		if cleaned := multiphase.CleanupReadLastAppliedAnnotations(ctx, h.Client(), r, logger); cleaned > 0 {
+			logger.Debugf("Cleaned legacy last-applied-configuration annotation from %d managed object(s) of type '%s'", cleaned, objectType)
+		}
+	}
+
 	// Compute diff (orphan detection + classified create/update/delete)
 	diff, res, err = reconcilerAction.Diff(ctx, o, read, data, logger)
 	if err != nil {
