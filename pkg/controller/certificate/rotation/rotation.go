@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	"emperror.dev/errors"
 	"github.com/disaster37/operator-sdk-extra/v3/pkg/apis/shared"
 	apworkflow "github.com/disaster37/operator-sdk-extra/v3/pkg/apis/workflow"
 	"github.com/disaster37/operator-sdk-extra/v3/pkg/controller/certificate"
@@ -83,6 +84,13 @@ func WithForceRegenerateLeafAnnotation[T object.MultiPhaseObject](name string) O
 	return func(s *tlsStep[T]) { s.forceLeafAnnotation = name }
 }
 
+// WithCertificateCustomizer injects the content customizer. Applied once per
+// Read cycle; the customized spec is threaded to every backend call and to
+// drift/renewal checks in that cycle.
+func WithCertificateCustomizer[T object.MultiPhaseObject](c certificate.CertificateCustomizer[T]) Option[T] {
+	return func(s *tlsStep[T]) { s.customizer = c }
+}
+
 // tlsStep is the concrete saga step. It embeds the default workflow WithDiff
 // action (for Diff/Apply/Configure/OnError/phase helpers) and overrides
 // Read, OnDiff, OnSuccess.
@@ -90,6 +98,7 @@ type tlsStep[T object.MultiPhaseObject] struct {
 	*workflow.DefaultWorkflowStepReconcilerActionWithDiff[T, client.Object]
 	backend              certificate.TLSBackend[T]
 	provider             certificate.TLSSpecProvider[T]
+	customizer           certificate.CertificateCustomizer[T]
 	convergenceCheck     ConvergenceCheck[T]
 	labelsDecorator      LabelsDecorator[T]
 	annotationsDecorator AnnotationsDecorator[T]
@@ -167,9 +176,36 @@ func (s *tlsStep[T]) removeForceAnnotations(ctx context.Context, o T, forceAll, 
 	return s.Client().Update(ctx, o)
 }
 
+// computeSpec resolves the TLSSpec for a cycle: it starts from the provider,
+// applies the optional content customizer, and validates the result before any
+// backend call or drift/renewal check runs. Backends that ignore certificate
+// content (certificate.ContentIgnoringBackend, e.g. BYO) skip content
+// validation: they perform no generation and only enforce their own structural
+// validation (e.g. a non-empty SecretName) in DesiredObjects.
+func (s *tlsStep[T]) computeSpec(ctx context.Context, o T) (certificate.TLSSpec, error) {
+	spec := s.provider.TLSSpec(o)
+	if s.customizer != nil {
+		var err error
+		spec, err = s.customizer.CustomizeCertificate(o, spec)
+		if err != nil {
+			return certificate.TLSSpec{}, errors.Wrap(err, "customize certificate content")
+		}
+	}
+	if b, ok := s.backend.(certificate.ContentIgnoringBackend); ok && b.IgnoresCertificateContent() {
+		return spec, nil
+	}
+	if err := spec.ValidateContent(); err != nil {
+		return certificate.TLSSpec{}, err
+	}
+	return spec, nil
+}
+
 func (s *tlsStep[T]) Read(ctx context.Context, o T, data map[string]any, logger *logrus.Entry) (multiphase.MultiPhaseRead[client.Object], reconcile.Result, error) {
 	read := multiphase.NewMultiPhaseRead[client.Object]()
-	spec := s.provider.TLSSpec(o)
+	spec, err := s.computeSpec(ctx, o)
+	if err != nil {
+		return nil, reconcile.Result{}, err
+	}
 	namespace := o.GetNamespace()
 	leafName := s.backend.CertificateSecretName(o, spec)
 	caName := leafName + selfmanaged.CASecretSuffix
@@ -246,6 +282,13 @@ func (s *tlsStep[T]) Read(ctx context.Context, o T, data map[string]any, logger 
 				return nil, reconcile.Result{}, err
 			}
 			caNeed = need
+			if !caNeed {
+				changed, err := selfmanaged.CAContentChanged(currentCA, spec)
+				if err != nil {
+					return nil, reconcile.Result{}, err
+				}
+				caNeed = changed
+			}
 		}
 
 		// 3. Leaf change (drift/expiry). LeafManager treats nil leaf as Missing.

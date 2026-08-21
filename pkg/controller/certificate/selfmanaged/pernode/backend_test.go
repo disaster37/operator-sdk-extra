@@ -336,3 +336,77 @@ func TestPerNodeLeafNeedsChange_ExpectedNodeNamesError(t *testing.T) {
 	_, err := backend.LeafNeedsChange(context.Background(), newPerNodeObject(), &corev1.Secret{Data: map[string][]byte{"x": {}}}, certificate.TLSSpec{SecretName: "test-tls"}, time.Now())
 	require.Error(t, err)
 }
+
+func TestPerNodeDesiredObjects_RSA(t *testing.T) {
+	backend := newPerNodeBackend(newStubProvider("node1"))
+	o := newPerNodeObject()
+	spec := certificate.TLSSpec{
+		SecretName:   "test-tls",
+		CommonName:   "cluster",
+		KeyAlgorithm: certificate.KeyAlgorithmRSA,
+	}
+
+	objects, err := backend.DesiredObjects(context.Background(), o, spec)
+	require.NoError(t, err)
+	require.Len(t, objects, 2)
+
+	caSecret, ok := objects[0].(*corev1.Secret)
+	require.True(t, ok)
+	caKeyBlock, _ := pem.Decode(caSecret.Data[selfmanaged.CAKeyPrivate])
+	require.NotNil(t, caKeyBlock)
+	assert.Equal(t, "RSA PRIVATE KEY", caKeyBlock.Type)
+
+	leafSecret, ok := objects[1].(*corev1.Secret)
+	require.True(t, ok)
+	assert.Contains(t, string(leafSecret.Data["node1"+pernode.NodeKeySuffix]), "BEGIN RSA PRIVATE KEY")
+	assert.Equal(t, x509.RSA, parseNodeCert(t, leafSecret, "node1").PublicKeyAlgorithm)
+}
+
+func TestPerNodeLeafNeedsChange_SubjectChanged(t *testing.T) {
+	buildSpec := certificate.TLSSpec{
+		SecretName: "test-tls",
+		CommonName: "cluster",
+		Subject:    certificate.CertificateSubject{Countries: []string{"FR"}},
+	}
+	backend := newPerNodeBackend(newStubProvider("node1"))
+	o := newPerNodeObject()
+	objects, err := backend.DesiredObjects(context.Background(), o, buildSpec)
+	require.NoError(t, err)
+	leaf := objects[1].(*corev1.Secret)
+
+	driftSpec := buildSpec
+	driftSpec.Subject.Countries = []string{"US"}
+	chg, err := backend.LeafNeedsChange(context.Background(), o, leaf, driftSpec, time.Now())
+	require.NoError(t, err)
+	assert.Equal(t, certificate.LeafSubjectChanged, chg.Reason)
+}
+
+func TestPerNodeLeafNeedsChange_KeyChanged(t *testing.T) {
+	buildSpec := certificate.TLSSpec{SecretName: "test-tls", CommonName: "cluster"}
+	backend := newPerNodeBackend(newStubProvider("node1"))
+	o := newPerNodeObject()
+	objects, err := backend.DesiredObjects(context.Background(), o, buildSpec)
+	require.NoError(t, err)
+	leaf := objects[1].(*corev1.Secret)
+
+	driftSpec := buildSpec
+	driftSpec.KeySize = 384
+	chg, err := backend.LeafNeedsChange(context.Background(), o, leaf, driftSpec, time.Now())
+	require.NoError(t, err)
+	assert.Equal(t, certificate.LeafKeyChanged, chg.Reason)
+}
+
+func TestPerNodeLeafNeedsChange_UsagesChanged(t *testing.T) {
+	buildSpec := certificate.TLSSpec{SecretName: "test-tls", CommonName: "cluster"}
+	backend := newPerNodeBackend(newStubProvider("node1"))
+	o := newPerNodeObject()
+	objects, err := backend.DesiredObjects(context.Background(), o, buildSpec)
+	require.NoError(t, err)
+	leaf := objects[1].(*corev1.Secret)
+
+	driftSpec := buildSpec
+	driftSpec.Usages = []string{certificate.UsageServerAuth}
+	chg, err := backend.LeafNeedsChange(context.Background(), o, leaf, driftSpec, time.Now())
+	require.NoError(t, err)
+	assert.Equal(t, certificate.LeafUsagesChanged, chg.Reason)
+}

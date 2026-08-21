@@ -103,6 +103,79 @@ type TLSSpecProvider[T object.MultiPhaseObject] interface {
 // certificate.TLSSpecProviderFunc[T] adapts a bare func(o T) TLSSpec.
 ```
 
+### Certificate content customization
+
+Beyond the legacy `CommonName`/`Organization` fields, `TLSSpec` is now a rich,
+declarative, json-tagged certificate-content contract. All new fields are
+optional and backward compatible (zero value reproduces the previous behavior:
+P-256 ECDSA, `Organization` singular, `ServerAuth`+`ClientAuth`, `<cn>-ca` CA
+naming, 365/730/30-day validities).
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `subject` | `CertificateSubject` | — | Extended leaf RDN block: `organizations`, `organizationalUnits`, `countries`, `localities`, `provinces`, `streetAddresses`, `postalCodes`, `serialNumber`. |
+| `keyAlgorithm` | string | `ECDSA` | `ECDSA` or `RSA`. |
+| `keySize` | int | 256 (ECDSA) / 2048 (RSA) | Key size in bits; ECDSA accepts 256/384/521. |
+| `usages` | []string | `[serverAuth, clientAuth]` | Leaf `ExtKeyUsage` strings (`Usage*` constants). |
+| `keyUsages` | []string | `[digitalSignature, keyEncipherment]` | Leaf `KeyUsage` strings (`KeyUsage*` constants). |
+| `caCommonName` | string | `<commonName>-ca` | CA certificate CN override. |
+| `caSubject` | `*CertificateSubject` | leaf subject | CA RDN override. |
+
+Defaulting and precedence are centralized in `TLSSpec` resolver methods —
+`Organizations()`, `LeafSubject()`, `ResolvedCASubject()`,
+`EffectiveKeyAlgorithm()`, `EffectiveKeySize()`, `EffectiveUsages()`,
+`EffectiveKeyUsages()`, `ValidateContent()` — so backends never re-read raw
+fields. `ValidateContent()` fails fast on invalid algorithm/size/usage/empty-DNS
+values and is called by every backend and by the rotation saga before
+generation. Exported sentinels (`ErrUnsupportedKeyAlgorithm`, `ErrInvalidKeySize`,
+`ErrUnknownUsage`) allow programmatic checks.
+
+For content that cannot be declared statically, operators supply an optional
+`CertificateCustomizer` compute hook (applied once per reconcile by the rotation
+saga):
+
+```go
+type CertificateCustomizer[T object.MultiPhaseObject] interface {
+    CustomizeCertificate(o T, base TLSSpec) (TLSSpec, error)
+}
+```
+
+`certificate.DefaultCertificateCustomizer[T]()` fills `CommonName` with the
+object name when empty (opt-in; no implicit behavior change). Minimal glue:
+
+```go
+step := rotation.NewTLSStep[*MyCRD](
+    r.Client(), "tls", "TLSCertificatesReady", r.Recorder, "my-operator",
+    selfmanaged.NewSelfManagedBackend[*MyCRD](),
+    certificate.TLSSpecProviderFunc[*MyCRD](func(o *MyCRD) certificate.TLSSpec { return o.Spec.TLS }),
+    rotation.WithCertificateCustomizer(
+        certificate.CertificateCustomizerFunc[*MyCRD](func(o *MyCRD, base certificate.TLSSpec) (certificate.TLSSpec, error) {
+            if len(base.DNSNames) == 0 {
+                base.DNSNames = []string{o.Name + "." + o.Namespace + ".svc"}
+            }
+            return base, nil // the library generates everything
+        }),
+    ),
+)
+```
+
+The selfmanaged backend now signs with `crypto.Signer` (ECDSA and RSA), and the
+cert-manager backend maps `subject`/`usages`/`privateKey` to its CR spec.
+`selfmanaged.CAContentChanged` and the extended `LeafNeedsChange` (new reasons
+`SubjectChanged`, `KeyChanged`, `UsagesChanged`) detect CA/leaf content drift so
+a subject/key/usage change triggers regeneration (and rollout) even before
+expiry.
+
+> **Behavior note (v3)**: the cert-manager CA `Certificate` no longer hardcodes
+> `subject.organizations: ["operator-sdk-extra"]`, and its `commonName` changed
+> from `<secretName>-ca` to `<commonName>-ca` (unified with the selfmanaged
+> backend); the CA subject now follows `TLSSpec` (default empty unless the
+> operator sets an organization). The cert-manager leaf `Certificate` now also
+> sets `spec.privateKey` (`ECDSA`/256 by default) and `spec.usages` (`server
+> auth`, `client auth`) explicitly, where previously both were omitted and
+> relied on cert-manager's defaults (may cause a one-time re-issuance/key-type
+> change).
+
 ### Self-managed backend
 
 The self-managed backend generates a CA + leaf certificate pair using Go's
@@ -370,7 +443,7 @@ func NewTLSStep[T object.MultiPhaseObject](
 
 Options: `WithConvergenceCheck`, `WithLabelsDecorator`,
 `WithAnnotationsDecorator`, `WithForceRegenerateAllAnnotation`,
-`WithForceRegenerateLeafAnnotation`.
+`WithForceRegenerateLeafAnnotation`, `WithCertificateCustomizer`.
 
 ```go
 step := rotation.NewTLSStep[*MyCRD](
@@ -464,6 +537,47 @@ blackout window) rather than a condition.
 | Rolling restart | Custom annotation logic | `SecretHashAnnotation()` |
 
 ---
+
+## Client-side TLS helper (pkg/tlsconfig)
+
+For operators that also need a client-side TLS configuration (any remote API),
+`pkg/tlsconfig` provides a generic, app-agnostic builder with no
+controller-runtime or client-library dependencies. `CertificateOptions` carries
+CA sources (inline PEM or file paths), an optional client certificate + key,
+`InsecureSkipVerify`, `ServerName`, and TLS version bounds, and exposes
+`Validate`, `Resolve`, `BuildTLSConfig`, and `BuildHTTPTransport`
+(`WithBaseTLSConfig`/`WithBaseTransport` options layer onto an existing base).
+The zero value yields `(nil, nil)` — no customization.
+
+```go
+opts := &tlsconfig.CertificateOptions{InsecureSkipVerify: true}
+tlsCfg, err := opts.BuildTLSConfig()      // *tls.Config
+transport, err := opts.BuildHTTPTransport() // *http.Transport
+```
+
+`pkg/tlsconfig/k8s` (imports controller-runtime `client.Client`) resolves the
+same material from Kubernetes Secrets:
+
+```go
+r := tlsk8s.New(c) // client.Client
+transport, err := r.BuildHTTPTransport(ctx, namespace, tlsk8s.Options{
+    CASecretName:       "my-tls-ca",
+    ClientCertSecretName: "my-tls",
+})
+```
+
+The produced `*tls.Config`/`*http.Transport` (or CA bytes/`InsecureSkipVerify`)
+is wired into whichever HTTP client library the operator uses — no specific
+client library is imported by this package.
+
+> **Security notes**: `pkg/tlsconfig/k8s` `Options.Validate` fails closed and
+> requires at least one of `CASecretName` or `ClientCertSecretName`; a
+> skip-verify-only config (neither secret set) is rejected. When
+> `InsecureSkipVerify` is `true`, Go's TLS stack skips verification entirely,
+> so any CA certificates are ignored for verification (`RootCAs` is unused).
+> Path-based sources (`CAPath`/`ClientCertPath`/`ClientKeyPath`) read arbitrary
+> files and must only ever be populated from operator-controlled configuration,
+> never untrusted input.
 
 ## Testing
 

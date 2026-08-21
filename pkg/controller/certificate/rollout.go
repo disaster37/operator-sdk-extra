@@ -67,7 +67,7 @@ func ShouldRollout(policy RolloutPolicy, sig *LayerSignals) bool {
 			return false
 		}
 		switch lc.Reason {
-		case LeafExpiring, LeafCNChanged, LeafOrgChanged, LeafMissing, LeafForceRegen:
+		case LeafExpiring, LeafCNChanged, LeafOrgChanged, LeafSubjectChanged, LeafKeyChanged, LeafUsagesChanged, LeafMissing, LeafForceRegen:
 			return true
 		case LeafSANsChanged, LeafIPsChanged:
 			return len(lc.SANsAdded) > 0 || len(lc.IPsAdded) > 0

@@ -10,7 +10,10 @@ package certmanager
 
 import (
 	"context"
+	"crypto/x509/pkix"
 	"fmt"
+
+	"emperror.dev/errors"
 
 	"github.com/disaster37/operator-sdk-extra/v3/pkg/controller/certificate"
 	"github.com/disaster37/operator-sdk-extra/v3/pkg/object"
@@ -53,7 +56,10 @@ func NewCertManagerBackend[T object.MultiPhaseObject]() *CertManagerBackend[T] {
 // the TLSSpec configuration.
 func (b *CertManagerBackend[T]) DesiredObjects(ctx context.Context, o T, spec certificate.TLSSpec) ([]client.Object, error) {
 	if spec.SecretName == "" {
-		return nil, fmt.Errorf("cert-manager TLS backend requires a non-empty SecretName in TLSSpec")
+		return nil, errors.New("cert-manager TLS backend requires a non-empty SecretName in TLSSpec")
+	}
+	if err := spec.ValidateContent(); err != nil {
+		return nil, err
 	}
 
 	namespace := o.GetNamespace()
@@ -73,14 +79,19 @@ func (b *CertManagerBackend[T]) DesiredObjects(ctx context.Context, o T, spec ce
 		}
 		objects = append(objects, caCert)
 
-		leaf, err := b.buildLeafCertificate(spec, spec.SecretName+"-ca-issuer", namespace)
+		leaf, err := b.buildLeafCertificate(spec, map[string]interface{}{
+			"name": spec.SecretName + "-ca-issuer",
+			"kind": "Issuer",
+		}, namespace)
 		if err != nil {
 			return nil, err
 		}
 		objects = append(objects, leaf)
 	} else {
 		// Existing-CA mode: leaf Certificate referencing an existing Issuer
-		leaf, err := b.buildLeafCertificateWithIssuer(spec, spec.IssuerRef, namespace)
+		leaf, err := b.buildLeafCertificate(spec, map[string]interface{}{
+			"name": spec.IssuerRef,
+		}, namespace)
 		if err != nil {
 			return nil, err
 		}
@@ -109,7 +120,7 @@ func (b *CertManagerBackend[T]) buildSelfSignedIssuer(name, namespace string) (*
 	if err := unstructured.SetNestedField(u.Object, map[string]interface{}{
 		"selfSigned": map[string]interface{}{},
 	}, "spec"); err != nil {
-		return nil, fmt.Errorf("set spec.selfSigned on self-signed Issuer %q: %w", name, err)
+		return nil, errors.Wrapf(err, "set spec.selfSigned on self-signed Issuer %q", name)
 	}
 	return u, nil
 }
@@ -119,89 +130,146 @@ func (b *CertManagerBackend[T]) buildCACertificate(spec certificate.TLSSpec, nam
 	u.SetGroupVersionKind(certificateGVK)
 	u.SetName(name + "-ca")
 	u.SetNamespace(namespace)
-	if err := unstructured.SetNestedField(u.Object, map[string]interface{}{
+
+	specMap := map[string]interface{}{
 		"isCA":       true,
-		"commonName": name + "-ca",
+		"commonName": spec.ResolvedCASubject().CommonName,
 		"secretName": name + "-ca",
 		"issuerRef": map[string]interface{}{
 			"name": issuerName,
 			"kind": "Issuer",
 		},
-		"subject": map[string]interface{}{
-			"organizations": []interface{}{"operator-sdk-extra"},
-		},
-		"duration": fmt.Sprintf("%dh", certificate.GetValidCADays(spec)*24),
-	}, "spec"); err != nil {
-		return nil, fmt.Errorf("set spec on CA Certificate %q: %w", name+"-ca", err)
+		"duration": fmtDurationHours(certificate.GetValidCADays(spec)),
+	}
+	if subject := subjectMap(spec.ResolvedCASubject()); len(subject) > 0 {
+		specMap["subject"] = subject
+	}
+
+	if err := unstructured.SetNestedField(u.Object, specMap, "spec"); err != nil {
+		return nil, errors.Wrapf(err, "set spec on CA Certificate %q", name+"-ca")
 	}
 	return u, nil
 }
 
-func (b *CertManagerBackend[T]) buildLeafCertificate(spec certificate.TLSSpec, caIssuerName, namespace string) (*unstructured.Unstructured, error) {
+func (b *CertManagerBackend[T]) buildLeafCertificate(spec certificate.TLSSpec, issuerRef map[string]interface{}, namespace string) (*unstructured.Unstructured, error) {
 	u := &unstructured.Unstructured{}
 	u.SetGroupVersionKind(certificateGVK)
 	u.SetName(spec.SecretName)
 	u.SetNamespace(namespace)
 
 	specMap := map[string]interface{}{
-		"commonName": spec.CommonName,
+		"commonName": spec.LeafSubject().CommonName,
 		"secretName": spec.SecretName,
-		"issuerRef": map[string]interface{}{
-			"name": caIssuerName,
-			"kind": "Issuer",
-		},
+		"issuerRef":  issuerRef,
 	}
 
-	if spec.Organization != "" {
-		specMap["subject"] = map[string]interface{}{
-			"organizations": []interface{}{spec.Organization},
-		}
+	if subject := subjectMap(spec.LeafSubject()); len(subject) > 0 {
+		specMap["subject"] = subject
 	}
 
-	setCommonCertificateSpec(specMap, spec)
+	if err := setCommonCertificateSpec(specMap, spec); err != nil {
+		return nil, err
+	}
 
 	if err := unstructured.SetNestedField(u.Object, specMap, "spec"); err != nil {
-		return nil, fmt.Errorf("set spec on leaf Certificate %q: %w", spec.SecretName, err)
+		return nil, errors.Wrapf(err, "set spec on leaf Certificate %q", spec.SecretName)
 	}
 	return u, nil
 }
 
-func (b *CertManagerBackend[T]) buildLeafCertificateWithIssuer(spec certificate.TLSSpec, issuerRef, namespace string) (*unstructured.Unstructured, error) {
-	u := &unstructured.Unstructured{}
-	u.SetGroupVersionKind(certificateGVK)
-	u.SetName(spec.SecretName)
-	u.SetNamespace(namespace)
-
-	specMap := map[string]interface{}{
-		"commonName": spec.CommonName,
-		"secretName": spec.SecretName,
-		"issuerRef": map[string]interface{}{
-			"name": issuerRef,
-		},
+// setCommonCertificateSpec populates the DNS/IP SAN, renewal, validity, usage,
+// and private-key fields shared by both leaf Certificate builders onto specMap.
+func setCommonCertificateSpec(specMap map[string]interface{}, spec certificate.TLSSpec) error {
+	if dnsNames := certificate.DedupStrings(spec.DNSNames); len(dnsNames) > 0 {
+		specMap["dnsNames"] = toStringInterfaceSlice(dnsNames)
 	}
-
-	setCommonCertificateSpec(specMap, spec)
-
-	if err := unstructured.SetNestedField(u.Object, specMap, "spec"); err != nil {
-		return nil, fmt.Errorf("set spec on leaf Certificate %q: %w", spec.SecretName, err)
-	}
-	return u, nil
-}
-
-// setCommonCertificateSpec populates the DNS/IP SAN, renewal, and validity
-// fields shared by both leaf Certificate builders onto specMap.
-func setCommonCertificateSpec(specMap map[string]interface{}, spec certificate.TLSSpec) {
-	if len(spec.DNSNames) > 0 {
-		specMap["dnsNames"] = toStringInterfaceSlice(spec.DNSNames)
-	}
-	if len(spec.IPAddresses) > 0 {
-		specMap["ipAddresses"] = toStringInterfaceSlice(spec.IPAddresses)
+	if ipAddresses := certificate.DedupStrings(spec.IPAddresses); len(ipAddresses) > 0 {
+		specMap["ipAddresses"] = toStringInterfaceSlice(ipAddresses)
 	}
 	if spec.RenewalDays > 0 {
-		specMap["renewBefore"] = fmt.Sprintf("%dh", certificate.GetValidRenewalDays(spec)*24)
+		specMap["renewBefore"] = fmtDurationHours(certificate.GetValidRenewalDays(spec))
 	}
 	if spec.LeafValidityDays > 0 {
-		specMap["duration"] = fmt.Sprintf("%dh", spec.LeafValidityDays*24)
+		// Use the clamped getter so an oversized LeafValidityDays cannot
+		// overflow the `days*24` multiplication in fmtDurationHours (the same
+		// overflow class MaxValidityDays guards against in the selfmanaged
+		// backend).
+		specMap["duration"] = fmtDurationHours(certificate.GetValidLeafDays(spec))
+	}
+
+	usages := spec.EffectiveUsages()
+	mapped := make([]interface{}, 0, len(usages))
+	for _, u := range usages {
+		cm, ok := certManagerUsageFor(u)
+		if !ok {
+			return errors.Wrapf(certificate.ErrUnknownUsage, "unknown extended key usage %q", u)
+		}
+		mapped = append(mapped, cm)
+	}
+	if len(mapped) > 0 {
+		specMap["usages"] = mapped
+	}
+
+	size, err := spec.EffectiveKeySize()
+	if err != nil {
+		return err
+	}
+	specMap["privateKey"] = map[string]interface{}{
+		"algorithm": spec.EffectiveKeyAlgorithm(),
+		"size":      int64(size),
+	}
+	return nil
+}
+
+// subjectMap converts a resolved pkix.Name into a cert-manager Certificate
+// spec.subject block, omitting empty slices.
+func subjectMap(name pkix.Name) map[string]interface{} {
+	m := map[string]interface{}{}
+	if len(name.Organization) > 0 {
+		m["organizations"] = toStringInterfaceSlice(name.Organization)
+	}
+	if len(name.OrganizationalUnit) > 0 {
+		m["organizationalUnits"] = toStringInterfaceSlice(name.OrganizationalUnit)
+	}
+	if len(name.Country) > 0 {
+		m["countries"] = toStringInterfaceSlice(name.Country)
+	}
+	if len(name.Locality) > 0 {
+		m["localities"] = toStringInterfaceSlice(name.Locality)
+	}
+	if len(name.Province) > 0 {
+		m["provinces"] = toStringInterfaceSlice(name.Province)
+	}
+	if len(name.StreetAddress) > 0 {
+		m["streetAddresses"] = toStringInterfaceSlice(name.StreetAddress)
+	}
+	if len(name.PostalCode) > 0 {
+		m["postalCodes"] = toStringInterfaceSlice(name.PostalCode)
+	}
+	if name.SerialNumber != "" {
+		m["serialNumber"] = name.SerialNumber
+	}
+	return m
+}
+
+// certManagerUsageFor maps a Usage* constant to the corresponding cert-manager
+// Certificate.spec.usages string.
+func certManagerUsageFor(name string) (string, bool) {
+	switch name {
+	case certificate.UsageServerAuth:
+		return "server auth", true
+	case certificate.UsageClientAuth:
+		return "client auth", true
+	case certificate.UsageCodeSigning:
+		return "code signing", true
+	case certificate.UsageEmailProtection:
+		return "email protection", true
+	case certificate.UsageTimestamping:
+		return "timestamping", true
+	case certificate.UsageOCSPSigning:
+		return "ocsp signing", true
+	default:
+		return "", false
 	}
 }
 
@@ -213,4 +281,10 @@ func toStringInterfaceSlice(values []string) []interface{} {
 		out[i] = v
 	}
 	return out
+}
+
+// fmtDurationHours renders a duration in days as a cert-manager duration
+// string (e.g. "2160h" for 90 days).
+func fmtDurationHours(days int) string {
+	return fmt.Sprintf("%dh", days*24)
 }

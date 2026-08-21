@@ -4,14 +4,14 @@ package pernode
 
 import (
 	"context"
-	"crypto/ecdsa"
+	"crypto"
 	"crypto/x509"
 	"encoding/pem"
-	"fmt"
 	"sort"
 	"strings"
 	"time"
 
+	"emperror.dev/errors"
 	"github.com/disaster37/operator-sdk-extra/v3/pkg/controller/certificate"
 	"github.com/disaster37/operator-sdk-extra/v3/pkg/controller/certificate/selfmanaged"
 	"github.com/disaster37/operator-sdk-extra/v3/pkg/object"
@@ -48,12 +48,12 @@ func NewPerNodeBackend[T object.MultiPhaseObject](provider NodeSpecProvider[T]) 
 
 // DesiredObjects generates a fresh CA and one cert/key pair per expected node.
 func (b *PerNodeBackend[T]) DesiredObjects(ctx context.Context, o T, spec certificate.TLSSpec) ([]client.Object, error) {
-	caSecret, caKey, caCert, err := selfmanaged.BuildCA(o.GetNamespace(), spec.SecretName, spec)
+	caSecret, caSigner, caCert, err := selfmanaged.BuildCASigner(o.GetNamespace(), spec.SecretName, spec)
 	if err != nil {
 		return nil, err
 	}
 
-	leafSecret, err := b.buildLeafSecret(o, spec, caCert, caKey, caSecret.Data[selfmanaged.CAKey])
+	leafSecret, err := b.buildLeafSecret(o, spec, caCert, caSigner, caSecret.Data[selfmanaged.CAKey])
 	if err != nil {
 		return nil, err
 	}
@@ -85,11 +85,11 @@ func (b *PerNodeBackend[T]) NodeSecretKeys() (certSuffix, keySuffix string) {
 // (no new CA), returning the Opaque leaf Secret whose ca.crt equals the CA
 // secret's ca.crt.
 func (b *PerNodeBackend[T]) DesiredLeafWithCA(ctx context.Context, o T, spec certificate.TLSSpec, caSecret *corev1.Secret) (*corev1.Secret, error) {
-	caCert, caKey, err := selfmanaged.ParseCA(caSecret)
+	caCert, caSigner, err := selfmanaged.ParseCASigner(caSecret)
 	if err != nil {
 		return nil, err
 	}
-	return b.buildLeafSecret(o, spec, caCert, caKey, caSecret.Data[selfmanaged.CAKey])
+	return b.buildLeafSecret(o, spec, caCert, caSigner, caSecret.Data[selfmanaged.CAKey])
 }
 
 // LeafNeedsChange reports whether the per-node leaf Secret needs regeneration
@@ -123,13 +123,16 @@ func (b *PerNodeBackend[T]) LeafNeedsChange(ctx context.Context, o T, leafSecret
 	expiring := false
 	cnChanged := false
 	orgChanged := false
+	subjectChanged := false
+	keyChangedFlag := false
+	usagesChangedFlag := false
 	for _, node := range expected {
 		if _, ok := existingSet[node]; !ok {
 			continue
 		}
 		cert, err := parseFirstCert(leafSecret.Data[node+NodeCertSuffix])
 		if err != nil {
-			return chg, fmt.Errorf("parse cert for node %q: %w", node, err)
+			return chg, errors.Wrapf(err, "parse cert for node %q", node)
 		}
 		cn, _, _, err := b.provider.NodeCertSpec(o, node)
 		if err != nil {
@@ -141,8 +144,21 @@ func (b *PerNodeBackend[T]) LeafNeedsChange(ctx context.Context, o T, leafSecret
 		if cert.Subject.CommonName != cn {
 			cnChanged = true
 		}
-		if !stringSetEqual([]string{spec.Organization}, cert.Subject.Organization) {
+		if !selfmanaged.OrganizationsEqual(spec, cert) {
 			orgChanged = true
+		}
+		if !selfmanaged.SubjectRestEqual(spec.LeafSubject(), cert.Subject) {
+			subjectChanged = true
+		}
+		if kc, err := selfmanaged.KeyChanged(spec, cert); err != nil {
+			return chg, err
+		} else if kc {
+			keyChangedFlag = true
+		}
+		if uc, err := selfmanaged.UsagesChanged(spec, cert); err != nil {
+			return chg, err
+		} else if uc {
+			usagesChangedFlag = true
 		}
 	}
 
@@ -153,6 +169,12 @@ func (b *PerNodeBackend[T]) LeafNeedsChange(ctx context.Context, o T, leafSecret
 		chg.Reason = certificate.LeafCNChanged
 	case orgChanged:
 		chg.Reason = certificate.LeafOrgChanged
+	case subjectChanged:
+		chg.Reason = certificate.LeafSubjectChanged
+	case keyChangedFlag:
+		chg.Reason = certificate.LeafKeyChanged
+	case usagesChangedFlag:
+		chg.Reason = certificate.LeafUsagesChanged
 	case len(chg.NodesAdded) > 0 || len(chg.NodesRemoved) > 0:
 		chg.Reason = certificate.LeafNodesChanged
 	default:
@@ -162,14 +184,14 @@ func (b *PerNodeBackend[T]) LeafNeedsChange(ctx context.Context, o T, leafSecret
 }
 
 // buildLeafSecret signs one cert/key pair per expected node against caCert/
-// caKey and assembles the Opaque leaf Secret.
-func (b *PerNodeBackend[T]) buildLeafSecret(o T, spec certificate.TLSSpec, caCert *x509.Certificate, caKey *ecdsa.PrivateKey, caPEM []byte) (*corev1.Secret, error) {
+// caSigner and assembles the Opaque leaf Secret.
+func (b *PerNodeBackend[T]) buildLeafSecret(o T, spec certificate.TLSSpec, caCert *x509.Certificate, caSigner crypto.Signer, caPEM []byte) (*corev1.Secret, error) {
 	expected, err := b.provider.ExpectedNodeNames(o)
 	if err != nil {
 		return nil, err
 	}
 	if len(expected) == 0 {
-		return nil, fmt.Errorf("per-node TLS backend requires at least one expected node")
+		return nil, errors.New("per-node TLS backend requires at least one expected node")
 	}
 
 	data := map[string][]byte{
@@ -178,15 +200,15 @@ func (b *PerNodeBackend[T]) buildLeafSecret(o T, spec certificate.TLSSpec, caCer
 	for _, node := range expected {
 		cn, dnsNames, ips, err := b.provider.NodeCertSpec(o, node)
 		if err != nil {
-			return nil, fmt.Errorf("node cert spec for %q: %w", node, err)
+			return nil, errors.Wrapf(err, "node cert spec for %q", node)
 		}
 		nodeSpec := spec
 		nodeSpec.CommonName = cn
 		nodeSpec.DNSNames = dnsNames
 		nodeSpec.IPAddresses = ips
-		certPEM, keyPEM, err := selfmanaged.SignLeaf(caCert, caKey, nodeSpec)
+		certPEM, keyPEM, err := selfmanaged.SignLeafSigner(caCert, caSigner, nodeSpec)
 		if err != nil {
-			return nil, fmt.Errorf("sign leaf for node %q: %w", node, err)
+			return nil, errors.Wrapf(err, "sign leaf for node %q", node)
 		}
 		data[node+NodeCertSuffix] = certPEM
 		data[node+NodeKeySuffix] = keyPEM
@@ -246,27 +268,11 @@ func nodeSetDiff(expected, existing []string) (added, removed []string) {
 func parseFirstCert(pemBytes []byte) (*x509.Certificate, error) {
 	block, _ := pem.Decode(pemBytes)
 	if block == nil || block.Type != "CERTIFICATE" {
-		return nil, fmt.Errorf("no certificate found in PEM data")
+		return nil, errors.New("no certificate found in PEM data")
 	}
 	cert, err := x509.ParseCertificate(block.Bytes)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse certificate: %w", err)
+		return nil, errors.Wrap(err, "failed to parse certificate")
 	}
 	return cert, nil
-}
-
-func stringSetEqual(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	set := make(map[string]struct{}, len(a))
-	for _, s := range a {
-		set[s] = struct{}{}
-	}
-	for _, s := range b {
-		if _, ok := set[s]; !ok {
-			return false
-		}
-	}
-	return true
 }

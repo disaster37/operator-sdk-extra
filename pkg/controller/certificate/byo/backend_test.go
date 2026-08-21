@@ -73,3 +73,9 @@ func TestBYORequiresRotationSaga(t *testing.T) {
 	backend := byo.NewBYOBackend[*testBYOObject]()
 	assert.False(t, backend.RequiresRotationSaga())
 }
+
+func TestBYOBackendIgnoresCertificateContent(t *testing.T) {
+	backend := byo.NewBYOBackend[*testBYOObject]()
+	var _ certificate.ContentIgnoringBackend = backend
+	assert.True(t, backend.IgnoresCertificateContent())
+}

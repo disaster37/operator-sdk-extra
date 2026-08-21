@@ -41,3 +41,10 @@ func (b *BYOBackend[T]) CertificateSecretName(o T, spec certificate.TLSSpec) str
 func (b *BYOBackend[T]) RequiresRotationSaga() bool {
 	return false
 }
+
+// IgnoresCertificateContent reports that the BYO backend performs no
+// certificate generation and ignores TLSSpec content fields (only SecretName
+// is validated). It satisfies certificate.ContentIgnoringBackend.
+func (b *BYOBackend[T]) IgnoresCertificateContent() bool {
+	return true
+}

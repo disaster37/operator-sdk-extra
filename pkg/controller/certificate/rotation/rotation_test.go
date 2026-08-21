@@ -180,10 +180,11 @@ func makeCertPEM(t *testing.T, cn string, notBefore, notAfter time.Time) []byte 
 	require.NoError(t, err)
 	tmpl := &x509.Certificate{
 		SerialNumber:          big.NewInt(1),
-		Subject:               pkix.Name{CommonName: cn, Organization: []string{""}},
+		Subject:               pkix.Name{CommonName: cn},
 		NotBefore:             notBefore,
 		NotAfter:              notAfter,
-		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 		IsCA:                  true,
 		BasicConstraintsValid: true,
 		DNSNames:              []string{"test.example.com"},
@@ -1340,4 +1341,110 @@ func TestRead_SagaNoLeafManager_MissingLeaf_FallsBackToSaga(t *testing.T) {
 	assert.Equal(t, reconcile.Result{}, res)
 	require.Len(t, read.GetExpectedObjects(), 2)
 	assert.Equal(t, true, data["rotationRenewed"])
+}
+
+func TestRead_WithCertificateCustomizer_MutatesSpec(t *testing.T) {
+	backend := selfmanaged.NewSelfManagedBackend[*rotObject]()
+	customizer := certificate.CertificateCustomizerFunc[*rotObject](func(o *rotObject, base certificate.TLSSpec) (certificate.TLSSpec, error) {
+		base.DNSNames = append(base.DNSNames, "customized.example.com")
+		return base, nil
+	})
+	step := newStep(newFakeClient(t), backend, rotation.WithCertificateCustomizer[*rotObject](customizer))
+	o := newRotObject()
+
+	data := map[string]any{}
+	read, res, err := step.Read(context.Background(), o, data, testLogger())
+	require.NoError(t, err)
+	assert.Equal(t, reconcile.Result{}, res)
+
+	newLeaf := findSecret(t, read.GetExpectedObjects(), "test-tls")
+	block, _ := pem.Decode(newLeaf.Data[selfmanaged.CertKey])
+	require.NotNil(t, block)
+	leaf, err := x509.ParseCertificate(block.Bytes)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"test.example.com", "customized.example.com"}, leaf.DNSNames)
+}
+
+func TestRead_CustomizerError(t *testing.T) {
+	sentinel := errors.New("customizer boom")
+	customizer := certificate.CertificateCustomizerFunc[*rotObject](func(o *rotObject, base certificate.TLSSpec) (certificate.TLSSpec, error) {
+		return certificate.TLSSpec{}, sentinel
+	})
+	step := newStep(newFakeClient(t), selfmanaged.NewSelfManagedBackend[*rotObject](),
+		rotation.WithCertificateCustomizer[*rotObject](customizer))
+
+	_, _, err := step.Read(context.Background(), newRotObject(), map[string]any{}, testLogger())
+	require.ErrorIs(t, err, sentinel)
+	assert.Contains(t, err.Error(), "customize certificate content")
+}
+
+func TestRead_NilCustomizer(t *testing.T) {
+	step := newStep(newFakeClient(t), selfmanaged.NewSelfManagedBackend[*rotObject](),
+		rotation.WithCertificateCustomizer[*rotObject](nil))
+	_, _, err := step.Read(context.Background(), newRotObject(), map[string]any{}, testLogger())
+	require.NoError(t, err)
+}
+
+func TestRead_CAContentChange_TriggersSaga(t *testing.T) {
+	backend := selfmanaged.NewSelfManagedBackend[*rotObject]()
+	o := newRotObject()
+	buildSpec := certificate.TLSSpec{
+		SecretName:       "test-tls",
+		CommonName:       "test.example.com",
+		DNSNames:         []string{"test.example.com"},
+		LeafValidityDays: 365,
+		RenewalDays:      30,
+	}
+	objs, err := backend.DesiredObjects(context.Background(), o, buildSpec)
+	require.NoError(t, err)
+	ca := objs[0].(*corev1.Secret)
+	leaf := objs[1].(*corev1.Secret)
+
+	c := newFakeClient(t, ca, leaf)
+	driftProvider := certificate.TLSSpecProviderFunc[*rotObject](func(o *rotObject) certificate.TLSSpec {
+		return certificate.TLSSpec{
+			SecretName:       "test-tls",
+			CommonName:       "test.example.com",
+			CACommonName:     "changed-ca",
+			DNSNames:         []string{"test.example.com"},
+			LeafValidityDays: 365,
+			RenewalDays:      30,
+		}
+	})
+	step := newStepProvider(c, backend, driftProvider)
+
+	data := map[string]any{}
+	read, res, err := step.Read(context.Background(), o, data, testLogger())
+	require.NoError(t, err)
+	assert.Equal(t, reconcile.Result{}, res)
+	require.Len(t, read.GetExpectedObjects(), 2)
+	assert.Equal(t, true, data["rotationRenewed"])
+
+	sig, ok := data["tls.tls"].(*certificate.LayerSignals)
+	require.True(t, ok)
+	assert.True(t, sig.CARotated)
+	assert.True(t, sig.LeafRegenerated)
+}
+
+func TestRead_ComputeSpecValidatesContent(t *testing.T) {
+	badProvider := certificate.TLSSpecProviderFunc[*rotObject](func(o *rotObject) certificate.TLSSpec {
+		return certificate.TLSSpec{SecretName: "test-tls", KeyAlgorithm: "bogus"}
+	})
+	step := newStepProvider(newFakeClient(t), selfmanaged.NewSelfManagedBackend[*rotObject](), badProvider)
+
+	_, _, err := step.Read(context.Background(), newRotObject(), map[string]any{}, testLogger())
+	require.Error(t, err)
+}
+
+func TestRead_BYOBackend_SkipsContentValidation(t *testing.T) {
+	// BYO performs no generation and ignores content fields, so invalid
+	// content must not fail the cycle (only SecretName is enforced).
+	badProvider := certificate.TLSSpecProviderFunc[*rotObject](func(o *rotObject) certificate.TLSSpec {
+		return certificate.TLSSpec{SecretName: "my-secret", KeyAlgorithm: "bogus", DNSNames: []string{""}}
+	})
+	step := newStepProvider(newFakeClient(t), byo.NewBYOBackend[*rotObject](), badProvider)
+
+	read, _, err := step.Read(context.Background(), newRotObject(), map[string]any{}, testLogger())
+	require.NoError(t, err)
+	assert.Empty(t, read.GetExpectedObjects())
 }
