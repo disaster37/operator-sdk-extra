@@ -23,6 +23,7 @@ type InterceptorClient struct {
 	StatusUpdateInterceptor func(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error
 	StatusPatchInterceptor  func(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error
 	StatusCreateInterceptor func(ctx context.Context, obj client.Object, subResource client.Object, opts ...client.SubResourceCreateOption) error
+	StatusApplyInterceptor  func(ctx context.Context, obj runtime.ApplyConfiguration, opts ...client.SubResourceApplyOption) error
 }
 
 func NewInterceptorClient(c client.Client) *InterceptorClient {
@@ -84,6 +85,7 @@ func (c *InterceptorClient) Status() client.SubResourceWriter {
 		updateInterceptor: c.StatusUpdateInterceptor,
 		patchInterceptor:  c.StatusPatchInterceptor,
 		createInterceptor: c.StatusCreateInterceptor,
+		applyInterceptor:  c.StatusApplyInterceptor,
 	}
 }
 
@@ -112,9 +114,17 @@ type InterceptorStatusClient struct {
 	updateInterceptor func(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error
 	patchInterceptor  func(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error
 	createInterceptor func(ctx context.Context, obj client.Object, subResource client.Object, opts ...client.SubResourceCreateOption) error
+	applyInterceptor  func(ctx context.Context, obj runtime.ApplyConfiguration, opts ...client.SubResourceApplyOption) error
 }
 
 var _ client.SubResourceWriter = &InterceptorStatusClient{}
+
+func (s *InterceptorStatusClient) Apply(ctx context.Context, obj runtime.ApplyConfiguration, opts ...client.SubResourceApplyOption) error {
+	if s.applyInterceptor != nil {
+		return s.applyInterceptor(ctx, obj, opts...)
+	}
+	return s.client.Status().Apply(ctx, obj, opts...)
+}
 
 func (s *InterceptorStatusClient) Create(ctx context.Context, obj client.Object, subResource client.Object, opts ...client.SubResourceCreateOption) error {
 	if s.createInterceptor != nil {

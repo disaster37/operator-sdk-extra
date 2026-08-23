@@ -57,11 +57,44 @@ var mockObjectListGVK = schema.GroupVersionKind{
 type mockObjectList struct {
 	client.ObjectList
 	metav1.TypeMeta
+	metav1.ListMeta
 	Items []mockObject
 }
 
 func (m *mockObjectList) GetObjectKind() schema.ObjectKind {
 	return &m.TypeMeta
+}
+
+func (m *mockObjectList) GetResourceVersion() string {
+	return m.ListMeta.ResourceVersion
+}
+
+func (m *mockObjectList) SetResourceVersion(version string) {
+	m.ListMeta.ResourceVersion = version
+}
+
+func (m *mockObjectList) GetSelfLink() string {
+	return m.ListMeta.SelfLink
+}
+
+func (m *mockObjectList) SetSelfLink(selfLink string) {
+	m.ListMeta.SelfLink = selfLink
+}
+
+func (m *mockObjectList) GetContinue() string {
+	return m.ListMeta.Continue
+}
+
+func (m *mockObjectList) SetContinue(c string) {
+	m.ListMeta.Continue = c
+}
+
+func (m *mockObjectList) GetRemainingItemCount() *int64 {
+	return m.ListMeta.RemainingItemCount
+}
+
+func (m *mockObjectList) SetRemainingItemCount(c *int64) {
+	m.ListMeta.RemainingItemCount = c
 }
 
 func (m *mockObjectList) DeepCopyObject() runtime.Object {

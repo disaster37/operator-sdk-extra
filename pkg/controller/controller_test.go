@@ -39,8 +39,7 @@ func (t *ControllerTestSuite) TestSetupIndexerWithManager() {
 
 func (t *ControllerTestSuite) TestSetupWebhookWithManager() {
 	webhook := func(mgr ctrl.Manager, client client.Client) error {
-		return ctrl.NewWebhookManagedBy(mgr).
-			For(&corev1.ConfigMap{}).
+		return ctrl.NewWebhookManagedBy(mgr, &corev1.ConfigMap{}).
 			Complete()
 	}
 
