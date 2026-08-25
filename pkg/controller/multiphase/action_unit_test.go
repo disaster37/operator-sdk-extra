@@ -241,18 +241,18 @@ func TestBasicMultiPhaseReconcilerAction(t *testing.T) {
 	})
 }
 
-// Test ObjectMultiPhaseRead wrapper
+// Test ObjectMultiPhaseRead wrapper via .As[D]() method
 func TestObjectMultiPhaseRead(t *testing.T) {
-	t.Run("NewObjectMultiphaseRead should create wrapper", func(t *testing.T) {
-		innerRead := NewMultiPhaseRead[*corev1.ConfigMap]()
-		wrapper := NewObjectMultiphaseRead[*corev1.ConfigMap, client.Object](innerRead)
+	t.Run("As[D]() should create wrapper", func(t *testing.T) {
+		innerRead := NewMultiPhaseRead[*corev1.ConfigMap]().(*DefaultMultiPhaseRead[*corev1.ConfigMap])
+		wrapper := innerRead.As[client.Object]()
 
 		assert.NotNil(t, wrapper)
 	})
 
-	t.Run("ObjectMultiPhaseRead methods should delegate to inner read", func(t *testing.T) {
-		innerRead := NewMultiPhaseRead[*corev1.ConfigMap]()
-		wrapper := NewObjectMultiphaseRead[*corev1.ConfigMap, client.Object](innerRead)
+	t.Run("As[D]() methods should delegate to inner read", func(t *testing.T) {
+		innerRead := NewMultiPhaseRead[*corev1.ConfigMap]().(*DefaultMultiPhaseRead[*corev1.ConfigMap])
+		wrapper := innerRead.As[client.Object]()
 
 		cm := &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
@@ -278,20 +278,27 @@ func TestObjectMultiPhaseRead(t *testing.T) {
 		wrapper.SetExpectedObjects(newObjs)
 		assert.Len(t, wrapper.GetExpectedObjects(), 2) // already had 1, now adding 1 more
 	})
+
+	t.Run("Deprecated NewObjectMultiphaseRead should still work", func(t *testing.T) {
+		innerRead := NewMultiPhaseRead[*corev1.ConfigMap]()
+		wrapper := NewObjectMultiphaseRead[*corev1.ConfigMap, client.Object](innerRead)
+
+		assert.NotNil(t, wrapper)
+	})
 }
 
-// Test ObjectMultiPhaseDiff wrapper
+// Test ObjectMultiPhaseDiff wrapper via .As[D]() method
 func TestObjectMultiPhaseDiff(t *testing.T) {
-	t.Run("NewObjectMultiphaseDiff should create wrapper", func(t *testing.T) {
-		innerDiff := NewMultiPhaseDiff[*corev1.ConfigMap]()
-		wrapper := NewObjectMultiphaseDiff[*corev1.ConfigMap, client.Object](innerDiff)
+	t.Run("As[D]() should create wrapper", func(t *testing.T) {
+		innerDiff := NewMultiPhaseDiff[*corev1.ConfigMap]().(*DefaultMultiPhaseDiff[*corev1.ConfigMap])
+		wrapper := innerDiff.As[client.Object]()
 
 		assert.NotNil(t, wrapper)
 	})
 
-	t.Run("ObjectMultiPhaseDiff methods should delegate to inner diff", func(t *testing.T) {
-		innerDiff := NewMultiPhaseDiff[*corev1.ConfigMap]()
-		wrapper := NewObjectMultiphaseDiff[*corev1.ConfigMap, client.Object](innerDiff)
+	t.Run("As[D]() methods should delegate to inner diff", func(t *testing.T) {
+		innerDiff := NewMultiPhaseDiff[*corev1.ConfigMap]().(*DefaultMultiPhaseDiff[*corev1.ConfigMap])
+		wrapper := innerDiff.As[client.Object]()
 
 		cm := &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
@@ -338,12 +345,19 @@ func TestObjectMultiPhaseDiff(t *testing.T) {
 		wrapper.SetObjectsToDelete(newObjs)
 		assert.Len(t, wrapper.GetObjectsToDelete(), 2) // already had 1, now adding 1 more
 	})
+
+	t.Run("Deprecated NewObjectMultiphaseDiff should still work", func(t *testing.T) {
+		innerDiff := NewMultiPhaseDiff[*corev1.ConfigMap]()
+		wrapper := NewObjectMultiphaseDiff[*corev1.ConfigMap, client.Object](innerDiff)
+
+		assert.NotNil(t, wrapper)
+	})
 }
 
 // Test nil handling for ObjectMultiPhaseRead
 func TestObjectMultiPhaseReadNilHandling(t *testing.T) {
-	innerRead := NewMultiPhaseRead[*corev1.ConfigMap]()
-	wrapper := NewObjectMultiphaseRead[*corev1.ConfigMap, client.Object](innerRead)
+	innerRead := NewMultiPhaseRead[*corev1.ConfigMap]().(*DefaultMultiPhaseRead[*corev1.ConfigMap])
+	wrapper := innerRead.As[client.Object]()
 
 	// Add nil object should not panic
 	var nilCm *corev1.ConfigMap
@@ -357,8 +371,8 @@ func TestObjectMultiPhaseReadNilHandling(t *testing.T) {
 
 // Test empty slice handling for ObjectMultiPhaseDiff
 func TestObjectMultiPhaseDiffEmptySliceHandling(t *testing.T) {
-	innerDiff := NewMultiPhaseDiff[*corev1.ConfigMap]()
-	wrapper := NewObjectMultiphaseDiff[*corev1.ConfigMap, client.Object](innerDiff)
+	innerDiff := NewMultiPhaseDiff[*corev1.ConfigMap]().(*DefaultMultiPhaseDiff[*corev1.ConfigMap])
+	wrapper := innerDiff.As[client.Object]()
 
 	// Set with empty slice should not panic and not change state
 	var emptySlice []client.Object
@@ -384,13 +398,13 @@ func TestMultiPhaseStepReconcilerAction(t *testing.T) {
 	assert.Equal(t, shared.PhaseName("phase"), phaseName)
 }
 
-// Test NewObjectMultiPhaseStepReconcilerAction
+// Test As[D]() method on DefaultMultiPhaseStepReconcilerAction
 func TestNewObjectMultiPhaseStepReconcilerAction(t *testing.T) {
 	client := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
 	recorder := &mockEventRecorder{}
 
-	innerAction := NewMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap](client, "phase", "condition", recorder, "fieldManager")
-	objectAction := NewObjectMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap, *corev1.Secret](innerAction)
+	innerAction := NewMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap](client, "phase", "condition", recorder, "fieldManager").(*DefaultMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap])
+	objectAction := innerAction.As[*corev1.Secret]()
 
 	assert.NotNil(t, objectAction)
 
@@ -469,13 +483,13 @@ func TestMultiPhaseStepReconcilerActionImplementations(t *testing.T) {
 	assert.Len(t, diffResult.GetObjectsToDelete(), 1)
 }
 
-// Test ObjectMultiPhaseStepReconcilerAction wrapper methods
+// Test ObjectMultiPhaseStepReconcilerAction wrapper methods via .As[D]()
 func TestObjectMultiPhaseStepReconcilerActionImplementations(t *testing.T) {
 	client := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
 	recorder := &mockEventRecorder{}
 
-	innerAction := NewMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap](client, "phase", "condition", recorder, "fieldManager")
-	objectAction := NewObjectMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap, *corev1.Secret](innerAction)
+	innerAction := NewMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap](client, "phase", "condition", recorder, "fieldManager").(*DefaultMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap])
+	objectAction := innerAction.As[*corev1.Secret]()
 	logger := logrus.NewEntry(logrus.StandardLogger())
 
 	// Create a mock object

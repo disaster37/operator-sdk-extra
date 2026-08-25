@@ -77,38 +77,50 @@ func (h *DefaultMultiPhaseRead[k8sStepObject]) AddExpectedObject(o k8sStepObject
 	h.expectedObjects = append(h.expectedObjects, o)
 }
 
-// ObjectMultiPhaseRead is the implementation of MultiPhaseRead for a specific client.Object type needed by multiphase reconciler
-// It's kind of wrapper to conver MultiPhaseRead[k8sStepObject] to MultiPhaseRead[client.Object]
-type ObjectMultiPhaseRead[k8sStepObjectSrc client.Object, k8sStepObjectDst client.Object] struct {
-	in MultiPhaseRead[k8sStepObjectSrc]
-}
-
-func NewObjectMultiphaseRead[k8sStepObjectSrc client.Object, k8sStepObjectDst client.Object](in MultiPhaseRead[k8sStepObjectSrc]) MultiPhaseRead[k8sStepObjectDst] {
-	return &ObjectMultiPhaseRead[k8sStepObjectSrc, k8sStepObjectDst]{
-		in: in,
+// As converts this read container to expose a different client.Object subtype D.
+// The conversion is identity-based (all client.Object subtypes share the same
+// underlying interface); it is provided as a method for ergonomics so callers
+// don't need to construct the wrapper type manually.
+func (h *DefaultMultiPhaseRead[S]) As[D client.Object]() MultiPhaseRead[D] {
+	if h == nil {
+		return nil
 	}
+	return &objectMultiPhaseRead[S, D]{in: h}
 }
 
-func (h *ObjectMultiPhaseRead[k8sStepObjectSrc, k8sStepObjectDst]) GetCurrentObjects() []k8sStepObjectDst {
-	return helper.ToSliceOfObject[k8sStepObjectSrc, k8sStepObjectDst](h.in.GetCurrentObjects())
+// objectMultiPhaseRead wraps MultiPhaseRead[Src] as MultiPhaseRead[Dst].
+type objectMultiPhaseRead[Src, Dst client.Object] struct {
+	in MultiPhaseRead[Src]
 }
 
-func (h *ObjectMultiPhaseRead[k8sStepObjectSrc, k8sStepObjectDst]) SetCurrentObjects(objects []k8sStepObjectDst) {
-	h.in.SetCurrentObjects(helper.ToSliceOfObject[k8sStepObjectDst, k8sStepObjectSrc](objects))
+// Deprecated: Use DefaultMultiPhaseRead.As[D]() instead.
+type ObjectMultiPhaseRead[Src, Dst client.Object] = objectMultiPhaseRead[Src, Dst]
+
+// Deprecated: Use a concrete read's .As[D]() method instead.
+func NewObjectMultiphaseRead[Src, Dst client.Object](in MultiPhaseRead[Src]) MultiPhaseRead[Dst] {
+	return &objectMultiPhaseRead[Src, Dst]{in: in}
 }
 
-func (h *ObjectMultiPhaseRead[k8sStepObjectSrc, k8sStepObjectDst]) AddCurrentObject(o k8sStepObjectDst) {
-	h.in.AddCurrentObject(helper.ToObject[k8sStepObjectDst, k8sStepObjectSrc](o))
+func (h *objectMultiPhaseRead[Src, Dst]) GetCurrentObjects() []Dst {
+	return helper.ToSliceOfObject[Src, Dst](h.in.GetCurrentObjects())
 }
 
-func (h *ObjectMultiPhaseRead[k8sStepObjectSrc, k8sStepObjectDst]) GetExpectedObjects() []k8sStepObjectDst {
-	return helper.ToSliceOfObject[k8sStepObjectSrc, k8sStepObjectDst](h.in.GetExpectedObjects())
+func (h *objectMultiPhaseRead[Src, Dst]) SetCurrentObjects(objects []Dst) {
+	h.in.SetCurrentObjects(helper.ToSliceOfObject[Dst, Src](objects))
 }
 
-func (h *ObjectMultiPhaseRead[k8sStepObjectSrc, k8sStepObjectDst]) SetExpectedObjects(objects []k8sStepObjectDst) {
-	h.in.SetExpectedObjects(helper.ToSliceOfObject[k8sStepObjectDst, k8sStepObjectSrc](objects))
+func (h *objectMultiPhaseRead[Src, Dst]) AddCurrentObject(o Dst) {
+	h.in.AddCurrentObject(helper.ToObject[Dst, Src](o))
 }
 
-func (h *ObjectMultiPhaseRead[k8sStepObjectSrc, k8sStepObjectDst]) AddExpectedObject(o k8sStepObjectDst) {
-	h.in.AddExpectedObject(helper.ToObject[k8sStepObjectDst, k8sStepObjectSrc](o))
+func (h *objectMultiPhaseRead[Src, Dst]) GetExpectedObjects() []Dst {
+	return helper.ToSliceOfObject[Src, Dst](h.in.GetExpectedObjects())
+}
+
+func (h *objectMultiPhaseRead[Src, Dst]) SetExpectedObjects(objects []Dst) {
+	h.in.SetExpectedObjects(helper.ToSliceOfObject[Dst, Src](objects))
+}
+
+func (h *objectMultiPhaseRead[Src, Dst]) AddExpectedObject(o Dst) {
+	h.in.AddExpectedObject(helper.ToObject[Dst, Src](o))
 }

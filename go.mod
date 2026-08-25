@@ -1,8 +1,6 @@
 module github.com/disaster37/operator-sdk-extra/v3
 
-go 1.26.0
-
-toolchain go1.26.6
+go 1.27.0
 
 require (
 	dario.cat/mergo v1.0.2

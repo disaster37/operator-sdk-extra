@@ -22,18 +22,18 @@ const (
 )
 
 type configMapReconciler struct {
-	multiphase.MultiPhaseStepReconcilerAction[*cachecrd.Memcached, *corev1.ConfigMap]
+	*multiphase.DefaultMultiPhaseStepReconcilerAction[*cachecrd.Memcached, *corev1.ConfigMap]
 }
 
-func newConfigMapReconciler(c client.Client, recorder record.EventRecorder) multiphase.MultiPhaseStepReconcilerAction[*cachecrd.Memcached, *corev1.ConfigMap] {
+func newConfigMapReconciler(c client.Client, recorder record.EventRecorder) *configMapReconciler {
 	return &configMapReconciler{
-		MultiPhaseStepReconcilerAction: multiphase.NewMultiPhaseStepReconcilerAction[*cachecrd.Memcached, *corev1.ConfigMap](
+		DefaultMultiPhaseStepReconcilerAction: multiphase.NewMultiPhaseStepReconcilerAction[*cachecrd.Memcached, *corev1.ConfigMap](
 			c,
 			ConfigmapPhase,
 			ConfigmapCondition,
 			recorder,
 			"memcached-operator",
-		),
+		).(*multiphase.DefaultMultiPhaseStepReconcilerAction[*cachecrd.Memcached, *corev1.ConfigMap]),
 	}
 }
 

@@ -223,6 +223,14 @@ func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) GetPha
 	return h.phaseName
 }
 
+// As converts this step action to operate on a different client.Object subtype D.
+func (h *DefaultMultiPhaseStepReconcilerAction[K, S]) As[D client.Object]() MultiPhaseStepReconcilerAction[K, D] {
+	if h == nil {
+		return nil
+	}
+	return &objectMultiPhaseStepReconcilerAction[K, S, D]{in: h, ReconcilerAction: h.ReconcilerAction}
+}
+
 func (h *DefaultMultiPhaseStepReconcilerActionWithDiff[k8sObject, k8sStepObject]) OnDiff(ctx context.Context, o k8sObject, data map[string]any, diff MultiPhaseDiff[k8sStepObject], logger *logrus.Entry) (res reconcile.Result, err error) {
 	return res, nil
 }
@@ -231,111 +239,118 @@ func (h *DefaultMultiPhaseStepReconcilerActionWithDiff[k8sObject, k8sStepObject]
 	return h.classifyDiff(ctx, read, logger, true)
 }
 
-// ObjectMultiPhaseStepReconcilerAction is the implementation of MultiPhaseStepReconcilerAction for a specific client.Object type needed by multiphase reconciler
-// It's kind of wrapper to convert MultiPhaseStepReconcilerAction[k8sStepObject] to MultiPhaseStepReconcilerAction[client.Object]
-type ObjectMultiPhaseStepReconcilerAction[k8sObject object.MultiPhaseObject, k8sStepObjectSrc client.Object, k8sStepObjectDst client.Object] struct {
-	controller.ReconcilerAction
-	in MultiPhaseStepReconcilerAction[k8sObject, k8sStepObjectSrc]
+// AsWithDiff converts this diff-variant step action to operate on a different client.Object subtype D.
+func (h *DefaultMultiPhaseStepReconcilerActionWithDiff[K, S]) AsWithDiff[D client.Object]() MultiPhaseStepReconcilerActionWithDiff[K, D] {
+	if h == nil {
+		return nil
+	}
+	return &objectMultiPhaseStepReconcilerActionWithDiff[K, S, D]{in: h, ReconcilerAction: h.ReconcilerAction}
 }
 
-func NewObjectMultiPhaseStepReconcilerAction[k8sObject object.MultiPhaseObject, k8sStepObjectSrc client.Object, k8sStepObjectDst client.Object](in MultiPhaseStepReconcilerAction[k8sObject, k8sStepObjectSrc]) MultiPhaseStepReconcilerAction[k8sObject, k8sStepObjectDst] {
-	return &ObjectMultiPhaseStepReconcilerAction[k8sObject, k8sStepObjectSrc, k8sStepObjectDst]{
-		in: in,
-		ReconcilerAction: controller.NewReconcilerAction(
-			in.Client(),
-			in.Recorder(),
-			in.Condition(),
-		),
+// objectMultiPhaseStepReconcilerAction wraps MultiPhaseStepReconcilerAction[K, S] as MultiPhaseStepReconcilerAction[K, D].
+type objectMultiPhaseStepReconcilerAction[K object.MultiPhaseObject, S, D client.Object] struct {
+	controller.ReconcilerAction
+	in MultiPhaseStepReconcilerAction[K, S]
+}
+
+// Deprecated: Use DefaultMultiPhaseStepReconcilerAction.As[D]() instead.
+type ObjectMultiPhaseStepReconcilerAction[K object.MultiPhaseObject, S, D client.Object] = objectMultiPhaseStepReconcilerAction[K, S, D]
+
+// Deprecated: Use a concrete action's .As[D]() method instead.
+func NewObjectMultiPhaseStepReconcilerAction[K object.MultiPhaseObject, S, D client.Object](in MultiPhaseStepReconcilerAction[K, S]) MultiPhaseStepReconcilerAction[K, D] {
+	if a, ok := in.(*DefaultMultiPhaseStepReconcilerAction[K, S]); ok {
+		return a.As[D]()
+	}
+	return &objectMultiPhaseStepReconcilerAction[K, S, D]{
+		in:               in,
+		ReconcilerAction: controller.NewReconcilerAction(in.Client(), in.Recorder(), in.Condition()),
 	}
 }
 
-func (h *ObjectMultiPhaseStepReconcilerAction[k8sObject, k8sStepObjectSrc, k8sStepObjectDst]) Configure(ctx context.Context, req reconcile.Request, o k8sObject, logger *logrus.Entry) (res reconcile.Result, err error) {
+func (h *objectMultiPhaseStepReconcilerAction[K, S, D]) Configure(ctx context.Context, req reconcile.Request, o K, logger *logrus.Entry) (reconcile.Result, error) {
 	return h.in.Configure(ctx, req, o, logger)
 }
 
-func (h *ObjectMultiPhaseStepReconcilerAction[k8sObject, k8sStepObjectSrc, k8sStepObjectDst]) Read(ctx context.Context, o k8sObject, data map[string]any, logger *logrus.Entry) (read MultiPhaseRead[k8sStepObjectDst], res reconcile.Result, err error) {
-	readTmp, res, err := h.in.Read(ctx, o, data, logger)
-	return NewObjectMultiphaseRead[k8sStepObjectSrc, k8sStepObjectDst](readTmp), res, err
-}
-
-func (h *ObjectMultiPhaseStepReconcilerAction[k8sObject, k8sStepObjectSrc, k8sStepObjectDst]) Apply(ctx context.Context, o k8sObject, data map[string]any, objects []k8sStepObjectDst, logger *logrus.Entry) (res reconcile.Result, err error) {
-	return h.in.Apply(ctx, o, data, helper.ToSliceOfObject[k8sStepObjectDst, k8sStepObjectSrc](objects), logger)
-}
-
-func (h *ObjectMultiPhaseStepReconcilerAction[k8sObject, k8sStepObjectSrc, k8sStepObjectDst]) Delete(ctx context.Context, o k8sObject, data map[string]any, objects []k8sStepObjectDst, logger *logrus.Entry) (res reconcile.Result, err error) {
-	return h.in.Delete(ctx, o, data, helper.ToSliceOfObject[k8sStepObjectDst, k8sStepObjectSrc](objects), logger)
-}
-
-func (h *ObjectMultiPhaseStepReconcilerAction[k8sObject, k8sStepObjectSrc, k8sStepObjectDst]) OnError(ctx context.Context, o k8sObject, data map[string]any, currentErr error, logger *logrus.Entry) (res reconcile.Result, err error) {
+func (h *objectMultiPhaseStepReconcilerAction[K, S, D]) OnError(ctx context.Context, o K, data map[string]any, currentErr error, logger *logrus.Entry) (reconcile.Result, error) {
 	return h.in.OnError(ctx, o, data, currentErr, logger)
 }
 
-func (h *ObjectMultiPhaseStepReconcilerAction[k8sObject, k8sStepObjectSrc, k8sStepObjectDst]) OnSuccess(ctx context.Context, o k8sObject, data map[string]any, diff MultiPhaseDiff[k8sStepObjectDst], logger *logrus.Entry) (res reconcile.Result, err error) {
-	return h.in.OnSuccess(ctx, o, data, NewObjectMultiphaseDiff[k8sStepObjectDst, k8sStepObjectSrc](diff), logger)
+func (h *objectMultiPhaseStepReconcilerAction[K, S, D]) GetPhaseName() shared.PhaseName { return h.in.GetPhaseName() }
+
+func (h *objectMultiPhaseStepReconcilerAction[K, S, D]) Read(ctx context.Context, o K, data map[string]any, logger *logrus.Entry) (MultiPhaseRead[D], reconcile.Result, error) {
+	readTmp, res, err := h.in.Read(ctx, o, data, logger)
+	return NewObjectMultiphaseRead[S, D](readTmp), res, err
 }
 
-func (h *ObjectMultiPhaseStepReconcilerAction[k8sObject, k8sStepObjectSrc, k8sStepObjectDst]) Diff(ctx context.Context, o k8sObject, read MultiPhaseRead[k8sStepObjectDst], data map[string]any, logger *logrus.Entry) (diff MultiPhaseDiff[k8sStepObjectDst], res reconcile.Result, err error) {
-	diffTmp, res, err := h.in.Diff(ctx, o, NewObjectMultiphaseRead[k8sStepObjectDst, k8sStepObjectSrc](read), data, logger)
-	return NewObjectMultiphaseDiff[k8sStepObjectSrc, k8sStepObjectDst](diffTmp), res, err
+func (h *objectMultiPhaseStepReconcilerAction[K, S, D]) Apply(ctx context.Context, o K, data map[string]any, objects []D, logger *logrus.Entry) (reconcile.Result, error) {
+	return h.in.Apply(ctx, o, data, helper.ToSliceOfObject[D, S](objects), logger)
 }
 
-func (h *ObjectMultiPhaseStepReconcilerAction[k8sObject, k8sStepObjectSrc, k8sStepObjectDst]) GetPhaseName() shared.PhaseName {
-	return h.in.GetPhaseName()
+func (h *objectMultiPhaseStepReconcilerAction[K, S, D]) Delete(ctx context.Context, o K, data map[string]any, objects []D, logger *logrus.Entry) (reconcile.Result, error) {
+	return h.in.Delete(ctx, o, data, helper.ToSliceOfObject[D, S](objects), logger)
 }
 
-// ObjectMultiPhaseStepReconcilerActionWithDiff is the diff-variant implementation of the object wrapper.
-// It wraps a MultiPhaseStepReconcilerActionWithDiff[src] into a MultiPhaseStepReconcilerActionWithDiff[dst]
-// and forwards OnDiff to the inner action.
-type ObjectMultiPhaseStepReconcilerActionWithDiff[k8sObject object.MultiPhaseObject, k8sStepObjectSrc client.Object, k8sStepObjectDst client.Object] struct {
+func (h *objectMultiPhaseStepReconcilerAction[K, S, D]) OnSuccess(ctx context.Context, o K, data map[string]any, diff MultiPhaseDiff[D], logger *logrus.Entry) (reconcile.Result, error) {
+	return h.in.OnSuccess(ctx, o, data, NewObjectMultiphaseDiff[D, S](diff), logger)
+}
+
+func (h *objectMultiPhaseStepReconcilerAction[K, S, D]) Diff(ctx context.Context, o K, read MultiPhaseRead[D], data map[string]any, logger *logrus.Entry) (MultiPhaseDiff[D], reconcile.Result, error) {
+	diffTmp, res, err := h.in.Diff(ctx, o, NewObjectMultiphaseRead[D, S](read), data, logger)
+	return NewObjectMultiphaseDiff[S, D](diffTmp), res, err
+}
+
+// objectMultiPhaseStepReconcilerActionWithDiff wraps MultiPhaseStepReconcilerActionWithDiff[K, S] as MultiPhaseStepReconcilerActionWithDiff[K, D].
+type objectMultiPhaseStepReconcilerActionWithDiff[K object.MultiPhaseObject, S, D client.Object] struct {
 	controller.ReconcilerAction
-	in MultiPhaseStepReconcilerActionWithDiff[k8sObject, k8sStepObjectSrc]
+	in MultiPhaseStepReconcilerActionWithDiff[K, S]
 }
 
-func NewObjectMultiPhaseStepReconcilerActionWithDiff[k8sObject object.MultiPhaseObject, k8sStepObjectSrc client.Object, k8sStepObjectDst client.Object](in MultiPhaseStepReconcilerActionWithDiff[k8sObject, k8sStepObjectSrc]) MultiPhaseStepReconcilerActionWithDiff[k8sObject, k8sStepObjectDst] {
-	return &ObjectMultiPhaseStepReconcilerActionWithDiff[k8sObject, k8sStepObjectSrc, k8sStepObjectDst]{
-		in: in,
-		ReconcilerAction: controller.NewReconcilerAction(
-			in.Client(),
-			in.Recorder(),
-			in.Condition(),
-		),
+// Deprecated: Use DefaultMultiPhaseStepReconcilerActionWithDiff.AsWithDiff[D]() instead.
+type ObjectMultiPhaseStepReconcilerActionWithDiff[K object.MultiPhaseObject, S, D client.Object] = objectMultiPhaseStepReconcilerActionWithDiff[K, S, D]
+
+// Deprecated: Use a concrete action's .AsWithDiff[D]() method instead.
+func NewObjectMultiPhaseStepReconcilerActionWithDiff[K object.MultiPhaseObject, S, D client.Object](in MultiPhaseStepReconcilerActionWithDiff[K, S]) MultiPhaseStepReconcilerActionWithDiff[K, D] {
+	if a, ok := in.(*DefaultMultiPhaseStepReconcilerActionWithDiff[K, S]); ok {
+		return a.AsWithDiff[D]()
+	}
+	return &objectMultiPhaseStepReconcilerActionWithDiff[K, S, D]{
+		in:               in,
+		ReconcilerAction: controller.NewReconcilerAction(in.Client(), in.Recorder(), in.Condition()),
 	}
 }
 
-func (h *ObjectMultiPhaseStepReconcilerActionWithDiff[k8sObject, k8sStepObjectSrc, k8sStepObjectDst]) Configure(ctx context.Context, req reconcile.Request, o k8sObject, logger *logrus.Entry) (res reconcile.Result, err error) {
+func (h *objectMultiPhaseStepReconcilerActionWithDiff[K, S, D]) Configure(ctx context.Context, req reconcile.Request, o K, logger *logrus.Entry) (reconcile.Result, error) {
 	return h.in.Configure(ctx, req, o, logger)
 }
 
-func (h *ObjectMultiPhaseStepReconcilerActionWithDiff[k8sObject, k8sStepObjectSrc, k8sStepObjectDst]) Read(ctx context.Context, o k8sObject, data map[string]any, logger *logrus.Entry) (read MultiPhaseRead[k8sStepObjectDst], res reconcile.Result, err error) {
-	readTmp, res, err := h.in.Read(ctx, o, data, logger)
-	return NewObjectMultiphaseRead[k8sStepObjectSrc, k8sStepObjectDst](readTmp), res, err
-}
-
-func (h *ObjectMultiPhaseStepReconcilerActionWithDiff[k8sObject, k8sStepObjectSrc, k8sStepObjectDst]) Apply(ctx context.Context, o k8sObject, data map[string]any, objects []k8sStepObjectDst, logger *logrus.Entry) (res reconcile.Result, err error) {
-	return h.in.Apply(ctx, o, data, helper.ToSliceOfObject[k8sStepObjectDst, k8sStepObjectSrc](objects), logger)
-}
-
-func (h *ObjectMultiPhaseStepReconcilerActionWithDiff[k8sObject, k8sStepObjectSrc, k8sStepObjectDst]) Delete(ctx context.Context, o k8sObject, data map[string]any, objects []k8sStepObjectDst, logger *logrus.Entry) (res reconcile.Result, err error) {
-	return h.in.Delete(ctx, o, data, helper.ToSliceOfObject[k8sStepObjectDst, k8sStepObjectSrc](objects), logger)
-}
-
-func (h *ObjectMultiPhaseStepReconcilerActionWithDiff[k8sObject, k8sStepObjectSrc, k8sStepObjectDst]) OnError(ctx context.Context, o k8sObject, data map[string]any, currentErr error, logger *logrus.Entry) (res reconcile.Result, err error) {
+func (h *objectMultiPhaseStepReconcilerActionWithDiff[K, S, D]) OnError(ctx context.Context, o K, data map[string]any, currentErr error, logger *logrus.Entry) (reconcile.Result, error) {
 	return h.in.OnError(ctx, o, data, currentErr, logger)
 }
 
-func (h *ObjectMultiPhaseStepReconcilerActionWithDiff[k8sObject, k8sStepObjectSrc, k8sStepObjectDst]) OnSuccess(ctx context.Context, o k8sObject, data map[string]any, diff MultiPhaseDiff[k8sStepObjectDst], logger *logrus.Entry) (res reconcile.Result, err error) {
-	return h.in.OnSuccess(ctx, o, data, NewObjectMultiphaseDiff[k8sStepObjectDst, k8sStepObjectSrc](diff), logger)
+func (h *objectMultiPhaseStepReconcilerActionWithDiff[K, S, D]) GetPhaseName() shared.PhaseName { return h.in.GetPhaseName() }
+
+func (h *objectMultiPhaseStepReconcilerActionWithDiff[K, S, D]) Read(ctx context.Context, o K, data map[string]any, logger *logrus.Entry) (MultiPhaseRead[D], reconcile.Result, error) {
+	readTmp, res, err := h.in.Read(ctx, o, data, logger)
+	return NewObjectMultiphaseRead[S, D](readTmp), res, err
 }
 
-func (h *ObjectMultiPhaseStepReconcilerActionWithDiff[k8sObject, k8sStepObjectSrc, k8sStepObjectDst]) OnDiff(ctx context.Context, o k8sObject, data map[string]any, diff MultiPhaseDiff[k8sStepObjectDst], logger *logrus.Entry) (res reconcile.Result, err error) {
-	return h.in.OnDiff(ctx, o, data, NewObjectMultiphaseDiff[k8sStepObjectDst, k8sStepObjectSrc](diff), logger)
+func (h *objectMultiPhaseStepReconcilerActionWithDiff[K, S, D]) Apply(ctx context.Context, o K, data map[string]any, objects []D, logger *logrus.Entry) (reconcile.Result, error) {
+	return h.in.Apply(ctx, o, data, helper.ToSliceOfObject[D, S](objects), logger)
 }
 
-func (h *ObjectMultiPhaseStepReconcilerActionWithDiff[k8sObject, k8sStepObjectSrc, k8sStepObjectDst]) Diff(ctx context.Context, o k8sObject, read MultiPhaseRead[k8sStepObjectDst], data map[string]any, logger *logrus.Entry) (diff MultiPhaseDiff[k8sStepObjectDst], res reconcile.Result, err error) {
-	diffTmp, res, err := h.in.Diff(ctx, o, NewObjectMultiphaseRead[k8sStepObjectDst, k8sStepObjectSrc](read), data, logger)
-	return NewObjectMultiphaseDiff[k8sStepObjectSrc, k8sStepObjectDst](diffTmp), res, err
+func (h *objectMultiPhaseStepReconcilerActionWithDiff[K, S, D]) Delete(ctx context.Context, o K, data map[string]any, objects []D, logger *logrus.Entry) (reconcile.Result, error) {
+	return h.in.Delete(ctx, o, data, helper.ToSliceOfObject[D, S](objects), logger)
 }
 
-func (h *ObjectMultiPhaseStepReconcilerActionWithDiff[k8sObject, k8sStepObjectSrc, k8sStepObjectDst]) GetPhaseName() shared.PhaseName {
-	return h.in.GetPhaseName()
+func (h *objectMultiPhaseStepReconcilerActionWithDiff[K, S, D]) OnSuccess(ctx context.Context, o K, data map[string]any, diff MultiPhaseDiff[D], logger *logrus.Entry) (reconcile.Result, error) {
+	return h.in.OnSuccess(ctx, o, data, NewObjectMultiphaseDiff[D, S](diff), logger)
+}
+
+func (h *objectMultiPhaseStepReconcilerActionWithDiff[K, S, D]) OnDiff(ctx context.Context, o K, data map[string]any, diff MultiPhaseDiff[D], logger *logrus.Entry) (reconcile.Result, error) {
+	return h.in.OnDiff(ctx, o, data, NewObjectMultiphaseDiff[D, S](diff), logger)
+}
+
+func (h *objectMultiPhaseStepReconcilerActionWithDiff[K, S, D]) Diff(ctx context.Context, o K, read MultiPhaseRead[D], data map[string]any, logger *logrus.Entry) (MultiPhaseDiff[D], reconcile.Result, error) {
+	diffTmp, res, err := h.in.Diff(ctx, o, NewObjectMultiphaseRead[D, S](read), data, logger)
+	return NewObjectMultiphaseDiff[S, D](diffTmp), res, err
 }
