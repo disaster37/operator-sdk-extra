@@ -65,8 +65,8 @@ func (t *ControllerSentinelTestSuite) SetupSuite() {
 	k8sClient := k8sManager.GetClient()
 	t.k8sClient = k8sClient
 
-	reconciler := NewTestReconciler(k8sClient, logrus.NewEntry(logrus.StandardLogger()), 	//nolint:staticcheck
-	k8sManager.GetEventRecorderFor("test-controller"))
+	reconciler := NewTestReconciler(k8sClient, logrus.NewEntry(logrus.StandardLogger()),
+		k8sManager.GetEventRecorderFor("test-controller")) //nolint:staticcheck
 	if err = reconciler.SetupWithManager(k8sManager); err != nil {
 		panic(err)
 	}

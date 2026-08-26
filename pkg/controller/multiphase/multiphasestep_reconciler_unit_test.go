@@ -3,6 +3,7 @@ package multiphase
 import (
 	"context"
 	"testing"
+	"time"
 
 	"emperror.dev/errors"
 	"github.com/disaster37/operator-sdk-extra/v3/pkg/apis/shared"
@@ -157,7 +158,7 @@ func TestDefaultMultiPhaseStepReconciler_Reconcile_WithDiffAction_OnDiffError(t 
 		mockStepReconcilerAction: mockStepReconcilerAction{
 			phaseName:  "test-phase",
 			diff:       diff,
-			onErrorRes: reconcile.Result{Requeue: true},
+			onErrorRes: reconcile.Result{RequeueAfter: time.Millisecond},
 		},
 		onDiffErr: errors.New("onDiff failed"),
 	}
@@ -167,7 +168,7 @@ func TestDefaultMultiPhaseStepReconciler_Reconcile_WithDiffAction_OnDiffError(t 
 
 	res, err := reconciler.Reconcile(context.Background(), req, o, map[string]any{}, action, logger)
 	assert.Error(t, err)
-	assert.True(t, res.Requeue)
+	assert.Greater(t, res.RequeueAfter, time.Duration(0))
 	assert.True(t, action.onDiffCalled)
 	assert.False(t, action.onSuccessCalled)
 }
@@ -272,7 +273,7 @@ func TestDefaultMultiPhaseStepReconciler_Reconcile_WithDiffAction_OnDiffRequeue(
 			phaseName: "test-phase",
 			diff:      diff,
 		},
-		onDiffRes: reconcile.Result{Requeue: true},
+		onDiffRes: reconcile.Result{RequeueAfter: time.Millisecond},
 	}
 
 	o := &mockMultiPhaseObject{name: "parent", namespace: "test-ns"}
@@ -280,7 +281,7 @@ func TestDefaultMultiPhaseStepReconciler_Reconcile_WithDiffAction_OnDiffRequeue(
 
 	res, err := reconciler.Reconcile(context.Background(), req, o, map[string]any{}, action, logger)
 	assert.NoError(t, err)
-	assert.True(t, res.Requeue)
+	assert.Greater(t, res.RequeueAfter, time.Duration(0))
 	assert.True(t, action.onDiffCalled)
 	assert.False(t, action.onSuccessCalled)
 }

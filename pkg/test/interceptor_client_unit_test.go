@@ -88,7 +88,7 @@ func (m *mockObjectList) GetContinue() string {
 }
 
 func (m *mockObjectList) SetContinue(c string) {
-	m.ListMeta.Continue = c
+	m.Continue = c
 }
 
 func (m *mockObjectList) GetRemainingItemCount() *int64 {
