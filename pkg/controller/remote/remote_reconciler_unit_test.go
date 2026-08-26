@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/disaster37/generic-objectmatcher/patch"
 	"github.com/sirupsen/logrus"
@@ -130,7 +131,7 @@ func TestDefaultRemoteReconciler_Reconcile(t *testing.T) {
 		reconciler := NewRemoteReconciler[*mockRemoteObject, mockAPIObject, mockAPIClient](c, "test", "", logger, recorder)
 		req := reconcile.Request{NamespacedName: types.NamespacedName{Name: "test", Namespace: "default"}}
 
-		onErrorRes := reconcile.Result{Requeue: true}
+		onErrorRes := reconcile.Result{RequeueAfter: time.Millisecond}
 		mockAction := &mockRemoteReconcilerAction2{
 			getRemoteHandlerErr: errors.New("handler error"),
 			onErrorRes:          onErrorRes,
@@ -138,7 +139,7 @@ func TestDefaultRemoteReconciler_Reconcile(t *testing.T) {
 
 		res, err := reconciler.Reconcile(context.Background(), req, obj, map[string]any{}, mockAction)
 		assert.Error(t, err)
-		assert.True(t, res.Requeue)
+		assert.Greater(t, res.RequeueAfter, time.Duration(0))
 	})
 
 	t.Run("configure error calls onError", func(t *testing.T) {
@@ -159,11 +160,11 @@ func TestDefaultRemoteReconciler_Reconcile(t *testing.T) {
 		mockAction := &mockRemoteReconcilerAction2{
 			getRemoteHandlerHandler: &DefaultRemoteExternalReconciler[*mockRemoteObject, mockAPIObject, mockAPIClient]{},
 			configureErr:            errors.New("configure failed"),
-			onErrorRes:              reconcile.Result{Requeue: true},
+			onErrorRes:              reconcile.Result{RequeueAfter: time.Millisecond},
 		}
 
 		res, err := reconciler.Reconcile(context.Background(), req, obj, map[string]any{}, mockAction)
 		assert.Error(t, err)
-		assert.True(t, res.Requeue)
+		assert.Greater(t, res.RequeueAfter, time.Duration(0))
 	})
 }
