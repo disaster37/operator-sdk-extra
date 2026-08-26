@@ -28,6 +28,7 @@ func DryRunApply(ctx context.Context, c client.Client, obj client.Object, fieldM
 	predicted.SetManagedFields(nil)
 	predicted.SetResourceVersion("")
 
+	//nolint:staticcheck
 	if err := c.Patch(ctx, predicted, client.Apply, client.DryRunAll, client.FieldOwner(fieldManager), client.ForceOwnership); err != nil {
 		return nil, err
 	}

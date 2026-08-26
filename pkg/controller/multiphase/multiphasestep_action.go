@@ -148,6 +148,7 @@ func (h *DefaultMultiPhaseStepReconcilerAction[k8sObject, k8sStepObject]) Apply(
 		oChild.SetManagedFields(nil)
 		oChild.SetResourceVersion("")
 
+		//nolint:staticcheck
 		if err = h.Client().Patch(ctx, oChild, client.Apply, client.FieldOwner(h.fieldManager), client.ForceOwnership); err != nil {
 			return res, errors.Wrapf(err, "Error when apply object '%s'", oChild.GetName())
 		}

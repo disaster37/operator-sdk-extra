@@ -74,7 +74,7 @@ func (h *DefaultMultiPhaseReconciler[k8sObject]) Reconcile(ctx context.Context, 
 				return reconcilerAction.OnError(ctx, o, data, errors.Wrap(err, controller.ErrWhenAddFinalizer.Error()), logger)
 			}
 			logger.Debug("Add finalizer successfully, force requeue object")
-			return reconcile.Result{Requeue: true}, nil
+			return reconcile.Result{RequeueAfter: time.Millisecond}, nil
 		}
 	}
 
