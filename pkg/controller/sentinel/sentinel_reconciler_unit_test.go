@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/disaster37/operator-sdk-extra/v3/pkg/controller/multiphase"
 	"github.com/sirupsen/logrus"
@@ -205,12 +206,12 @@ func TestDefaultSentinelReconciler_Reconcile(t *testing.T) {
 		req := reconcile.Request{NamespacedName: types.NamespacedName{Name: "test", Namespace: "default"}}
 		mockAction := &mockSentinelReconcilerAction{
 			configureErr: errors.New("configure failed"),
-			onErrorRes:   reconcile.Result{Requeue: true},
+			onErrorRes:   reconcile.Result{RequeueAfter: time.Millisecond},
 		}
 
 		res, err := reconciler.Reconcile(context.Background(), req, mockObj, map[string]any{}, mockAction)
 		assert.Error(t, err)
-		assert.True(t, res.Requeue)
+		assert.Greater(t, res.RequeueAfter, time.Duration(0))
 	})
 
 	t.Run("configure returns requeue - short circuits", func(t *testing.T) {
@@ -221,12 +222,12 @@ func TestDefaultSentinelReconciler_Reconcile(t *testing.T) {
 		reconciler := NewSentinelReconciler[*corev1.Pod](c, "test", logger, recorder)
 		req := reconcile.Request{NamespacedName: types.NamespacedName{Name: "test", Namespace: "default"}}
 		mockAction := &mockSentinelReconcilerAction{
-			configureRes: reconcile.Result{Requeue: true},
+			configureRes: reconcile.Result{RequeueAfter: time.Millisecond},
 		}
 
 		res, err := reconciler.Reconcile(context.Background(), req, mockObj, map[string]any{}, mockAction)
 		assert.NoError(t, err)
-		assert.True(t, res.Requeue)
+		assert.Greater(t, res.RequeueAfter, time.Duration(0))
 	})
 
 	t.Run("read error calls onError", func(t *testing.T) {
@@ -238,12 +239,12 @@ func TestDefaultSentinelReconciler_Reconcile(t *testing.T) {
 		req := reconcile.Request{NamespacedName: types.NamespacedName{Name: "test", Namespace: "default"}}
 		mockAction := &mockSentinelReconcilerAction{
 			readErr:    errors.New("read failed"),
-			onErrorRes: reconcile.Result{Requeue: true},
+			onErrorRes: reconcile.Result{RequeueAfter: time.Millisecond},
 		}
 
 		res, err := reconciler.Reconcile(context.Background(), req, mockObj, map[string]any{}, mockAction)
 		assert.Error(t, err)
-		assert.True(t, res.Requeue)
+		assert.Greater(t, res.RequeueAfter, time.Duration(0))
 	})
 
 	t.Run("diff error calls onError", func(t *testing.T) {
@@ -256,12 +257,12 @@ func TestDefaultSentinelReconciler_Reconcile(t *testing.T) {
 		mockAction := &mockSentinelReconcilerAction{
 			readObj:    NewSentinelRead(scheme),
 			diffErr:    errors.New("diff failed"),
-			onErrorRes: reconcile.Result{Requeue: true},
+			onErrorRes: reconcile.Result{RequeueAfter: time.Millisecond},
 		}
 
 		res, err := reconciler.Reconcile(context.Background(), req, mockObj, map[string]any{}, mockAction)
 		assert.Error(t, err)
-		assert.True(t, res.Requeue)
+		assert.Greater(t, res.RequeueAfter, time.Duration(0))
 	})
 
 	t.Run("successful reconcile with apply and delete", func(t *testing.T) {
@@ -303,12 +304,12 @@ func TestDefaultSentinelReconciler_Reconcile(t *testing.T) {
 			readObj:    read,
 			diffObj:    diff,
 			applyErr:   errors.New("apply failed"),
-			onErrorRes: reconcile.Result{Requeue: true},
+			onErrorRes: reconcile.Result{RequeueAfter: time.Millisecond},
 		}
 
 		res, err := reconciler.Reconcile(context.Background(), req, mockObj, map[string]any{}, mockAction)
 		assert.Error(t, err)
-		assert.True(t, res.Requeue)
+		assert.Greater(t, res.RequeueAfter, time.Duration(0))
 	})
 
 	t.Run("delete error calls onError", func(t *testing.T) {
@@ -327,12 +328,12 @@ func TestDefaultSentinelReconciler_Reconcile(t *testing.T) {
 			readObj:    read,
 			diffObj:    diff,
 			deleteErr:  errors.New("delete failed"),
-			onErrorRes: reconcile.Result{Requeue: true},
+			onErrorRes: reconcile.Result{RequeueAfter: time.Millisecond},
 		}
 
 		res, err := reconciler.Reconcile(context.Background(), req, mockObj, map[string]any{}, mockAction)
 		assert.Error(t, err)
-		assert.True(t, res.Requeue)
+		assert.Greater(t, res.RequeueAfter, time.Duration(0))
 	})
 }
 
@@ -444,12 +445,12 @@ func TestDefaultSentinelReconciler_Reconcile_WithDiffAction_OnDiffError(t *testi
 		readObj:    NewSentinelRead(scheme),
 		diffObj:    diff,
 		onDiffErr:  errors.New("onDiff failed"),
-		onErrorRes: reconcile.Result{Requeue: true},
+		onErrorRes: reconcile.Result{RequeueAfter: time.Millisecond},
 	}
 
 	res, err := reconciler.Reconcile(context.Background(), req, mockObj, map[string]any{}, mockAction)
 	assert.Error(t, err)
-	assert.True(t, res.Requeue)
+	assert.Greater(t, res.RequeueAfter, time.Duration(0))
 	assert.True(t, mockAction.onDiffCalled)
 }
 
@@ -477,11 +478,11 @@ func TestDefaultSentinelReconciler_Reconcile_WithDiffAction_OnDiffRequeue(t *tes
 	mockAction := &mockSentinelReconcilerAction{
 		readObj:   NewSentinelRead(scheme),
 		diffObj:   diff,
-		onDiffRes: reconcile.Result{Requeue: true},
+		onDiffRes: reconcile.Result{RequeueAfter: time.Millisecond},
 	}
 
 	res, err := reconciler.Reconcile(context.Background(), req, mockObj, map[string]any{}, mockAction)
 	assert.NoError(t, err)
-	assert.True(t, res.Requeue)
+	assert.Greater(t, res.RequeueAfter, time.Duration(0))
 	assert.True(t, mockAction.onDiffCalled)
 }
