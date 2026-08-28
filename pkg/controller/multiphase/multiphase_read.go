@@ -93,12 +93,27 @@ type objectMultiPhaseRead[Src, Dst client.Object] struct {
 	in MultiPhaseRead[Src]
 }
 
+// ReadAs converts any MultiPhaseRead[S] to expose client.Object subtype D.
+// It prefers the efficient .As[D]() generic method when the underlying type is
+// *DefaultMultiPhaseRead, falling back to a wrapper for custom implementations.
+//
+// This is the non-deprecated equivalent of NewObjectMultiphaseRead.
+func ReadAs[S, D client.Object](in MultiPhaseRead[S]) MultiPhaseRead[D] {
+	if a, ok := in.(*DefaultMultiPhaseRead[S]); ok {
+		return a.As[D]()
+	}
+	if in == nil {
+		return nil
+	}
+	return &objectMultiPhaseRead[S, D]{in: in}
+}
+
 // Deprecated: Use DefaultMultiPhaseRead.As[D]() instead.
 type ObjectMultiPhaseRead[Src, Dst client.Object] = objectMultiPhaseRead[Src, Dst]
 
-// Deprecated: Use a concrete read's .As[D]() method instead.
+// Deprecated: Use ReadAs[S, D](in) instead.
 func NewObjectMultiphaseRead[Src, Dst client.Object](in MultiPhaseRead[Src]) MultiPhaseRead[Dst] {
-	return &objectMultiPhaseRead[Src, Dst]{in: in}
+	return ReadAs[Src, Dst](in)
 }
 
 func (h *objectMultiPhaseRead[Src, Dst]) GetCurrentObjects() []Dst {

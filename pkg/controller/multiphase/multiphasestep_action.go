@@ -254,18 +254,30 @@ type objectMultiPhaseStepReconcilerAction[K object.MultiPhaseObject, S, D client
 	in MultiPhaseStepReconcilerAction[K, S]
 }
 
-// Deprecated: Use DefaultMultiPhaseStepReconcilerAction.As[D]() instead.
-type ObjectMultiPhaseStepReconcilerAction[K object.MultiPhaseObject, S, D client.Object] = objectMultiPhaseStepReconcilerAction[K, S, D]
-
-// Deprecated: Use a concrete action's .As[D]() method instead.
-func NewObjectMultiPhaseStepReconcilerAction[K object.MultiPhaseObject, S, D client.Object](in MultiPhaseStepReconcilerAction[K, S]) MultiPhaseStepReconcilerAction[K, D] {
+// As converts any MultiPhaseStepReconcilerAction[K, S] to operate on client.Object subtype D.
+// It prefers the efficient .As[D]() generic method when the underlying type is
+// *DefaultMultiPhaseStepReconcilerAction, falling back to a wrapper for custom implementations.
+//
+// This is the non-deprecated equivalent of NewObjectMultiPhaseStepReconcilerAction.
+func As[K object.MultiPhaseObject, S, D client.Object](in MultiPhaseStepReconcilerAction[K, S]) MultiPhaseStepReconcilerAction[K, D] {
 	if a, ok := in.(*DefaultMultiPhaseStepReconcilerAction[K, S]); ok {
 		return a.As[D]()
+	}
+	if in == nil {
+		return nil
 	}
 	return &objectMultiPhaseStepReconcilerAction[K, S, D]{
 		in:               in,
 		ReconcilerAction: controller.NewReconcilerAction(in.Client(), in.Recorder(), in.Condition()),
 	}
+}
+
+// Deprecated: Use DefaultMultiPhaseStepReconcilerAction.As[D]() instead.
+type ObjectMultiPhaseStepReconcilerAction[K object.MultiPhaseObject, S, D client.Object] = objectMultiPhaseStepReconcilerAction[K, S, D]
+
+// Deprecated: Use As[K, S, D](in) instead.
+func NewObjectMultiPhaseStepReconcilerAction[K object.MultiPhaseObject, S, D client.Object](in MultiPhaseStepReconcilerAction[K, S]) MultiPhaseStepReconcilerAction[K, D] {
+	return As[K, S, D](in)
 }
 
 func (h *objectMultiPhaseStepReconcilerAction[K, S, D]) Configure(ctx context.Context, req reconcile.Request, o K, logger *logrus.Entry) (reconcile.Result, error) {
@@ -309,15 +321,29 @@ type objectMultiPhaseStepReconcilerActionWithDiff[K object.MultiPhaseObject, S, 
 // Deprecated: Use DefaultMultiPhaseStepReconcilerActionWithDiff.AsWithDiff[D]() instead.
 type ObjectMultiPhaseStepReconcilerActionWithDiff[K object.MultiPhaseObject, S, D client.Object] = objectMultiPhaseStepReconcilerActionWithDiff[K, S, D]
 
-// Deprecated: Use a concrete action's .AsWithDiff[D]() method instead.
-func NewObjectMultiPhaseStepReconcilerActionWithDiff[K object.MultiPhaseObject, S, D client.Object](in MultiPhaseStepReconcilerActionWithDiff[K, S]) MultiPhaseStepReconcilerActionWithDiff[K, D] {
+// AsWithDiff converts any MultiPhaseStepReconcilerActionWithDiff[K, S] to operate on
+// client.Object subtype D.
+// It prefers the efficient .AsWithDiff[D]() generic method when the underlying type is
+// *DefaultMultiPhaseStepReconcilerActionWithDiff, falling back to a wrapper for custom
+// implementations.
+//
+// This is the non-deprecated equivalent of NewObjectMultiPhaseStepReconcilerActionWithDiff.
+func AsWithDiff[K object.MultiPhaseObject, S, D client.Object](in MultiPhaseStepReconcilerActionWithDiff[K, S]) MultiPhaseStepReconcilerActionWithDiff[K, D] {
 	if a, ok := in.(*DefaultMultiPhaseStepReconcilerActionWithDiff[K, S]); ok {
 		return a.AsWithDiff[D]()
+	}
+	if in == nil {
+		return nil
 	}
 	return &objectMultiPhaseStepReconcilerActionWithDiff[K, S, D]{
 		in:               in,
 		ReconcilerAction: controller.NewReconcilerAction(in.Client(), in.Recorder(), in.Condition()),
 	}
+}
+
+// Deprecated: Use AsWithDiff[K, S, D](in) instead.
+func NewObjectMultiPhaseStepReconcilerActionWithDiff[K object.MultiPhaseObject, S, D client.Object](in MultiPhaseStepReconcilerActionWithDiff[K, S]) MultiPhaseStepReconcilerActionWithDiff[K, D] {
+	return AsWithDiff[K, S, D](in)
 }
 
 func (h *objectMultiPhaseStepReconcilerActionWithDiff[K, S, D]) Configure(ctx context.Context, req reconcile.Request, o K, logger *logrus.Entry) (reconcile.Result, error) {

@@ -386,6 +386,137 @@ func TestObjectMultiPhaseDiffEmptySliceHandling(t *testing.T) {
 	assert.False(t, wrapper.NeedDelete())
 }
 
+// Test package-level As[K, S, D]() function
+func TestPackageLevelAs(t *testing.T) {
+	cl := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
+	recorder := &mockEventRecorder{}
+
+	t.Run("fast path: *DefaultMultiPhaseStepReconcilerAction uses .As[D]()", func(t *testing.T) {
+		inner := NewMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap](cl, "phase", "condition", recorder, "fm")
+		wrapped := As[*MockMultiPhaseObject, *corev1.ConfigMap, client.Object](inner)
+		assert.NotNil(t, wrapped)
+		assert.Equal(t, shared.PhaseName("phase"), wrapped.GetPhaseName())
+	})
+
+	t.Run("fallback: custom implementation uses wrapper", func(t *testing.T) {
+		// Create a custom type that embeds the interface (not the concrete type)
+		type customAction struct {
+			MultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap]
+		}
+		inner := &customAction{
+			MultiPhaseStepReconcilerAction: NewMultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap](cl, "phase", "condition", recorder, "fm"),
+		}
+		wrapped := As[*MockMultiPhaseObject, *corev1.ConfigMap, client.Object](inner)
+		assert.NotNil(t, wrapped)
+		assert.Equal(t, shared.PhaseName("phase"), wrapped.GetPhaseName())
+	})
+
+	t.Run("nil input returns nil", func(t *testing.T) {
+		var nilAction MultiPhaseStepReconcilerAction[*MockMultiPhaseObject, *corev1.ConfigMap]
+		wrapped := As[*MockMultiPhaseObject, *corev1.ConfigMap, client.Object](nilAction)
+		assert.Nil(t, wrapped)
+	})
+}
+
+// Test package-level AsWithDiff[K, S, D]() function
+func TestPackageLevelAsWithDiff(t *testing.T) {
+	cl := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
+	recorder := &mockEventRecorder{}
+
+	t.Run("fast path: *DefaultMultiPhaseStepReconcilerActionWithDiff uses .AsWithDiff[D]()", func(t *testing.T) {
+		inner := NewMultiPhaseStepReconcilerActionWithDiff[*MockMultiPhaseObject, *corev1.ConfigMap](cl, "phase", "condition", recorder, "fm")
+		wrapped := AsWithDiff[*MockMultiPhaseObject, *corev1.ConfigMap, client.Object](inner)
+		assert.NotNil(t, wrapped)
+		assert.Equal(t, shared.PhaseName("phase"), wrapped.GetPhaseName())
+	})
+
+	t.Run("fallback: custom implementation uses wrapper", func(t *testing.T) {
+		type customAction struct {
+			MultiPhaseStepReconcilerActionWithDiff[*MockMultiPhaseObject, *corev1.ConfigMap]
+		}
+		inner := &customAction{
+			MultiPhaseStepReconcilerActionWithDiff: NewMultiPhaseStepReconcilerActionWithDiff[*MockMultiPhaseObject, *corev1.ConfigMap](cl, "phase", "condition", recorder, "fm"),
+		}
+		wrapped := AsWithDiff[*MockMultiPhaseObject, *corev1.ConfigMap, client.Object](inner)
+		assert.NotNil(t, wrapped)
+		assert.Equal(t, shared.PhaseName("phase"), wrapped.GetPhaseName())
+	})
+
+	t.Run("nil input returns nil", func(t *testing.T) {
+		var nilAction MultiPhaseStepReconcilerActionWithDiff[*MockMultiPhaseObject, *corev1.ConfigMap]
+		wrapped := AsWithDiff[*MockMultiPhaseObject, *corev1.ConfigMap, client.Object](nilAction)
+		assert.Nil(t, wrapped)
+	})
+}
+
+// Test package-level ReadAs[S, D]() function for MultiPhaseRead
+func TestPackageLevelAsRead(t *testing.T) {
+	t.Run("fast path: *DefaultMultiPhaseRead uses .As[D]()", func(t *testing.T) {
+		inner := NewMultiPhaseRead[*corev1.ConfigMap]()
+		wrapped := ReadAs[*corev1.ConfigMap, client.Object](inner)
+		assert.NotNil(t, wrapped)
+
+		cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "test"}}
+		wrapped.AddCurrentObject(cm)
+		assert.Len(t, wrapped.GetCurrentObjects(), 1)
+	})
+
+	t.Run("fallback: custom implementation uses wrapper", func(t *testing.T) {
+		type customRead struct {
+			MultiPhaseRead[*corev1.ConfigMap]
+		}
+		inner := &customRead{
+			MultiPhaseRead: NewMultiPhaseRead[*corev1.ConfigMap](),
+		}
+		wrapped := ReadAs[*corev1.ConfigMap, client.Object](inner)
+		assert.NotNil(t, wrapped)
+
+		cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "test"}}
+		wrapped.AddCurrentObject(cm)
+		assert.Len(t, wrapped.GetCurrentObjects(), 1)
+	})
+
+	t.Run("nil input returns nil", func(t *testing.T) {
+		var nilRead MultiPhaseRead[*corev1.ConfigMap]
+		wrapped := ReadAs[*corev1.ConfigMap, client.Object](nilRead)
+		assert.Nil(t, wrapped)
+	})
+}
+
+// Test package-level DiffAs[S, D]() function for MultiPhaseDiff
+func TestPackageLevelAsDiff(t *testing.T) {
+	t.Run("fast path: *DefaultMultiPhaseDiff uses .As[D]()", func(t *testing.T) {
+		inner := NewMultiPhaseDiff[*corev1.ConfigMap]()
+		wrapped := DiffAs[*corev1.ConfigMap, client.Object](inner)
+		assert.NotNil(t, wrapped)
+
+		cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "test"}}
+		wrapped.AddObjectToCreate(cm)
+		assert.True(t, wrapped.NeedCreate())
+	})
+
+	t.Run("fallback: custom implementation uses wrapper", func(t *testing.T) {
+		type customDiff struct {
+			MultiPhaseDiff[*corev1.ConfigMap]
+		}
+		inner := &customDiff{
+			MultiPhaseDiff: NewMultiPhaseDiff[*corev1.ConfigMap](),
+		}
+		wrapped := DiffAs[*corev1.ConfigMap, client.Object](inner)
+		assert.NotNil(t, wrapped)
+
+		cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "test"}}
+		wrapped.AddObjectToCreate(cm)
+		assert.True(t, wrapped.NeedCreate())
+	})
+
+	t.Run("nil input returns nil", func(t *testing.T) {
+		var nilDiff MultiPhaseDiff[*corev1.ConfigMap]
+		wrapped := DiffAs[*corev1.ConfigMap, client.Object](nilDiff)
+		assert.Nil(t, wrapped)
+	})
+}
+
 // Test MultiPhaseStepReconcilerAction methods
 func TestMultiPhaseStepReconcilerAction(t *testing.T) {
 	client := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()

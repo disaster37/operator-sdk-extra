@@ -136,12 +136,27 @@ type objectMultiPhaseDiff[Src, Dst client.Object] struct {
 	in MultiPhaseDiff[Src]
 }
 
+// DiffAs converts any MultiPhaseDiff[S] to expose client.Object subtype D.
+// It prefers the efficient .As[D]() generic method when the underlying type is
+// *DefaultMultiPhaseDiff, falling back to a wrapper for custom implementations.
+//
+// This is the non-deprecated equivalent of NewObjectMultiphaseDiff.
+func DiffAs[S, D client.Object](in MultiPhaseDiff[S]) MultiPhaseDiff[D] {
+	if a, ok := in.(*DefaultMultiPhaseDiff[S]); ok {
+		return a.As[D]()
+	}
+	if in == nil {
+		return nil
+	}
+	return &objectMultiPhaseDiff[S, D]{in: in}
+}
+
 // Deprecated: Use DefaultMultiPhaseDiff.As[D]() instead.
 type ObjectMultiPhaseDiff[Src, Dst client.Object] = objectMultiPhaseDiff[Src, Dst]
 
-// Deprecated: Use a concrete diff's .As[D]() method instead.
+// Deprecated: Use DiffAs[S, D](in) instead.
 func NewObjectMultiphaseDiff[Src, Dst client.Object](in MultiPhaseDiff[Src]) MultiPhaseDiff[Dst] {
-	return &objectMultiPhaseDiff[Src, Dst]{in: in}
+	return DiffAs[Src, Dst](in)
 }
 
 func (h *objectMultiPhaseDiff[Src, Dst]) NeedCreate() bool          { return h.in.NeedCreate() }
