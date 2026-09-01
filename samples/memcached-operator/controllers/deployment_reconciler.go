@@ -22,18 +22,18 @@ const (
 )
 
 type deploymentReconciler struct {
-	multiphase.MultiPhaseStepReconcilerActionWithDiff[*cachecrd.Memcached, *appv1.Deployment]
+	*multiphase.DefaultMultiPhaseStepReconcilerActionWithDiff[*cachecrd.Memcached, *appv1.Deployment]
 }
 
-func newDeploymentReconciler(c client.Client, recorder record.EventRecorder) multiphase.MultiPhaseStepReconcilerActionWithDiff[*cachecrd.Memcached, *appv1.Deployment] {
+func newDeploymentReconciler(c client.Client, recorder record.EventRecorder) *deploymentReconciler {
 	return &deploymentReconciler{
-		MultiPhaseStepReconcilerActionWithDiff: multiphase.NewMultiPhaseStepReconcilerActionWithDiff[*cachecrd.Memcached, *appv1.Deployment](
+		DefaultMultiPhaseStepReconcilerActionWithDiff: multiphase.NewMultiPhaseStepReconcilerActionWithDiff[*cachecrd.Memcached, *appv1.Deployment](
 			c,
 			DeploymentPhase,
 			DeploymentCondition,
 			recorder,
 			"memcached-operator",
-		),
+		).(*multiphase.DefaultMultiPhaseStepReconcilerActionWithDiff[*cachecrd.Memcached, *appv1.Deployment]),
 	}
 }
 

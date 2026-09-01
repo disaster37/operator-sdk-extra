@@ -55,7 +55,7 @@ func NewTestReconciler(c client.Client, logger *logrus.Entry, recorder record.Ev
 		),
 		name: name,
 		stepReconcilers: []multiphase.MultiPhaseStepReconcilerAction[*MultiPhaseObject, client.Object]{
-			multiphase.NewObjectMultiPhaseStepReconcilerActionWithDiff[*MultiPhaseObject, *corev1.ConfigMap, client.Object](newConfiMapReconciler(c, recorder)),
+			multiphase.AsWithDiff[*MultiPhaseObject, *corev1.ConfigMap, client.Object](newConfiMapReconciler(c, recorder)),
 		},
 	}
 }

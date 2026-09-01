@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	remotepkg "github.com/disaster37/operator-sdk-extra/v3/pkg/controller/remote"
 	"github.com/disaster37/operator-sdk-extra/v3/pkg/object"
@@ -133,7 +134,7 @@ func TestNewMockRemoteReconcilerAction(t *testing.T) {
 		called := false
 		mockHandler := func(ctx context.Context, req reconcile.Request, o *mockRemoteObject, logger *logrus.Entry) (remotepkg.RemoteExternalReconciler[*mockRemoteObject, mockAPIObject, mockAPIClient], reconcile.Result, error) {
 			called = true
-			return nil, reconcile.Result{Requeue: true}, errors.New("mock error")
+			return nil, reconcile.Result{RequeueAfter: time.Millisecond}, errors.New("mock error")
 		}
 
 		action := NewMockRemoteReconcilerAction[*mockRemoteObject, mockAPIObject, mockAPIClient](baseAction, mockHandler)
@@ -143,7 +144,7 @@ func TestNewMockRemoteReconcilerAction(t *testing.T) {
 		handler, res, err := action.GetRemoteHandler(context.Background(), req, obj, &logrus.Entry{})
 		assert.True(t, called)
 		assert.Nil(t, handler)
-		assert.True(t, res.Requeue)
+		assert.Greater(t, res.RequeueAfter, time.Duration(0))
 		assert.EqualError(t, err, "mock error")
 	})
 }

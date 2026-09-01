@@ -66,35 +66,37 @@ func (m *mockObjectList) GetObjectKind() schema.ObjectKind {
 }
 
 func (m *mockObjectList) GetResourceVersion() string {
-	return m.ListMeta.ResourceVersion
+	return m.ResourceVersion
 }
 
 func (m *mockObjectList) SetResourceVersion(version string) {
-	m.ListMeta.ResourceVersion = version
+	m.ResourceVersion = version
 }
 
+//nolint:staticcheck
 func (m *mockObjectList) GetSelfLink() string {
-	return m.ListMeta.SelfLink
+	return m.SelfLink
 }
 
+//nolint:staticcheck
 func (m *mockObjectList) SetSelfLink(selfLink string) {
-	m.ListMeta.SelfLink = selfLink
+	m.SelfLink = selfLink
 }
 
 func (m *mockObjectList) GetContinue() string {
-	return m.ListMeta.Continue
+	return m.Continue
 }
 
 func (m *mockObjectList) SetContinue(c string) {
-	m.ListMeta.Continue = c
+	m.Continue = c
 }
 
 func (m *mockObjectList) GetRemainingItemCount() *int64 {
-	return m.ListMeta.RemainingItemCount
+	return m.RemainingItemCount
 }
 
 func (m *mockObjectList) SetRemainingItemCount(c *int64) {
-	m.ListMeta.RemainingItemCount = c
+	m.RemainingItemCount = c
 }
 
 func (m *mockObjectList) DeepCopyObject() runtime.Object {

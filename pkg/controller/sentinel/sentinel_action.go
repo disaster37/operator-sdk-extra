@@ -125,6 +125,7 @@ func (h *DefaultSentinelAction[k8sObject]) Apply(ctx context.Context, o k8sObjec
 		oChild.SetManagedFields(nil)
 		oChild.SetResourceVersion("")
 
+		//nolint:staticcheck
 		if err = h.Client().Patch(ctx, oChild, client.Apply, client.FieldOwner(h.fieldManager), client.ForceOwnership); err != nil {
 			return res, errors.Wrapf(err, "Error when apply object '%s'", oChild.GetName())
 		}

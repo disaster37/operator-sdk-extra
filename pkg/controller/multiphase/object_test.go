@@ -35,10 +35,6 @@ type MultiPhaseObjectList struct {
 	Items           []MultiPhaseObject `json:"items"`
 }
 
-func init() {
-	SchemeBuilder.Register(&MultiPhaseObject{}, &MultiPhaseObjectList{})
-}
-
 func (h *MultiPhaseObject) GetStatus() object.MultiPhaseObjectStatus {
 	return &h.Status
 }

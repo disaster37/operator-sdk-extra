@@ -123,25 +123,43 @@ func TestNewObjectMultiPhaseStepReconcilerActionWithDiff(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 	recorder := record.NewFakeRecorder(10)
 
-	inner := &mockWithDiffInnerAction{
-		MultiPhaseStepReconcilerActionWithDiff: NewMultiPhaseStepReconcilerActionWithDiff[*mockMultiPhaseObject, *mockStepObject](
+	t.Run("AsWithDiff[D]() method on default implementation", func(t *testing.T) {
+		inner := NewMultiPhaseStepReconcilerActionWithDiff[*mockMultiPhaseObject, *mockStepObject](
 			fakeClient,
 			"test-phase",
 			"Ready",
 			recorder,
 			"test-controller",
-		),
-	}
+		).(*DefaultMultiPhaseStepReconcilerActionWithDiff[*mockMultiPhaseObject, *mockStepObject])
 
-	wrapped := NewObjectMultiPhaseStepReconcilerActionWithDiff[*mockMultiPhaseObject, *mockStepObject, client.Object](inner)
-	require.NotNil(t, wrapped)
+		wrapped := inner.AsWithDiff[client.Object]()
+		require.NotNil(t, wrapped)
 
-	// OnDiff forwards to the inner action.
-	diff := NewMultiPhaseDiff[client.Object]()
-	res, err := wrapped.OnDiff(context.Background(), &mockMultiPhaseObject{name: "parent", namespace: "test-ns"}, map[string]any{}, diff, logrus.NewEntry(logrus.New()))
-	assert.NoError(t, err)
-	assert.Equal(t, reconcile.Result{}, res)
-	assert.True(t, inner.onDiffCalled)
+		// GetPhaseName should forward
+		assert.Equal(t, shared.PhaseName("test-phase"), wrapped.GetPhaseName())
+	})
+
+	t.Run("Deprecated NewObjectMultiPhaseStepReconcilerActionWithDiff with custom implementation", func(t *testing.T) {
+		inner := &mockWithDiffInnerAction{
+			MultiPhaseStepReconcilerActionWithDiff: NewMultiPhaseStepReconcilerActionWithDiff[*mockMultiPhaseObject, *mockStepObject](
+				fakeClient,
+				"test-phase",
+				"Ready",
+				recorder,
+				"test-controller",
+			),
+		}
+
+		wrapped := NewObjectMultiPhaseStepReconcilerActionWithDiff[*mockMultiPhaseObject, *mockStepObject, client.Object](inner)
+		require.NotNil(t, wrapped)
+
+		// OnDiff forwards to the inner action.
+		diff := NewMultiPhaseDiff[client.Object]()
+		res, err := wrapped.OnDiff(context.Background(), &mockMultiPhaseObject{name: "parent", namespace: "test-ns"}, map[string]any{}, diff, logrus.NewEntry(logrus.New()))
+		assert.NoError(t, err)
+		assert.Equal(t, reconcile.Result{}, res)
+		assert.True(t, inner.onDiffCalled)
+	})
 }
 
 func TestObjectMultiPhaseStepReconcilerAction_SimpleDoesNotImplementOnDiff(t *testing.T) {
@@ -151,16 +169,33 @@ func TestObjectMultiPhaseStepReconcilerAction_SimpleDoesNotImplementOnDiff(t *te
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 	recorder := record.NewFakeRecorder(10)
 
-	inner := NewMultiPhaseStepReconcilerAction[*mockMultiPhaseObject, *mockStepObject](
-		fakeClient,
-		"test-phase",
-		"Ready",
-		recorder,
-		"test-controller",
-	)
+	t.Run("As[D]() from simple action", func(t *testing.T) {
+		inner := NewMultiPhaseStepReconcilerAction[*mockMultiPhaseObject, *mockStepObject](
+			fakeClient,
+			"test-phase",
+			"Ready",
+			recorder,
+			"test-controller",
+		).(*DefaultMultiPhaseStepReconcilerAction[*mockMultiPhaseObject, *mockStepObject])
 
-	wrapped := NewObjectMultiPhaseStepReconcilerAction[*mockMultiPhaseObject, *mockStepObject, client.Object](inner)
+		wrapped := inner.As[client.Object]()
 
-	_, ok := any(wrapped).(MultiPhaseStepReconcilerActionWithDiff[*mockMultiPhaseObject, client.Object])
-	assert.False(t, ok)
+		_, ok := any(wrapped).(MultiPhaseStepReconcilerActionWithDiff[*mockMultiPhaseObject, client.Object])
+		assert.False(t, ok)
+	})
+
+	t.Run("Deprecated constructor from simple action", func(t *testing.T) {
+		inner := NewMultiPhaseStepReconcilerAction[*mockMultiPhaseObject, *mockStepObject](
+			fakeClient,
+			"test-phase",
+			"Ready",
+			recorder,
+			"test-controller",
+		)
+
+		wrapped := NewObjectMultiPhaseStepReconcilerAction[*mockMultiPhaseObject, *mockStepObject, client.Object](inner)
+
+		_, ok := any(wrapped).(MultiPhaseStepReconcilerActionWithDiff[*mockMultiPhaseObject, client.Object])
+		assert.False(t, ok)
+	})
 }

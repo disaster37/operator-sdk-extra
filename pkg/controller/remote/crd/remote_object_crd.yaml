@@ -10,6 +10,8 @@ spec:
     plural: remoteobjects
     singular: remoteobject
   scope: Namespaced
+  conversion:
+    strategy: None
   versions:
   - additionalPrinterColumns:
     - jsonPath: .status.expireAt

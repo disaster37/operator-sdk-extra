@@ -79,7 +79,7 @@ func (h *DefaultRemoteReconciler[k8sObject, apiObject, apiClient]) Reconcile(ctx
 				return reconciler.OnError(ctx, o, data, handler, errors.Wrap(err, controller.ErrWhenAddFinalizer.Error()), logger)
 			}
 			logger.Debug("Add finalizer successfully, force requeue object")
-			return reconcile.Result{Requeue: true}, nil
+			return reconcile.Result{RequeueAfter: time.Millisecond}, nil
 		}
 	}
 

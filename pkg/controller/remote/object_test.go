@@ -35,10 +35,6 @@ type RemoteObjectList struct {
 	Items           []RemoteObject `json:"items"`
 }
 
-func init() {
-	SchemeBuilder.Register(&RemoteObject{}, &RemoteObjectList{})
-}
-
 func (h *RemoteObject) GetStatus() object.RemoteObjectStatus {
 	return &h.Status
 }

@@ -10,6 +10,8 @@ spec:
     plural: multiphaseobjects
     singular: multiphaseobject
   scope: Namespaced
+  conversion:
+    strategy: None
   versions:
   - additionalPrinterColumns:
     - description: Phase

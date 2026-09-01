@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -105,11 +106,11 @@ func TestDefaultMultiPhaseReconciler_Reconcile(t *testing.T) {
 		req := reconcile.Request{NamespacedName: types.NamespacedName{Name: "test", Namespace: "default"}}
 		mockAction := &mockMultiPhaseReconcilerAction{
 			configureErr: errors.New("configure failed"),
-			onErrorRes:   reconcile.Result{Requeue: true},
+			onErrorRes:   reconcile.Result{RequeueAfter: time.Millisecond},
 		}
 
 		res, _ := reconciler.Reconcile(context.Background(), req, obj, map[string]any{}, mockAction)
-		assert.True(t, res.Requeue)
+		assert.Greater(t, res.RequeueAfter, time.Duration(0))
 	})
 
 	t.Run("configure returns requeue - short circuits", func(t *testing.T) {
@@ -121,12 +122,12 @@ func TestDefaultMultiPhaseReconciler_Reconcile(t *testing.T) {
 
 		req := reconcile.Request{NamespacedName: types.NamespacedName{Name: "test", Namespace: "default"}}
 		mockAction := &mockMultiPhaseReconcilerAction{
-			configureRes: reconcile.Result{Requeue: true},
+			configureRes: reconcile.Result{RequeueAfter: time.Millisecond},
 		}
 
 		res, err := reconciler.Reconcile(context.Background(), req, obj, map[string]any{}, mockAction)
 		assert.NoError(t, err)
-		assert.True(t, res.Requeue)
+		assert.Greater(t, res.RequeueAfter, time.Duration(0))
 	})
 
 	t.Run("read error calls onError", func(t *testing.T) {
@@ -139,11 +140,11 @@ func TestDefaultMultiPhaseReconciler_Reconcile(t *testing.T) {
 		req := reconcile.Request{NamespacedName: types.NamespacedName{Name: "test", Namespace: "default"}}
 		mockAction := &mockMultiPhaseReconcilerAction{
 			readErr:    errors.New("read failed"),
-			onErrorRes: reconcile.Result{Requeue: true},
+			onErrorRes: reconcile.Result{RequeueAfter: time.Millisecond},
 		}
 
 		res, _ := reconciler.Reconcile(context.Background(), req, obj, map[string]any{}, mockAction)
-		assert.True(t, res.Requeue)
+		assert.Greater(t, res.RequeueAfter, time.Duration(0))
 	})
 
 	t.Run("add finalizer on object without finalizer", func(t *testing.T) {
@@ -166,7 +167,7 @@ func TestDefaultMultiPhaseReconciler_Reconcile(t *testing.T) {
 
 		res, err := reconciler.Reconcile(context.Background(), req, objNoFinalizer, map[string]any{}, mockAction)
 		assert.NoError(t, err)
-		assert.True(t, res.Requeue)
+		assert.Greater(t, res.RequeueAfter, time.Duration(0))
 	})
 
 	t.Run("ignore reconcile with annotation", func(t *testing.T) {
