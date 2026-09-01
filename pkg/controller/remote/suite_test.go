@@ -82,7 +82,7 @@ func (t *ControllerRemoteTestSuite) SetupSuite() {
 		k8sClient,
 		logrus.NewEntry(logrus.StandardLogger()),
 		//nolint:staticcheck
-	k8sManager.GetEventRecorderFor("test-controller"),
+		k8sManager.GetEventRecorderFor("test-controller"),
 	)
 	testReconciler.(*TestReconciler).RemoteReconcilerAction = mock.NewMockRemoteReconcilerAction[*RemoteObject, *eshandler.XPackSecurityRole, eshandler.ElasticsearchHandler](
 		testReconciler.(*TestReconciler).RemoteReconcilerAction,

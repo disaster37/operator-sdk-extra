@@ -159,12 +159,12 @@ func NewObjectMultiphaseDiff[Src, Dst client.Object](in MultiPhaseDiff[Src]) Mul
 	return DiffAs[Src, Dst](in)
 }
 
-func (h *objectMultiPhaseDiff[Src, Dst]) NeedCreate() bool          { return h.in.NeedCreate() }
-func (h *objectMultiPhaseDiff[Src, Dst]) NeedUpdate() bool          { return h.in.NeedUpdate() }
-func (h *objectMultiPhaseDiff[Src, Dst]) NeedDelete() bool          { return h.in.NeedDelete() }
-func (h *objectMultiPhaseDiff[Src, Dst]) AddDiff(diff string)       { h.in.AddDiff(diff) }
-func (h *objectMultiPhaseDiff[Src, Dst]) Diff() string              { return h.in.Diff() }
-func (h *objectMultiPhaseDiff[Src, Dst]) IsDiff() bool              { return h.in.IsDiff() }
+func (h *objectMultiPhaseDiff[Src, Dst]) NeedCreate() bool    { return h.in.NeedCreate() }
+func (h *objectMultiPhaseDiff[Src, Dst]) NeedUpdate() bool    { return h.in.NeedUpdate() }
+func (h *objectMultiPhaseDiff[Src, Dst]) NeedDelete() bool    { return h.in.NeedDelete() }
+func (h *objectMultiPhaseDiff[Src, Dst]) AddDiff(diff string) { h.in.AddDiff(diff) }
+func (h *objectMultiPhaseDiff[Src, Dst]) Diff() string        { return h.in.Diff() }
+func (h *objectMultiPhaseDiff[Src, Dst]) IsDiff() bool        { return h.in.IsDiff() }
 
 func (h *objectMultiPhaseDiff[Src, Dst]) GetObjectsToCreate() []Dst {
 	return helper.ToSliceOfObject[Src, Dst](h.in.GetObjectsToCreate())

@@ -288,7 +288,9 @@ func (h *objectMultiPhaseStepReconcilerAction[K, S, D]) OnError(ctx context.Cont
 	return h.in.OnError(ctx, o, data, currentErr, logger)
 }
 
-func (h *objectMultiPhaseStepReconcilerAction[K, S, D]) GetPhaseName() shared.PhaseName { return h.in.GetPhaseName() }
+func (h *objectMultiPhaseStepReconcilerAction[K, S, D]) GetPhaseName() shared.PhaseName {
+	return h.in.GetPhaseName()
+}
 
 func (h *objectMultiPhaseStepReconcilerAction[K, S, D]) Read(ctx context.Context, o K, data map[string]any, logger *logrus.Entry) (MultiPhaseRead[D], reconcile.Result, error) {
 	readTmp, res, err := h.in.Read(ctx, o, data, logger)
@@ -354,7 +356,9 @@ func (h *objectMultiPhaseStepReconcilerActionWithDiff[K, S, D]) OnError(ctx cont
 	return h.in.OnError(ctx, o, data, currentErr, logger)
 }
 
-func (h *objectMultiPhaseStepReconcilerActionWithDiff[K, S, D]) GetPhaseName() shared.PhaseName { return h.in.GetPhaseName() }
+func (h *objectMultiPhaseStepReconcilerActionWithDiff[K, S, D]) GetPhaseName() shared.PhaseName {
+	return h.in.GetPhaseName()
+}
 
 func (h *objectMultiPhaseStepReconcilerActionWithDiff[K, S, D]) Read(ctx context.Context, o K, data map[string]any, logger *logrus.Entry) (MultiPhaseRead[D], reconcile.Result, error) {
 	readTmp, res, err := h.in.Read(ctx, o, data, logger)
