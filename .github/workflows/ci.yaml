@@ -1,4 +1,4 @@
-name: "build"
+name: "ci"
 
 on:
   push:
@@ -8,32 +8,68 @@ on:
       - v3
     tags:
       - "*"
-  pull_request:
-    branches:
-      - main
-      - v2
-      - v3
+
+# Least privilege at the workflow level; tightened per-job below.
+permissions:
+  contents: read
 
 jobs:
   build:
+    name: Build, test & release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # GITHUB_TOKEN pushes regenerated code back to the branch
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      # On tag -> push generated code to 'main'; otherwise push back to the pushed branch.
+      CI_GIT_BRANCH: ${{ github.ref_type == 'tag' && 'main' || github.ref_name }}
     steps:
-      - uses: actions/checkout@v2
-      - name: Dagger
-        uses: dagger/dagger-for-github@v7
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          version: latest
-          call: --src . ci --ci --git-token env:GITHUB_TOKEN --codecov-token env:CODECOV_TOKEN --git-branch ${BRANCH_NAME} ${IS_TAG} ${IS_PR}
+          persist-credentials: false
+      - name: Validate ref
+        shell: bash
+        run: |
+          # Whole-string bash regex (not grep): a ref name containing a newline
+          # must fail, and the raw value is never echoed back to the log.
+          if ! [[ "$CI_GIT_BRANCH" =~ ^[A-Za-z0-9._/-]{1,200}$ ]]; then
+            echo "::error::unsafe ref name (does not match ^[A-Za-z0-9._/-]{1,200}$)"
+            exit 1
+          fi
+      - name: Dagger CI
+        uses: dagger/dagger-for-github@b81317a976cb7f7125469707321849737cd1b3bc # v7.0.6
+        with:
+          version: v0.21.8
+          # NOTE: no branch/ref interpolation in argv. The branch is passed as a
+          # secret resolved from env CI_GIT_BRANCH by the Dagger CLI on the host
+          # (Dagger does not forward host env vars into module functions).
+          call: --src . ci --ci --git-token env:GITHUB_TOKEN --codecov-token env:CODECOV_TOKEN --git-branch env:CI_GIT_BRANCH --git-repo-url https://github.com/disaster37/operator-sdk-extra.git
           cloud-token: ${{ secrets.DAGGER_CLOUD_TOKEN }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-          VERSION: ${{ github.ref_type == 'tag' && github.ref_name || github.event_name == 'pull_request' && format('pr.{0}', github.event.number) || format('rc.{0}', github.run_number) }}
-          IS_TAG: ${{ github.ref_type == 'tag' && '--is-tag' || '' }}
-          IS_PR: ${{ github.event_name == 'pull_request' && '--is-pull-request' || '' }}
-          BRANCH_NAME: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_type == 'tag' && 'main' || github.ref_name }}
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: disaster37/operator-sdk-extra
+
+  npm-audit:
+    name: npm audit (.opencode)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: .opencode/package-lock.json
+      - name: Install & audit
+        working-directory: .opencode
+        run: |
+          npm ci
+          npm audit --audit-level=high
+          npm audit signatures

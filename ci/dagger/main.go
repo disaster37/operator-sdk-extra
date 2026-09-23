@@ -16,6 +16,7 @@ package main
 
 import (
 	"context"
+	"regexp"
 
 	"dagger/operator-sdk-extra/internal/dagger"
 
@@ -33,6 +34,12 @@ const (
 	gitEmail             = "github@localhost"
 	defaultBranch        = "main"
 )
+
+// branchNameRegex guards the git ref name used for the push-back (defense in
+// depth; the workflow validates the same pattern before invoking the module).
+// It rejects empty names, leading dashes (git argument injection), whitespace,
+// control characters and shell metacharacters.
+var branchNameRegex = regexp.MustCompile(`^[A-Za-z0-9._/-]{1,200}$`)
 
 type OperatorSdkExtra struct {
 	// +private
@@ -98,21 +105,6 @@ func (h *OperatorSdkExtra) CI(
 	// +optional
 	ci bool,
 
-	// Set true if current build is a tag
-	// It will use the stable and alpha channel
-	// alpha channel only instead
-	// +optional
-	isTag bool,
-
-	// Set true if current build is a Pull request
-	// +optional
-	isPullRequest bool,
-
-	// The git branch where you should to push
-	// You need to provide it when you are on PullRequest or on Tag
-	// +optional
-	gitBranch string,
-
 	// Set true to skip test
 	// +optional
 	skipTest bool,
@@ -124,6 +116,18 @@ func (h *OperatorSdkExtra) CI(
 	// The codecov token
 	// +optional
 	codecovToken *dagger.Secret,
+
+	// The git branch to push generated code back to.
+	// Pass it with `--git-branch env:CI_GIT_BRANCH`: the Dagger CLI resolves the
+	// environment variable on the host, so the ref name is never interpolated
+	// into argv. Falls back to the default branch when omitted.
+	// +optional
+	gitBranch *dagger.Secret,
+
+	// The Git repository URL to push generated code to.
+	// +optional
+	// +default="https://github.com/disaster37/operator-sdk-extra.git"
+	gitRepoURL string,
 ) (*dagger.Directory, error) {
 	var dir *dagger.Directory
 	var err error
@@ -197,12 +201,31 @@ func (h *OperatorSdkExtra) CI(
 				Email:    gitEmail,
 			})
 
+		// The branch to push back to is passed as a secret (resolved from the
+		// CI_GIT_BRANCH environment variable by the Dagger CLI on the host), so
+		// the ref name is never interpolated into argv. Dagger does not forward
+		// host environment variables into module functions, hence the secret
+		// indirection. See .github/workflows/ci.yaml.
+		branchName := defaultBranch
+		if gitBranch != nil {
+			branch, err := gitBranch.Plaintext(ctx)
+			if err != nil {
+				return nil, errors.Wrap(err, "Error when read git branch")
+			}
+			if branch != "" {
+				branchName = branch
+			}
+		}
+		if !branchNameRegex.MatchString(branchName) {
+			return nil, errors.Errorf("Unsafe git branch name: %q", branchName)
+		}
+
 		if _, err = git.CommitAndPush(
 			ctx,
 			gitToken,
 			dagger.GitModuleCommitAndPushOpts{
-				BranchName: gitBranch,
-				GitRepoURL: "https://github.com/hm-it/opensearch-operator-k8s.git",
+				BranchName: branchName,
+				GitRepoURL: gitRepoURL,
 				Message:    "Commit from CI",
 			},
 		); err != nil {

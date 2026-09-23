@@ -17,7 +17,9 @@ $(LOCALBIN):
 	mkdir -p $(LOCALBIN)
 
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
-CONTROLLER_TOOLS_VERSION ?= v0.13.0
+# Keep in sync with controllerGenVersion in ci/dagger/main.go; v0.13.0 does not
+# build or run with the current Go toolchain.
+CONTROLLER_TOOLS_VERSION ?= v0.16.1
 
 .PHONY: controller-gen
 controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary. If wrong version is installed, it will be overwritten.
@@ -25,9 +27,14 @@ $(CONTROLLER_GEN): $(LOCALBIN)
 	test -s $(LOCALBIN)/controller-gen && $(LOCALBIN)/controller-gen --version | grep -q $(CONTROLLER_TOOLS_VERSION) || \
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
 
-ENVTEST = $(shell pwd)/bin/setup-envtest
-envtest: ## Download envtest-setup locally if necessary.
-	$(call go-get-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@latest)
+ENVTEST ?= $(LOCALBIN)/setup-envtest
+ENVTEST_VERSION ?= v0.24.1
+
+.PHONY: envtest
+envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
+$(ENVTEST): $(LOCALBIN)
+	test -s $(ENVTEST) && go version -m $(ENVTEST) | grep -q "$(ENVTEST_VERSION)" || \
+	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@$(ENVTEST_VERSION)
 
 ENVTEST_K8S_VERSION = 1.28.x
 
@@ -37,20 +44,6 @@ GOBIN=$(shell go env GOPATH)/bin
 else
 GOBIN=$(shell go env GOBIN)
 endif
-
-# go-get-tool will 'go get' any package $2 and install it to $1.
-PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
-define go-get-tool
-@[ -f $(1) ] || { \
-set -e ;\
-TMP_DIR=$$(mktemp -d) ;\
-cd $$TMP_DIR ;\
-go mod init tmp ;\
-echo "Downloading $(2) on $(PROJECT_DIR)/bin" ;\
-GOBIN=$(PROJECT_DIR)/bin go install $(2) ;\
-rm -rf $$TMP_DIR ;\
-}
-endef
 
 
 

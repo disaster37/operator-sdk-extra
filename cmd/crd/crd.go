@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,27 +14,28 @@ import (
 )
 
 func CleanCrd(c *cli.Context) error {
-	fileMatches, err := filepath.Glob(c.String("crd-file"))
-	if err != nil {
-		log.Fatal(err)
-	}
+	pattern := c.String("crd-file")
+	dryRun := c.Bool("dry-run")
 
+	fileMatches, err := filepath.Glob(pattern)
+	if err != nil {
+		return fmt.Errorf("invalid glob %q: %w", pattern, err)
+	}
 	if len(fileMatches) == 0 {
-		panic("no files matching: " + c.String("crd-file"))
+		return fmt.Errorf("no files matching: %s", pattern)
 	}
 
 	for _, file := range fileMatches {
-
 		log.Infof("Start to process file %s", file)
 
 		// Read current CRD file
 		f, err := os.ReadFile(file)
 		if err != nil {
-			panic(err)
+			return fmt.Errorf("read %s: %w", file, err)
 		}
 		currentCrd := new(apiv1.CustomResourceDefinition)
 		if err = yaml.Unmarshal(f, currentCrd); err != nil {
-			panic(err)
+			return fmt.Errorf("unmarshal %s: %w", file, err)
 		}
 
 		// Search special tag on description to clean properties
@@ -46,10 +48,15 @@ func CleanCrd(c *cli.Context) error {
 		// Write clean CRD
 		b, err := yaml.Marshal(currentCrd)
 		if err != nil {
-			panic(err)
+			return fmt.Errorf("marshal %s: %w", file, err)
+		}
+
+		if dryRun {
+			log.Infof("[dry-run] would write %d bytes to %s", len(b), file)
+			continue
 		}
 		if err = os.WriteFile(file, b, 0o644); err != nil {
-			panic(err)
+			return fmt.Errorf("write %s: %w", file, err)
 		}
 
 		log.Infof("Successfully processed file %s", file)

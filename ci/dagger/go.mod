@@ -1,6 +1,6 @@
 module dagger/operator-sdk-extra
 
-go 1.25.0
+go 1.26.1
 
 require (
 	emperror.dev/errors v0.8.1
@@ -31,8 +31,8 @@ require (
 )
 
 require (
-	dagger.io/dagger v0.20.6-0.20260415192040-7058e9313c72
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/dagger/querybuilder v0.0.0-20260402040506-574a5e81cb59
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect

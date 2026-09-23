@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"net"
 	"net/http"
+	"os"
 	"time"
 
 	"emperror.dev/errors"
@@ -25,7 +26,6 @@ func GetElasticsearchHandler(ctx context.Context, o client.Object, esRef elastic
 	secretName := ""
 	isManaged := false
 	hosts := []string{}
-	selfSignedCertificate := false
 
 	secretName = esRef.ExternalElasticsearchRef.SecretRef.Name
 	hosts = esRef.ExternalElasticsearchRef.Addresses
@@ -58,7 +58,9 @@ func GetElasticsearchHandler(ctx context.Context, o client.Object, esRef elastic
 		Addresses: hosts,
 	}
 
-	if log.Logger.GetLevel() == logrus.DebugLevel {
+	// ES_DEBUG_LOG_BODIES=true additionally dumps HTTP request/response bodies at Debug level.
+	// ES traffic may contain PII, so this is OFF by default and requires an explicit opt-in.
+	if os.Getenv("ES_DEBUG_LOG_BODIES") == "true" && log.Logger.GetLevel() == logrus.DebugLevel {
 		cfg.Logger = &elastictransport.JSONLogger{EnableRequestBody: true, EnableResponseBody: true, Output: log.Logger.Out}
 	}
 
@@ -71,10 +73,6 @@ func GetElasticsearchHandler(ctx context.Context, o client.Object, esRef elastic
 		}
 		cfg.Username = string(secret.Data["username"])
 		cfg.Password = string(secret.Data["password"])
-	}
-
-	if selfSignedCertificate {
-		transport.TLSClientConfig.InsecureSkipVerify = true
 	}
 
 	// Create Elasticsearch handler/client
