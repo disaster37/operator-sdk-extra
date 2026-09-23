@@ -590,6 +590,52 @@ func TestCANeedsRenewal_RenewalDaysOverflowClamped(t *testing.T) {
 	assert.True(t, need, "clamped renewal window must still trigger renewal for a near-expiry CA")
 }
 
+func TestCANeedsRenewal_UsesCAWindow(t *testing.T) {
+	now := time.Now()
+	certPEM := makeTestCert(t, "test.example.com-ca", now.Add(-1*time.Hour), now.Add(60*24*time.Hour))
+	secret := &corev1.Secret{Data: map[string][]byte{selfmanaged.CAKey: certPEM}}
+
+	// CA expires in 60d: inside the 90d CA window, outside the 30d leaf window.
+	need, err := selfmanaged.CANeedsRenewal(secret, certificate.TLSSpec{RenewalDays: 30, CARenewalDays: 90}, now)
+	require.NoError(t, err)
+	assert.True(t, need, "CA renewal must follow CARenewalDays, not the leaf window")
+}
+
+func TestCANeedsRenewal_OutsideCAWindow(t *testing.T) {
+	now := time.Now()
+	certPEM := makeTestCert(t, "test.example.com-ca", now.Add(-1*time.Hour), now.Add(60*24*time.Hour))
+	secret := &corev1.Secret{Data: map[string][]byte{selfmanaged.CAKey: certPEM}}
+
+	// CA expires in 60d: outside the 30d CA window even though it is inside
+	// the 90d leaf window.
+	need, err := selfmanaged.CANeedsRenewal(secret, certificate.TLSSpec{RenewalDays: 90, CARenewalDays: 30}, now)
+	require.NoError(t, err)
+	assert.False(t, need, "a wider leaf window must not widen the CA window")
+}
+
+func TestCANeedsRenewal_CAWindowGuard(t *testing.T) {
+	now := time.Now()
+	certPEM := makeTestCert(t, "test.example.com-ca", now.Add(-1*time.Hour), now.Add(60*24*time.Hour))
+	secret := &corev1.Secret{Data: map[string][]byte{selfmanaged.CAKey: certPEM}}
+
+	// The 800-day window is guarded back to 30 days (CARenewalDays >=
+	// CAValidityDays), so a CA with 60 days left is outside the effective
+	// window; the unguarded 800-day window would have been inside.
+	need, err := selfmanaged.CANeedsRenewal(secret, certificate.TLSSpec{CARenewalDays: 800, CAValidityDays: 730}, now)
+	require.NoError(t, err)
+	assert.False(t, need, "the guard must clamp CARenewalDays to the fallback window")
+}
+
+func TestCANeedsRenewal_CAWindowClamped(t *testing.T) {
+	now := time.Now()
+	certPEM := makeTestCert(t, "test.example.com-ca", now.Add(-1*time.Hour), now.Add(1*time.Hour))
+	secret := &corev1.Secret{Data: map[string][]byte{selfmanaged.CAKey: certPEM}}
+
+	need, err := selfmanaged.CANeedsRenewal(secret, certificate.TLSSpec{CARenewalDays: 1 << 62}, now)
+	require.NoError(t, err)
+	assert.True(t, need, "clamped and guarded CA window must still trigger renewal for a near-expiry CA")
+}
+
 func TestDesiredLeafWithCA(t *testing.T) {
 	backend := selfmanaged.NewSelfManagedBackend[*testSelfManagedObject]()
 	o := &testSelfManagedObject{ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"}}

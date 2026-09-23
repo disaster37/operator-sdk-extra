@@ -255,6 +255,52 @@ func TestPerNodeLeafNeedsChange_NodeExpiring(t *testing.T) {
 	assert.Equal(t, certificate.LeafExpiring, chg.Reason)
 }
 
+func TestPerNodeLeafNeedsChange_IgnoresCARenewalDays(t *testing.T) {
+	backend := newPerNodeBackend(newStubProvider("node1"))
+	o := newPerNodeObject()
+	spec := certificate.TLSSpec{
+		SecretName:       "test-tls",
+		CommonName:       "cluster",
+		Organization:     "TestOrg",
+		LeafValidityDays: 60,
+		RenewalDays:      30,
+		CARenewalDays:    90,
+	}
+	objects, err := backend.DesiredObjects(context.Background(), o, spec)
+	require.NoError(t, err)
+	leaf := objects[1].(*corev1.Secret)
+
+	// Node cert expires in 60d: outside the 30d leaf window but inside the
+	// 90d CA window. Per-node certs are leaves, so CARenewalDays must be
+	// ignored — if it leaked into the leaf check this would be LeafExpiring.
+	chg, err := backend.LeafNeedsChange(context.Background(), o, leaf, spec, time.Now())
+	require.NoError(t, err)
+	assert.Equal(t, certificate.LeafNone, chg.Reason, "CARenewalDays must not drive per-node leaf expiry")
+}
+
+func TestPerNodeLeafNeedsChange_CAWindowDoesNotExtendLeaf(t *testing.T) {
+	backend := newPerNodeBackend(newStubProvider("node1"))
+	o := newPerNodeObject()
+	spec := certificate.TLSSpec{
+		SecretName:       "test-tls",
+		CommonName:       "cluster",
+		Organization:     "TestOrg",
+		LeafValidityDays: 20,
+		RenewalDays:      30,
+		CARenewalDays:    10,
+	}
+	objects, err := backend.DesiredObjects(context.Background(), o, spec)
+	require.NoError(t, err)
+	leaf := objects[1].(*corev1.Secret)
+
+	// Node cert expires in 20d: inside the 30d leaf window but outside the
+	// 10d CA window. A narrower CARenewalDays must not shrink the leaf window
+	// (if it leaked in, this would come back as LeafNone instead).
+	chg, err := backend.LeafNeedsChange(context.Background(), o, leaf, spec, time.Now())
+	require.NoError(t, err)
+	assert.Equal(t, certificate.LeafExpiring, chg.Reason, "leaf expiry must keep using RenewalDays")
+}
+
 func TestPerNodeLeafNeedsChange_NodeCNOrgDrift(t *testing.T) {
 	buildProvider := newStubProvider("node1")
 	backend := newPerNodeBackend(buildProvider)

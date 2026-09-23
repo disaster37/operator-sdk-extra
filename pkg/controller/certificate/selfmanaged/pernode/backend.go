@@ -118,6 +118,8 @@ func (b *PerNodeBackend[T]) LeafNeedsChange(ctx context.Context, o T, leafSecret
 		existingSet[n] = struct{}{}
 	}
 
+	// Per-node certs are leaves: expiry uses the leaf window; the shared CA is
+	// renewed by the saga via CANeedsRenewal (GetValidCARenewalDays).
 	window := time.Duration(certificate.GetValidRenewalDays(spec)) * 24 * time.Hour
 
 	expiring := false

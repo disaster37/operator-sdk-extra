@@ -179,6 +179,9 @@ func (b *CertManagerBackend[T]) buildLeafCertificate(spec certificate.TLSSpec, i
 
 // setCommonCertificateSpec populates the DNS/IP SAN, renewal, validity, usage,
 // and private-key fields shared by both leaf Certificate builders onto specMap.
+//
+// renewBefore applies to the leaf Certificate only. CARenewalDays is not
+// mapped: the CA is owned by the Issuer (or is self-signed per Certificate).
 func setCommonCertificateSpec(specMap map[string]interface{}, spec certificate.TLSSpec) error {
 	if dnsNames := certificate.DedupStrings(spec.DNSNames); len(dnsNames) > 0 {
 		specMap["dnsNames"] = toStringInterfaceSlice(dnsNames)

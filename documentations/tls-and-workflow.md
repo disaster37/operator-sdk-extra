@@ -79,6 +79,7 @@ type TLSSpec struct {
     Curve            string   // ECDSA curve (P-256/P-384/P-521)
     IPAddresses      []string // SAN IP addresses
     RenewalDays      int      // Renewal window before NotAfter (default 30)
+    CARenewalDays    int      // CA renewal window (default = RenewalDays)
     GenerateCRL      bool     // Add ca.crl to the CA Secret (selfmanaged)
 }
 ```
@@ -89,7 +90,8 @@ type TLSSpec struct {
 | `CAValidityDays` | int | 2× leaf | selfmanaged, certmanager | CA validity; `GetValidCADays(spec)`. |
 | `Curve` | string | `P-256` | selfmanaged | ECDSA curve: `P-256`, `P-384`, `P-521`. Unknown → error. |
 | `IPAddresses` | []string | none | selfmanaged, certmanager | SAN IPs (parsed via `net.ParseIP`). |
-| `RenewalDays` | int | 30 | selfmanaged (renewal window), certmanager (renewBefore) | Renewal window before `NotAfter`. |
+| `RenewalDays` | int | 30 | selfmanaged (renewal window), certmanager (renewBefore) | Leaf renewal window (also the CA fallback) before `NotAfter`. |
+| `CARenewalDays` | int | `RenewalDays` | selfmanaged, selfmanaged/pernode | CA-specific renewal window; `GetValidCARenewalDays(spec)`. Falls back to `RenewalDays` when unset. Guarded against `>= CAValidityDays`. |
 | `GenerateCRL` | bool | false | selfmanaged | Adds `ca.crl` (DER) to the CA Secret. |
 
 Backend selection is an **operator decision** (which backend type to construct), not
@@ -102,6 +104,35 @@ type TLSSpecProvider[T object.MultiPhaseObject] interface {
 }
 // certificate.TLSSpecProviderFunc[T] adapts a bare func(o T) TLSSpec.
 ```
+
+### CA vs leaf renewal windows
+
+`TLSSpec` carries two renewal windows, resolved independently:
+
+- **`RenewalDays`** — the **leaf** window. It drives leaf expiry/drift
+  regeneration (`LeafNeedsChange` in the selfmanaged and pernode backends) and
+  cert-manager's `renewBefore`. Defaults to 30 (`GetValidRenewalDays(spec)`).
+- **`CARenewalDays`** — the **CA** window. It drives
+  `selfmanaged.CANeedsRenewal` (used by the rotation saga for both
+  self-managed backends; the per-node backend shares the single CA). Resolved
+  by `GetValidCARenewalDays(spec)` in this order:
+  1. `CARenewalDays <= 0` → falls back to `GetValidRenewalDays(spec)` (the
+     shared window — exact pre-`CARenewalDays` behavior).
+  2. `CARenewalDays > MaxRenewalDays` → clamped to `MaxRenewalDays`
+     (defensive overflow guard, mirroring `GetValidRenewalDays`).
+  3. `CARenewalDays >= GetValidCADays(spec)` → falls back to
+     `min(30, CAValidityDays/2)`, floor 1. A window at least as large as the
+     CA lifetime would make a freshly issued CA immediately due for renewal
+     and rotate the CA on every reconcile (perpetual rotation loop).
+
+Guard (3) only applies when `CARenewalDays` is explicitly set (`> 0`), so
+specs that only set `RenewalDays` keep their exact previous behavior.
+
+`CARenewalDays` is **not** applied everywhere: it is ignored by the
+cert-manager backend (the CA is owned by the Issuer; only the leaf's
+`renewBefore` is mapped, from `RenewalDays`) and by the BYO backend (no
+generation). Only the self-managed backends (`selfmanaged`,
+`selfmanaged/pernode`) rotate the CA themselves and therefore honor it.
 
 ### Certificate content customization
 
@@ -199,7 +230,8 @@ The CA validity defaults to 2× the leaf validity (`certificate.GetValidCADays`,
 leaf via `certificate.GetValidLeafDays`). Regeneration is split by layer:
 
 - **CA renewal** is gated by `selfmanaged.CANeedsRenewal(caSecret, spec, now)`,
-  using the renewal window `certificate.GetValidRenewalDays(spec)`.
+  using the CA renewal window `certificate.GetValidCARenewalDays(spec)`.
+  Leaf drift/expiry keeps using `certificate.GetValidRenewalDays(spec)`.
 - **Leaf drift/expiry** is reported by the optional `LeafManager` capability
   (`DesiredLeafWithCA` re-signs against an existing CA; `LeafNeedsChange`
   reports a `LeafChange`). The selfmanaged (single-leaf) and selfmanaged/pernode
@@ -401,7 +433,9 @@ namespaced `tls.<phaseName>` signals.
 At phase `""` the step evaluates three conditions:
 
 1. **Force annotations** (honored at phase `""` only; see below).
-2. **CA need**: `!caExists || forceAll || CANeedsRenewal(currentCA, spec, now)`.
+2. **CA need**: `!caExists || forceAll || CANeedsRenewal(currentCA, spec, now)`
+   — `CANeedsRenewal` evaluates CA expiry against the CA window
+   (`GetValidCARenewalDays(spec)`), not the leaf window.
 3. **Leaf change**: `LeafManager.LeafNeedsChange(...)` (drift/expiry/missing).
 
 - `caNeed` → **full CA saga** (bundle + Rotate/Converge phases) and

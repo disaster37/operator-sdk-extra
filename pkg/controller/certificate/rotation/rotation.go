@@ -274,7 +274,7 @@ func (s *tlsStep[T]) Read(ctx context.Context, o T, data map[string]any, logger 
 		// 1. Force annotations (honored at phase "" only).
 		forceAll, forceLeaf := s.forceFlags(o)
 
-		// 2. CA need.
+		// 2. CA need (expiry against GetValidCARenewalDays, or content drift).
 		caNeed := !caExists || forceAll
 		if caExists && !forceAll {
 			need, err := selfmanaged.CANeedsRenewal(currentCA, spec, now)

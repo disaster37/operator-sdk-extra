@@ -216,9 +216,17 @@ type TLSSpec struct {
 	// Each entry must parse via net.ParseIP.
 	IPAddresses []string `json:"ipAddresses,omitempty"`
 
-	// RenewalDays is the window before expiry during which renewal is
-	// triggered. Defaults to 30 (see GetValidRenewalDays).
+	// RenewalDays is the window before expiry during which leaf renewal is
+	// triggered. Defaults to 30 (see GetValidRenewalDays). It is also the
+	// fallback CA renewal window when CARenewalDays is not set.
 	RenewalDays int `json:"renewalDays,omitempty"`
+
+	// CARenewalDays is the CA-specific renewal window in days. When <= 0, the
+	// shared RenewalDays window is used (backward compatible). Applies to the
+	// self-managed backends (selfmanaged, selfmanaged/pernode), where the CA is
+	// rotated by the rotation saga. Ignored by cert-manager (the CA is owned by
+	// the Issuer) and BYO (no generation).
+	CARenewalDays int `json:"caRenewalDays,omitempty"`
 
 	// GenerateCRL, when true, adds a ca.crl key (DER-encoded revocation
 	// list) to the CA Secret (selfmanaged only).
@@ -408,6 +416,41 @@ func GetValidRenewalDays(spec TLSSpec) int {
 		return MaxRenewalDays
 	}
 	return spec.RenewalDays
+}
+
+// GetValidCARenewalDays returns the CA renewal window in days.
+//
+// Resolution order:
+//  1. CARenewalDays <= 0 -> GetValidRenewalDays(spec) (shared window; exact
+//     pre-CARenewalDays behavior).
+//  2. CARenewalDays > MaxRenewalDays -> clamped to MaxRenewalDays (defensive
+//     overflow guard, mirroring GetValidRenewalDays).
+//  3. CARenewalDays >= GetValidCADays(spec) -> falls back to
+//     min(DefaultRenewalDays, CAValidityDays/2), floor 1. A window >= the CA
+//     lifetime makes a freshly issued CA immediately due for renewal, which
+//     would rotate the CA on every reconcile (perpetual rotation loop).
+//
+// The guard (3) only applies when CARenewalDays is explicitly set (> 0), so
+// existing specs that only set RenewalDays keep their exact behavior.
+func GetValidCARenewalDays(spec TLSSpec) int {
+	if spec.CARenewalDays <= 0 {
+		return GetValidRenewalDays(spec)
+	}
+	days := spec.CARenewalDays
+	if days > MaxRenewalDays {
+		days = MaxRenewalDays
+	}
+	if caDays := GetValidCADays(spec); caDays > 0 && days >= caDays {
+		fallback := DefaultRenewalDays
+		if half := caDays / 2; half < fallback {
+			fallback = half
+		}
+		if fallback < 1 {
+			fallback = 1
+		}
+		return fallback
+	}
+	return days
 }
 
 // Organizations returns the effective leaf organizations:

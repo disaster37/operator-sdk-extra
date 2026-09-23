@@ -394,6 +394,36 @@ func TestCertManagerBackendRenewBeforeClamped(t *testing.T) {
 	assert.Equal(t, "876000h", renewBefore)
 }
 
+func TestCertManagerBackendCARenewalDaysIgnored(t *testing.T) {
+	backend := certmanager.NewCertManagerBackend[*testCMObject]()
+	o := &testCMObject{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: "default",
+		},
+	}
+
+	// CARenewalDays must not be mapped: renewBefore stays on the leaf window
+	// (20d -> 480h); the CA is owned by the Issuer.
+	spec := certificate.TLSSpec{
+		SecretName:    "test-tls",
+		CommonName:    "test.example.com",
+		RenewalDays:   20,
+		CARenewalDays: 90,
+	}
+
+	objects, err := backend.DesiredObjects(context.Background(), o, spec)
+	require.NoError(t, err)
+	require.Len(t, objects, 3)
+
+	leaf, ok := objects[2].(*unstructured.Unstructured)
+	require.True(t, ok)
+	renewBefore, found, err := unstructured.NestedString(leaf.Object, "spec", "renewBefore")
+	require.NoError(t, err)
+	assert.True(t, found)
+	assert.Equal(t, "480h", renewBefore, "CARenewalDays must not change the leaf renewBefore")
+}
+
 func TestCertManagerBackendLeafValidityDays(t *testing.T) {
 	backend := certmanager.NewCertManagerBackend[*testCMObject]()
 	o := &testCMObject{

@@ -276,7 +276,7 @@ func ParseCASigner(caSecret *corev1.Secret) (*x509.Certificate, crypto.Signer, e
 //   - nil secret -> true (missing CA).
 //   - ca.crt absent/empty -> true.
 //   - ca.crt malformed -> error.
-//   - within GetValidRenewalDays(spec) of NotAfter -> true; else false.
+//   - within GetValidCARenewalDays(spec) of NotAfter -> true; else false.
 func CANeedsRenewal(caSecret *corev1.Secret, spec certificate.TLSSpec, now time.Time) (bool, error) {
 	if caSecret == nil {
 		return true, nil
@@ -285,7 +285,7 @@ func CANeedsRenewal(caSecret *corev1.Secret, spec certificate.TLSSpec, now time.
 	if !ok || len(raw) == 0 {
 		return true, nil
 	}
-	window := time.Duration(certificate.GetValidRenewalDays(spec)) * 24 * time.Hour
+	window := time.Duration(certificate.GetValidCARenewalDays(spec)) * 24 * time.Hour
 	return certsNeedRenewal(raw, now, window)
 }
 
@@ -408,6 +408,8 @@ func (b *SelfManagedBackend[T]) LeafNeedsChange(ctx context.Context, o T, leafSe
 	}
 	cert := certs[0]
 
+	// Leaf expiry uses the leaf window; CA renewal uses GetValidCARenewalDays
+	// in CANeedsRenewal.
 	window := time.Duration(certificate.GetValidRenewalDays(spec)) * 24 * time.Hour
 
 	// Delta slices are always populated regardless of the dominant reason.

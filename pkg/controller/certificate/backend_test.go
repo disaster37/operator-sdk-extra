@@ -150,6 +150,75 @@ func TestGetValidRenewalDaysAtMax(t *testing.T) {
 	assert.Equal(t, certificate.MaxRenewalDays, days)
 }
 
+func TestGetValidCARenewalDaysDefault(t *testing.T) {
+	spec := certificate.TLSSpec{}
+	days := certificate.GetValidCARenewalDays(spec)
+	assert.Equal(t, 30, days)
+}
+
+func TestGetValidCARenewalDaysFallsBackToShared(t *testing.T) {
+	spec := certificate.TLSSpec{RenewalDays: 45}
+	days := certificate.GetValidCARenewalDays(spec)
+	assert.Equal(t, 45, days)
+}
+
+func TestGetValidCARenewalDaysCustom(t *testing.T) {
+	spec := certificate.TLSSpec{RenewalDays: 30, CARenewalDays: 90}
+	days := certificate.GetValidCARenewalDays(spec)
+	assert.Equal(t, 90, days)
+}
+
+func TestGetValidCARenewalDaysZero(t *testing.T) {
+	spec := certificate.TLSSpec{CARenewalDays: 0, RenewalDays: 45}
+	days := certificate.GetValidCARenewalDays(spec)
+	assert.Equal(t, 45, days)
+}
+
+func TestGetValidCARenewalDaysNegative(t *testing.T) {
+	spec := certificate.TLSSpec{CARenewalDays: -5, RenewalDays: 45}
+	days := certificate.GetValidCARenewalDays(spec)
+	assert.Equal(t, 45, days)
+}
+
+func TestGetValidCARenewalDaysGuard(t *testing.T) {
+	// A window >= the CA lifetime would make a freshly issued CA immediately
+	// due for renewal; the guard falls back to min(30, CAValidityDays/2).
+	spec := certificate.TLSSpec{CARenewalDays: 800, CAValidityDays: 730}
+	days := certificate.GetValidCARenewalDays(spec)
+	assert.Equal(t, 30, days)
+}
+
+func TestGetValidCARenewalDaysGuardHalf(t *testing.T) {
+	// The guard fires at CARenewalDays >= CAValidityDays and falls back to
+	// CAValidityDays/2 when that is below DefaultRenewalDays.
+	spec := certificate.TLSSpec{CARenewalDays: 12, CAValidityDays: 12}
+	days := certificate.GetValidCARenewalDays(spec)
+	assert.Equal(t, 6, days)
+}
+
+func TestGetValidCARenewalDaysGuardFloor(t *testing.T) {
+	// CAValidityDays/2 can be 0; the fallback is floored at 1 day.
+	spec := certificate.TLSSpec{CARenewalDays: 1, CAValidityDays: 1}
+	days := certificate.GetValidCARenewalDays(spec)
+	assert.Equal(t, 1, days)
+}
+
+func TestGetValidCARenewalDaysHugeValue(t *testing.T) {
+	// A wildly large value must clamp to MaxRenewalDays (not overflow) and
+	// then hit the guard, never being returned as the effective window.
+	spec := certificate.TLSSpec{CARenewalDays: 1 << 62}
+	days := certificate.GetValidCARenewalDays(spec)
+	assert.Equal(t, 30, days)
+}
+
+func TestGetValidCARenewalDaysGuardUsesDefaultCAValidity(t *testing.T) {
+	// CAValidityDays unset resolves to 2× leaf (730); the guard compares
+	// against the resolved value.
+	spec := certificate.TLSSpec{CARenewalDays: 800, LeafValidityDays: 365}
+	days := certificate.GetValidCARenewalDays(spec)
+	assert.Equal(t, 30, days)
+}
+
 func TestCurveConstants(t *testing.T) {
 	assert.Equal(t, "P-256", certificate.CurveP256)
 	assert.Equal(t, "P-384", certificate.CurveP384)

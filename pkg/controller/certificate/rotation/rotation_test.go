@@ -205,6 +205,22 @@ func newSecret(name, namespace string, data map[string][]byte) *corev1.Secret {
 	}
 }
 
+// newCAAndLeafSecrets builds the standard CA/leaf Secret pair used by the
+// CA-window tests: a leaf that is fresh for 365 days (ca.crt = the CA cert)
+// and a CA that expires after caDays days.
+func newCAAndLeafSecrets(t *testing.T, caDays int) (*corev1.Secret, *corev1.Secret) {
+	t.Helper()
+	now := time.Now()
+	caPEM := makeCertPEM(t, "test.example.com-ca", now.Add(-1*time.Hour), now.Add(time.Duration(caDays)*24*time.Hour))
+	leafPEM := makeCertPEM(t, "test.example.com", now.Add(-1*time.Hour), now.Add(365*24*time.Hour))
+	ca := newSecret("test-tls-ca", "default", map[string][]byte{selfmanaged.CAKey: caPEM})
+	leaf := newSecret("test-tls", "default", map[string][]byte{
+		selfmanaged.CertKey: leafPEM,
+		selfmanaged.CAKey:   caPEM,
+	})
+	return ca, leaf
+}
+
 func TestNewTLSStep(t *testing.T) {
 	step := newStep(newFakeClient(t), selfmanaged.NewSelfManagedBackend[*rotObject]())
 	require.NotNil(t, step)
@@ -1424,6 +1440,109 @@ func TestRead_CAContentChange_TriggersSaga(t *testing.T) {
 	require.True(t, ok)
 	assert.True(t, sig.CARotated)
 	assert.True(t, sig.LeafRegenerated)
+}
+
+func TestRead_Saga_CAWindowTriggersRotation(t *testing.T) {
+	backend := selfmanaged.NewSelfManagedBackend[*rotObject]()
+	o := newRotObject()
+
+	// CA expires in 60d: inside the 90d CA window (and outside the 30d leaf
+	// window); the leaf itself is fresh.
+	ca, leaf := newCAAndLeafSecrets(t, 60)
+
+	spec := certificate.TLSSpec{
+		SecretName:       "test-tls",
+		CommonName:       "test.example.com",
+		DNSNames:         []string{"test.example.com"},
+		LeafValidityDays: 365,
+		RenewalDays:      30,
+		CARenewalDays:    90,
+	}
+	provider := certificate.TLSSpecProviderFunc[*rotObject](func(o *rotObject) certificate.TLSSpec { return spec })
+	step := newStepProvider(newFakeClient(t, ca, leaf), backend, provider)
+
+	data := map[string]any{}
+	read, res, err := step.Read(context.Background(), o, data, testLogger())
+	require.NoError(t, err)
+	assert.Equal(t, reconcile.Result{}, res)
+	require.Len(t, read.GetExpectedObjects(), 2)
+	assert.Equal(t, true, data["rotationRenewed"], "CA inside its own window must start the saga")
+
+	sig, ok := data["tls.tls"].(*certificate.LayerSignals)
+	require.True(t, ok)
+	assert.True(t, sig.CARotated)
+
+	_, err = step.OnSuccess(context.Background(), o, data, multiphase.NewMultiPhaseDiff[client.Object](), testLogger())
+	require.NoError(t, err)
+	assert.Equal(t, rotation.PhaseRotate, step.CurrentPhase(o))
+}
+
+func TestRead_CAWindowOutside_NoCASaga(t *testing.T) {
+	backend := selfmanaged.NewSelfManagedBackend[*rotObject]()
+	o := newRotObject()
+
+	// CA expires in 60d: outside the 30d CA window (inside the 90d leaf
+	// window); the CA content matches spec, so no drift fallback fires.
+	ca, leaf := newCAAndLeafSecrets(t, 60)
+
+	spec := certificate.TLSSpec{
+		SecretName:       "test-tls",
+		CommonName:       "test.example.com",
+		DNSNames:         []string{"test.example.com"},
+		LeafValidityDays: 365,
+		RenewalDays:      90,
+		CARenewalDays:    30,
+	}
+	provider := certificate.TLSSpecProviderFunc[*rotObject](func(o *rotObject) certificate.TLSSpec { return spec })
+	step := newStepProvider(newFakeClient(t, ca, leaf), backend, provider)
+
+	data := map[string]any{}
+	read, res, err := step.Read(context.Background(), o, data, testLogger())
+	require.NoError(t, err)
+	assert.Equal(t, reconcile.Result{}, res)
+
+	_, renewed := data["rotationRenewed"]
+	assert.False(t, renewed, "CA outside its window must not start the saga")
+
+	// Steady state: expected == current, no phase write.
+	assert.Len(t, read.GetExpectedObjects(), 2)
+	assert.Len(t, read.GetCurrentObjects(), 2)
+	assert.True(t, step.IsPhaseEmpty(o))
+}
+
+func TestRead_CAWindowGuard_PreventsPerpetualRotation(t *testing.T) {
+	backend := selfmanaged.NewSelfManagedBackend[*rotObject]()
+	o := newRotObject()
+
+	// Fresh CA with 700 days left: an unguarded 800-day CARenewalDays would
+	// be inside the window and rotate a freshly issued CA over and over; the
+	// guard falls back to 30 days, so the CA is outside the effective window.
+	ca, leaf := newCAAndLeafSecrets(t, 700)
+
+	spec := certificate.TLSSpec{
+		SecretName:       "test-tls",
+		CommonName:       "test.example.com",
+		DNSNames:         []string{"test.example.com"},
+		LeafValidityDays: 365,
+		RenewalDays:      30,
+		CAValidityDays:   730,
+		CARenewalDays:    800,
+	}
+	provider := certificate.TLSSpecProviderFunc[*rotObject](func(o *rotObject) certificate.TLSSpec { return spec })
+	step := newStepProvider(newFakeClient(t, ca, leaf), backend, provider)
+
+	data := map[string]any{}
+	read, res, err := step.Read(context.Background(), o, data, testLogger())
+	require.NoError(t, err)
+	assert.Equal(t, reconcile.Result{}, res)
+
+	_, renewed := data["rotationRenewed"]
+	assert.False(t, renewed, "the guard must keep a fresh CA out of the renewal window")
+
+	// Steady state: expected == current, no phase write.
+	assert.Len(t, read.GetExpectedObjects(), 2)
+	assert.Len(t, read.GetCurrentObjects(), 2)
+	assert.True(t, step.IsPhaseEmpty(o))
 }
 
 func TestRead_ComputeSpecValidatesContent(t *testing.T) {
