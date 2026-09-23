@@ -1,0 +1,51 @@
+name: "pr"
+
+on:
+  pull_request:
+    branches:
+      - main
+      - v2
+      - v3
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Lint, build & test (no secrets)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      # Deliberately NO GITHUB_TOKEN / CODECOV_TOKEN / DAGGER_CLOUD_TOKEN on this path.
+      - name: Dagger CI (no secrets, no push)
+        uses: dagger/dagger-for-github@b81317a976cb7f7125469707321849737cd1b3bc # v7.0.6
+        with:
+          version: v0.21.8
+          # `ci` defaults to false -> lint + vulncheck + test only; no Codecov, no commit/push.
+          call: --src . ci
+
+  npm-audit:
+    name: npm audit (.opencode)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: .opencode/package-lock.json
+      - name: Install & audit
+        working-directory: .opencode
+        run: |
+          npm ci
+          npm audit --audit-level=high
+          npm audit signatures
