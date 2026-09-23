@@ -200,25 +200,25 @@ spec:
 	assert.NoError(t, err)
 }
 
-func TestCleanCrdPanicsOnInvalidGlob(t *testing.T) {
-	t.Run("no files matching glob panics", func(t *testing.T) {
+func TestCleanCrdReturnsErrorOnInvalidGlob(t *testing.T) {
+	t.Run("no files matching glob returns error", func(t *testing.T) {
 		tempDir := t.TempDir()
 		nonExistentGlob := filepath.Join(tempDir, "nonexistent_*.yaml")
 
-		assert.Panics(t, func() {
-			_ = run([]string{"cmd", "clean-crd", "--crd-file", nonExistentGlob})
-		})
+		err := run([]string{"cmd", "clean-crd", "--crd-file", nonExistentGlob})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "no files matching")
 	})
 
-	t.Run("invalid yaml file panics", func(t *testing.T) {
+	t.Run("invalid yaml file returns error", func(t *testing.T) {
 		tempDir := t.TempDir()
 		invalidFile := filepath.Join(tempDir, "invalid.yaml")
 		err := os.WriteFile(invalidFile, []byte("invalid: ["), 0o644)
 		assert.NoError(t, err)
 
-		assert.Panics(t, func() {
-			_ = run([]string{"cmd", "clean-crd", "--crd-file", invalidFile})
-		})
+		err = run([]string{"cmd", "clean-crd", "--crd-file", invalidFile})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "unmarshal")
 	})
 }
 

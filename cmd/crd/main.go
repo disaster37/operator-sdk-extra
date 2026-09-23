@@ -7,7 +7,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
-	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 )
 
 var (
@@ -42,6 +41,10 @@ func run(args []string) error {
 					Name:  "crd-file",
 					Usage: "The CRD files to clean. Toy can use glob path",
 				},
+				&cli.BoolFlag{
+					Name:  "dry-run",
+					Usage: "Print planned writes without modifying files",
+				},
 			},
 			Action: CleanCrd,
 		},
@@ -53,10 +56,10 @@ func run(args []string) error {
 		}
 
 		if !c.Bool("no-color") {
-			formatter := new(prefixed.TextFormatter)
-			formatter.FullTimestamp = true
-			formatter.ForceFormatting = true
-			log.SetFormatter(formatter)
+			log.SetFormatter(&log.TextFormatter{
+				FullTimestamp: true,
+				ForceColors:   true, // replaces prefixed.ForceFormatting (no function-name prefix)
+			})
 		}
 
 		return nil

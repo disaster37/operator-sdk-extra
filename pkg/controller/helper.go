@@ -119,7 +119,19 @@ func DefaultControllerRateLimiter[T comparable]() workqueue.TypedRateLimiter[T] 
 	)
 }
 
-// EnsureNetworkPolicyForWebhook permit to create / update NetworkPolicy for webhook
+// EnsureNetworkPolicyForWebhook permit to create / update NetworkPolicy for webhook.
+//
+// SECURITY NOTE: the generated NetworkPolicy has an Ingress rule with an empty
+// `From` ([]) which means "allow ingress from ALL sources" to TCP 9443. This is
+// intentional: the Kubernetes API server (kube-apiserver) must be able to reach the
+// admission/conversion webhook, and the apiserver source is not a stable IP or label
+// across providers (EKS/GKE/self-managed control planes differ). The exposure is
+// limited to the webhook port (TCP 9443) on the selected pods.
+//
+// For hardened clusters, restrict this by editing the returned policy to set
+// `From` to the control-plane CIDR or a namespace/pod selector matching the
+// API server. This helper does not do that automatically because a wrong guess
+// silently breaks webhook calls (and therefore all resource admission).
 func EnsureNetworkPolicyForWebhook(ctx context.Context, c client.Client, logger *logrus.Entry, namespace string, labels map[string]string, podSelecetors map[string]string) error {
 	networkPolicy := &networkv1.NetworkPolicy{}
 	expectedNetworkPolicy := &networkv1.NetworkPolicy{

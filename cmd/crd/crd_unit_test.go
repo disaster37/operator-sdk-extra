@@ -85,10 +85,10 @@ spec:
 			},
 		}
 
-		// This should panic when trying to read a non-existent file
-		assert.Panics(t, func() {
-			_ = app.Run([]string{"", "--crd-file", nonExistentFile})
-		})
+		// CleanCrd returns an error instead of panicking on a non-existent file
+		err := app.Run([]string{"", "--crd-file", nonExistentFile})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "no files matching")
 	})
 
 	t.Run("invalid YAML file", func(t *testing.T) {
@@ -106,9 +106,9 @@ spec:
 			},
 		}
 
-		// This should panic when trying to unmarshal invalid YAML
-		assert.Panics(t, func() {
-			_ = app.Run([]string{"", "--crd-file", invalidYAMLFile})
-		})
+		// CleanCrd returns an error instead of panicking on invalid YAML
+		err = app.Run([]string{"", "--crd-file", invalidYAMLFile})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "unmarshal")
 	})
 }

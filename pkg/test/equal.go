@@ -2,8 +2,8 @@ package test
 
 import (
 	"bytes"
+	"io"
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/disaster37/operator-sdk-extra/v3/pkg/helper"
@@ -20,13 +20,28 @@ func EqualFromYamlFile[k8sobject any](t *testing.T, expectedYamlFile string, act
 		panic("expectedYamlFile must be provided")
 	}
 
-	// Read file
-	f, err := os.ReadFile(filepath.Clean(expectedYamlFile))
+	// Open the file strictly within the process working directory. os.OpenRoot
+	// blocks `..` traversal and symlink escapes, so a caller cannot read outside
+	// the intended tree (test-only path-traversal guard).
+	root, err := os.OpenRoot(".")
 	if err != nil {
 		panic(err)
 	}
+	defer func() { _ = root.Close() }() // ignore error on purpose
+
+	f, err := root.Open(expectedYamlFile)
+	if err != nil {
+		panic(err)
+	}
+	defer func() { _ = f.Close() }() // ignore error on purpose
+
+	b, err := io.ReadAll(f)
+	if err != nil {
+		panic(err)
+	}
+
 	expectedObject := new(k8sobject)
-	if err = yaml.Unmarshal(f, expectedObject); err != nil {
+	if err = yaml.Unmarshal(b, expectedObject); err != nil {
 		panic(err)
 	}
 

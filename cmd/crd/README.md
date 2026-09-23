@@ -8,6 +8,7 @@ It permit to clean CRD that contain a special tag `@clean` on description.
    - **Description:** Clean CRD that contains '@clean' in the description.
    - **Flags:**
      - `--crd-file`: The CRD files to clean. You can use a glob path.
+     - `--dry-run`: Print planned writes without modifying files.
 
 ### Flags
 
