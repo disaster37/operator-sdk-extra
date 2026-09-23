@@ -15,3 +15,6 @@
 # vendor/
 .vscode/
 .kilo/
+
+# Dependency tooling binaries (installed locally by `make generate` / `make test`)
+bin/
