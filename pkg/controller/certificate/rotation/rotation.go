@@ -252,10 +252,23 @@ func (s *tlsStep[T]) Read(ctx context.Context, o T, data map[string]any, logger 
 	if !s.backend.RequiresRotationSaga() {
 		forceAll, forceLeaf := s.forceFlags(o)
 		if forceAll || forceLeaf {
-			s.Recorder().Event(o, corev1.EventTypeWarning, "TLSForceUnsupported",
-				"force-regenerate annotations are not supported by this TLS backend; they were removed")
-			if err := s.removeForceAnnotations(ctx, o, forceAll, forceLeaf); err != nil {
-				return nil, reconcile.Result{}, err
+			if fr, ok := s.backend.(certificate.ForceRegenerator[T]); ok {
+				if err := fr.ForceRegenerate(ctx, o, spec, forceAll, forceLeaf); err != nil {
+					return nil, reconcile.Result{}, err
+				}
+				leafChg := certificate.LeafChange{Reason: certificate.LeafForceRegen}
+				data[s.signalKey()] = &certificate.LayerSignals{
+					CARotated:       forceAll && spec.IssuerRef == "" && spec.ClusterIssuerRef == "",
+					LeafRegenerated: true,
+					LeafChange:      &leafChg,
+					Forced:          true,
+				}
+			} else {
+				s.Recorder().Event(o, corev1.EventTypeWarning, "TLSForceUnsupported",
+					"force-regenerate annotations are not supported by this TLS backend; they were removed")
+				if err := s.removeForceAnnotations(ctx, o, forceAll, forceLeaf); err != nil {
+					return nil, reconcile.Result{}, err
+				}
 			}
 		}
 		if err := s.emitDesired(ctx, o, spec, read); err != nil {
@@ -597,17 +610,16 @@ func (s *tlsStep[T]) OnDiff(ctx context.Context, o T, data map[string]any, diff 
 }
 
 func (s *tlsStep[T]) OnSuccess(ctx context.Context, o T, data map[string]any, diff multiphase.MultiPhaseDiff[client.Object], logger *logrus.Entry) (reconcile.Result, error) {
-	// Remove honored force annotations (only reached after a successful Apply).
+	// Remove honored force annotations (only reached after a successful Apply)
+	// for both saga backends and non-saga backends implementing ForceRegenerator.
 	// This runs BEFORE the inherited condition handling because client.Update
 	// deserializes the API response back into `o`, overwriting any in-memory
 	// status mutation (the ready condition) made earlier in this cycle.
-	if s.backend.RequiresRotationSaga() {
-		if sig, _ := data[s.signalKey()].(*certificate.LayerSignals); sig != nil && sig.Forced {
-			forceAll, forceLeaf := s.forceFlags(o) // annotations still present on o
-			if forceAll || forceLeaf {
-				if err := s.removeForceAnnotations(ctx, o, forceAll, forceLeaf); err != nil {
-					return reconcile.Result{}, fmt.Errorf("remove force-regenerate annotation: %w", err)
-				}
+	if sig, _ := data[s.signalKey()].(*certificate.LayerSignals); sig != nil && sig.Forced {
+		forceAll, forceLeaf := s.forceFlags(o) // annotations still present on o
+		if forceAll || forceLeaf {
+			if err := s.removeForceAnnotations(ctx, o, forceAll, forceLeaf); err != nil {
+				return reconcile.Result{}, fmt.Errorf("remove force-regenerate annotation: %w", err)
 			}
 		}
 	}
