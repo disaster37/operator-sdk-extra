@@ -447,6 +447,24 @@ func TestTLSSpecValidateContent(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "reserved for the CA")
 	})
+	t.Run("valid IssuerRef only", func(t *testing.T) {
+		require.NoError(t, (certificate.TLSSpec{IssuerRef: "my-issuer"}).ValidateContent())
+	})
+	t.Run("valid ClusterIssuerRef only", func(t *testing.T) {
+		require.NoError(t, (certificate.TLSSpec{ClusterIssuerRef: "my-cluster-issuer"}).ValidateContent())
+	})
+	t.Run("conflicting IssuerRef and ClusterIssuerRef", func(t *testing.T) {
+		err := (certificate.TLSSpec{IssuerRef: "my-issuer", ClusterIssuerRef: "my-cluster-issuer"}).ValidateContent()
+		require.ErrorIs(t, err, certificate.ErrConflictingIssuerRefs)
+	})
+	t.Run("whitespace IssuerRef rejected", func(t *testing.T) {
+		err := (certificate.TLSSpec{IssuerRef: "   "}).ValidateContent()
+		require.ErrorIs(t, err, certificate.ErrInvalidIssuerRef)
+	})
+	t.Run("whitespace ClusterIssuerRef rejected", func(t *testing.T) {
+		err := (certificate.TLSSpec{ClusterIssuerRef: "\t\n"}).ValidateContent()
+		require.ErrorIs(t, err, certificate.ErrInvalidIssuerRef)
+	})
 }
 
 func TestDedupStrings(t *testing.T) {

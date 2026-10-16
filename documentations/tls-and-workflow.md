@@ -70,7 +70,8 @@ type TLSBackend[T object.MultiPhaseObject] interface {
 ```go
 type TLSSpec struct {
     SecretName       string   // Name of the resulting Secret
-    IssuerRef        string   // Existing Issuer/ClusterIssuer name (cert-manager only)
+    IssuerRef        string   // Existing namespace-scoped Issuer name (cert-manager only)
+    ClusterIssuerRef string   // Existing cluster-scoped ClusterIssuer name (cert-manager only)
     CommonName       string   // Certificate CN
     DNSNames         []string // SAN DNS names
     Organization     string   // Certificate O field
@@ -88,7 +89,9 @@ type TLSSpec struct {
 |---|---|---|---|---|
 | `LeafValidityDays` | int | 365 | selfmanaged, certmanager | Leaf validity; `GetValidLeafDays(spec)`. |
 | `CAValidityDays` | int | 2× leaf | selfmanaged, certmanager | CA validity; `GetValidCADays(spec)`. |
-| `Curve` | string | `P-256` | selfmanaged | ECDSA curve: `P-256`, `P-384`, `P-521`. Unknown → error. |
+| `IssuerRef` | string | none | certmanager | Existing namespace-scoped `Issuer` (`kind: Issuer`, `group: cert-manager.io`). Mutually exclusive with `ClusterIssuerRef`; both empty selects dedicated-CA mode. |
+| `ClusterIssuerRef` | string | none | certmanager | Existing cluster-scoped `ClusterIssuer` (`kind: ClusterIssuer`, `group: cert-manager.io`). Mutually exclusive with `IssuerRef`. |
+| `Curve` | string | `P-256` | selfmanaged, certmanager | ECDSA curve: `P-256`, `P-384`, `P-521`. Unknown → error. Drives cert-manager `privateKey.size`. |
 | `IPAddresses` | []string | none | selfmanaged, certmanager | SAN IPs (parsed via `net.ParseIP`). |
 | `RenewalDays` | int | 30 | selfmanaged (renewal window), certmanager (renewBefore) | Leaf renewal window (also the CA fallback) before `NotAfter`. |
 | `CARenewalDays` | int | `RenewalDays` | selfmanaged, selfmanaged/pernode | CA-specific renewal window; `GetValidCARenewalDays(spec)`. Falls back to `RenewalDays` when unset. Guarded against `>= CAValidityDays`. |
@@ -158,8 +161,11 @@ Defaulting and precedence are centralized in `TLSSpec` resolver methods —
 `EffectiveKeyUsages()`, `ValidateContent()` — so backends never re-read raw
 fields. `ValidateContent()` fails fast on invalid algorithm/size/usage/empty-DNS
 values and is called by every backend and by the rotation saga before
-generation. Exported sentinels (`ErrUnsupportedKeyAlgorithm`, `ErrInvalidKeySize`,
-`ErrUnknownUsage`) allow programmatic checks.
+generation. `ValidateContent()` also rejects setting both `IssuerRef` and
+`ClusterIssuerRef` (`ErrConflictingIssuerRefs`) and whitespace-only references
+(`ErrInvalidIssuerRef`). Exported sentinels (`ErrUnsupportedKeyAlgorithm`,
+`ErrInvalidKeySize`, `ErrUnknownUsage`, `ErrUnknownCurve`,
+`ErrConflictingIssuerRefs`, `ErrInvalidIssuerRef`) allow programmatic checks.
 
 For content that cannot be declared statically, operators supply an optional
 `CertificateCustomizer` compute hook (applied once per reconcile by the rotation
@@ -269,21 +275,61 @@ Per-node steps implement `NodeSetTLSBackend` and therefore never publish
 The cert-manager backend emits `Issuer` and `Certificate` CRs from the
 `cert-manager.io/v1` API group. It operates in two modes:
 
-- **Dedicated-CA**: Creates a self-signed `Issuer`, a CA `Certificate`,
-  a CA `Issuer`, and leaf `Certificate`s. All cert-manager CRs are built as
-  `unstructured.Unstructured` — no cert-manager Go API dependency is required
-  at build time.
-- **Existing-CA**: Creates only leaf `Certificate`s referencing an existing
-  `Issuer` or `ClusterIssuer` specified by `TLSSpec.IssuerRef`.
+- **Dedicated-CA** (`IssuerRef == "" && ClusterIssuerRef == ""`): creates the
+  full 4-object self-bootstrapped chain:
+
+  | # | Kind | Name | Points at |
+  |---|---|---|---|
+  | 1 | `Issuer` | `<secretName>-selfsigned-issuer` | `spec.selfSigned: {}` |
+  | 2 | `Certificate` | `<secretName>-ca` | `spec.issuerRef: {name: <secretName>-selfsigned-issuer, kind: Issuer, group: cert-manager.io}`, `spec.isCA: true`, `spec.secretName: <secretName>-ca` |
+  | 3 | `Issuer` | `<secretName>-ca-issuer` | `spec.ca.secretName: <secretName>-ca` |
+  | 4 | `Certificate` | `<secretName>` | `spec.issuerRef: {name: <secretName>-ca-issuer, kind: Issuer, group: cert-manager.io}` |
+
+- **Existing-CA**: creates only the leaf `Certificate` referencing an existing
+  `Issuer` (`TLSSpec.IssuerRef`, emitted as `kind: Issuer`,
+  `group: cert-manager.io`) or `ClusterIssuer` (`TLSSpec.ClusterIssuerRef`,
+  emitted as `kind: ClusterIssuer`, `group: cert-manager.io`). Setting both is
+  rejected by `ValidateContent()` with `ErrConflictingIssuerRefs`.
+
+All cert-manager CRs are built as `unstructured.Unstructured` — no
+cert-manager Go API dependency is required at build time. Both the CA and leaf
+`Certificate`s explicitly set `spec.privateKey` from
+`EffectiveKeyAlgorithm()`/`EffectiveKeySize()`: `ECDSA` (`P-256`/256 by
+default, or `384`/`521` via `Curve`/`KeySize`) or `RSA` with cert-manager's
+supported sizes (`2048`, `4096`, `8192`; any other size is rejected with
+`certificate.ErrInvalidKeySize`).
 
 Requires `cert-manager` to be installed in the cluster. The cert-manager
 operator handles renewal; `RequiresRotationSaga() == false`.
 
-> **Behavior note (v3)**: the leaf `Certificate` now sets `spec.duration` from
+**Force-regeneration (`ForceRegenerator`)**: pass
+`certmanager.WithClient[*MyCRD](r.Client())` to `NewCertManagerBackend` to
+enable `AnnotationForceRegenerateAll` / `AnnotationForceRegenerateLeaf`
+support. `ForceRegenerate` sets `status.conditions[type=Issuing, status=True,
+reason=ManuallyTriggered]` on the target `Certificate`(s) (the same mechanism
+as `cmctl renew`) while preserving existing conditions. Your controller's RBAC
+must allow it:
+
+```go
+// +kubebuilder:rbac:groups=cert-manager.io,resources=issuers,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=cert-manager.io,resources=certificates,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=cert-manager.io,resources=certificates/status,verbs=get;update;patch
+```
+
+`forceAll` in dedicated-CA mode triggers re-issuance on both the CA
+(`<secretName>-ca`) and leaf (`<secretName>`) `Certificate`s; `forceAll` in
+existing-CA mode (CA is external) and `forceLeaf` in any mode trigger the leaf
+only. A target `Certificate` that does not exist yet (`NotFound`) is skipped —
+the same-cycle SSA `Apply` creates it and cert-manager issues it immediately.
+
+> **Behavior note (v3)**: the leaf `Certificate` sets `spec.duration` from
 > `LeafValidityDays` in **both** dedicated-CA and existing-CA modes (existing-CA
 > previously omitted it, so cert-manager used its 90-day default), and the CA
 > `Certificate` sets `spec.duration` from `GetValidCADays(spec)` (previously
-> omitted, so cert-manager used its default).
+> omitted, so cert-manager used its default). In-place upgrades from the old
+> 3-object dedicated-CA chain re-point `<secretName>-ca-issuer` from
+> `spec.selfSigned` to `spec.ca.secretName: <secretName>-ca` and add ECDSA
+> `spec.privateKey`; cert-manager re-issues the CA and leaf accordingly.
 
 ### Import isolation
 
@@ -454,9 +500,22 @@ Two one-shot annotations trigger regeneration at phase `""`:
 | `operator-sdk-extra.webcenter.fr/force-regenerate-certificates` | `AnnotationForceRegenerateLeaf` | Leaf-only regeneration (falls back to full saga if the CA is missing). |
 
 Read as `== "true"`. force-all wins when both are set. The honored annotation
-is removed in `OnSuccess` (saga backends) after a successful Apply; on Apply
-failure it is left in place and retried next cycle. Non-saga backends record a
-`TLSForceUnsupported` warning Event and remove the annotation without
+is removed in `OnSuccess` after a successful Apply; on Apply failure it is left
+in place and retried next cycle. Both `selfmanaged` (saga) and `certmanager`
+honor the annotations:
+
+- `selfmanaged` starts a full CA saga (force-all) or a leaf-only regeneration
+  (force-leaf).
+- `certmanager` implements the optional `ForceRegenerator[T]` capability:
+  during `Read` it sets `status.conditions[type=Issuing, status=True]` on the
+  target `Certificate` status subresource (reason `ManuallyTriggered`, matching
+  `cmctl renew`) and publishes `LayerSignals{Forced: true, ...}`. It requires
+  `WithClient` (see the cert-manager backend section); without a client,
+  `Read` fails with `certmanager.ErrClientRequired` and the annotation is kept
+  for retry.
+
+Non-saga backends that do **not** implement `ForceRegenerator` (such as `byo`)
+record a `TLSForceUnsupported` warning Event and remove the annotation without
 regenerating. The annotation names are overridable via
 `WithForceRegenerateAllAnnotation` / `WithForceRegenerateLeafAnnotation`.
 
@@ -503,6 +562,83 @@ operator-managed single-cycle flow).
 > `workflow.WorkflowStatus` (now DeepCopy-safe via the hand-written
 > `zz_generated.deepcopy.go`) and implement
 > `GetWorkflowStatus() *workflow.WorkflowStatus`.
+
+## Admission webhook validation (`TLSSpecValidator`)
+
+`certificate.TLSSpecValidator[T]` implements
+`sigs.k8s.io/controller-runtime/pkg/webhook/admission.Validator[T]` and
+delegates to `TLSSpec.ValidateContent()` on `CREATE`/`UPDATE` (deletion is
+always allowed). Use it to reject conflicting `issuerRef`/`clusterIssuerRef`
+(and any other invalid `TLSSpec` content) at admission time:
+
+```go
+provider := certificate.TLSSpecProviderFunc[*MyCRD](func(o *MyCRD) certificate.TLSSpec { return o.Spec.TLS })
+validator := certificate.NewTLSSpecValidator[*MyCRD](provider)
+
+if err := ctrl.NewWebhookManagedBy(mgr, &MyCRD{}).
+    WithValidator(validator).
+    Complete(); err != nil {
+    return err
+}
+```
+
+A nil provider is rejected with `certificate.ErrNilTLSSpecProvider`.
+Operators that already implement `admission.Validator[T]` for other CRD fields
+can call `validator.ValidateCreate` / `validator.ValidateUpdate` from their own
+validator (or call `spec.ValidateContent()` directly). Via the library helper:
+
+```go
+err := controller.SetupWebhookWithManager(mgr, r.Client(),
+    func(mgr ctrl.Manager, c client.Client) error {
+        return ctrl.NewWebhookManagedBy(mgr, &MyCRD{}).WithValidator(validator).Complete()
+    },
+)
+```
+
+## Watching cert-manager resources & TLS Secrets
+
+The reconciler's SSA apply sets a controller `ownerReference` on every
+cert-manager `Issuer`/`Certificate` (via `SetControllerReference`). Registering
+`.Owns(certmanager.NewIssuerObject()).Owns(certmanager.NewCertificateObject())`
+therefore reconciles your CR automatically when cert-manager creates or updates
+those CRs (including status transitions).
+
+The issued `Secret`s are created **asynchronously by cert-manager** and do
+**not** carry an `ownerReference` to your CR, so `Secret` creation/rotation
+does not trigger a reconcile by default. Register a field index over the leaf
+and CA Secret names and a `Secret → CR` mapper:
+
+```go
+provider := certificate.TLSSpecProviderFunc[*MyCRD](func(o *MyCRD) certificate.TLSSpec { return o.Spec.TLS })
+
+// 1. Index each CR by both <secretName> and <secretName>-ca.
+if err := controller.SetupIndexerWithManager(mgr,
+    certificate.SetupTLSSecretIndexer(&MyCRD{}, "", provider),
+); err != nil {
+    return err
+}
+
+// 2. Own the cert-manager CRs and watch the TLS Secrets.
+return ctrl.NewControllerManagedBy(mgr).
+    For(&MyCRD{}).
+    Owns(certmanager.NewIssuerObject()).
+    Owns(certmanager.NewCertificateObject()).
+    Watches(&corev1.Secret{},
+        handler.EnqueueRequestsFromMapFunc(
+            certificate.SecretToTLSObjectsMapFunc(r.Client(),
+                func() client.ObjectList { return &MyCRDList{} }, ""),
+        ),
+    ).
+    Complete(r)
+```
+
+`certificate.TLSSecretNameIndexField` (`"spec.tls.secretName"`) is the default
+field key used when the `field` argument is empty.
+`ExtractTLSSecretNames(provider)` indexes both the leaf (`<secretName>`) and CA
+(`<secretName>-ca`) Secret names, so a single index matches both.
+`SecretToTLSObjectsMapFunc(c, newListFunc, field)` lists matching CRs in the
+Secret's namespace and enqueues them. Remember to enable the force-regenerate
+RBAC above when using `certmanager.WithClient[*MyCRD](r.Client())`.
 
 ## Rollout helper
 

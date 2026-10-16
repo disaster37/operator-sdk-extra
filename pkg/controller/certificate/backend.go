@@ -112,6 +112,14 @@ var ErrUnknownUsage = errors.Sentinel("unknown usage")
 // CurveP256, CurveP384 or CurveP521.
 var ErrUnknownCurve = errors.Sentinel("unknown curve")
 
+// ErrConflictingIssuerRefs is returned when both TLSSpec.IssuerRef and
+// TLSSpec.ClusterIssuerRef are set.
+var ErrConflictingIssuerRefs = errors.Sentinel("issuerRef and clusterIssuerRef are mutually exclusive")
+
+// ErrInvalidIssuerRef is returned when TLSSpec.IssuerRef or
+// TLSSpec.ClusterIssuerRef contains only whitespace characters.
+var ErrInvalidIssuerRef = errors.Sentinel("invalid issuer reference")
+
 // CertificateSubject is the certificate RDN block beyond the legacy single
 // CommonName/Organization fields. All fields are optional; empty = unset.
 type CertificateSubject struct {
@@ -184,10 +192,17 @@ type TLSSpec struct {
 	// and key. Consumers mount this Secret or hash it for rollout.
 	SecretName string `json:"secretName,omitempty"`
 
-	// IssuerRef references an existing Issuer or ClusterIssuer for the
-	// cert-manager backend (existing-CA mode). When empty, a self-signed
-	// Issuer is created (dedicated-CA mode).
+	// IssuerRef references an existing namespace-scoped cert-manager Issuer
+	// (existing-CA mode). Mutually exclusive with ClusterIssuerRef. When both
+	// IssuerRef and ClusterIssuerRef are empty, the cert-manager backend
+	// bootstraps a dedicated self-signed CA Issuer chain (dedicated-CA mode).
 	IssuerRef string `json:"issuerRef,omitempty"`
+
+	// ClusterIssuerRef references an existing cluster-scoped cert-manager
+	// ClusterIssuer (existing-CA mode). Mutually exclusive with IssuerRef.
+	// When both IssuerRef and ClusterIssuerRef are empty, the cert-manager
+	// backend bootstraps a dedicated self-signed CA Issuer chain (dedicated-CA mode).
+	ClusterIssuerRef string `json:"clusterIssuerRef,omitempty"`
 
 	// CommonName is the CN for the generated certificate.
 	CommonName string `json:"commonName,omitempty"`
@@ -322,6 +337,22 @@ type LeafManager[T object.MultiPhaseObject] interface {
 	// LeafNeedsChange reports whether the leaf Secret needs regeneration vs
 	// spec at now. leafSecret may be nil (treated as LeafMissing).
 	LeafNeedsChange(ctx context.Context, o T, leafSecret *corev1.Secret, spec TLSSpec, now time.Time) (LeafChange, error)
+}
+
+// ForceRegenerator is an optional capability for non-saga backends (such as
+// cert-manager) that can trigger certificate re-issuance on demand when the
+// force-regenerate annotations (AnnotationForceRegenerateAll or
+// AnnotationForceRegenerateLeaf) are present on the reconciled object.
+//
+// When a non-saga backend implements ForceRegenerator, the rotation step calls
+// ForceRegenerate during Read, publishes a Forced LayerSignals entry, and
+// removes the honored annotation(s) in OnSuccess after Apply succeeds.
+// Non-saga backends that do not implement ForceRegenerator (such as BYO) emit
+// a TLSForceUnsupported warning event and strip the annotations.
+type ForceRegenerator[T object.MultiPhaseObject] interface {
+	// ForceRegenerate triggers re-issuance of the CA and/or leaf certificates
+	// according to forceAll and forceLeaf.
+	ForceRegenerate(ctx context.Context, o T, spec TLSSpec, forceAll, forceLeaf bool) error
 }
 
 // NodeSetTLSBackend marks per-node (multi-cert) saga backends. Its presence
@@ -585,6 +616,16 @@ func DedupIPs(in []net.IP) []net.IP {
 // ValidateContent validates all customizable content fields. Returns the first
 // error. Called by backends and by the rotation saga before generation.
 func (s TLSSpec) ValidateContent() error {
+	if s.IssuerRef != "" && strings.TrimSpace(s.IssuerRef) == "" {
+		return errors.Wrap(ErrInvalidIssuerRef, "issuerRef must not be whitespace-only")
+	}
+	if s.ClusterIssuerRef != "" && strings.TrimSpace(s.ClusterIssuerRef) == "" {
+		return errors.Wrap(ErrInvalidIssuerRef, "clusterIssuerRef must not be whitespace-only")
+	}
+	if s.IssuerRef != "" && s.ClusterIssuerRef != "" {
+		return errors.Wrapf(ErrConflictingIssuerRefs, "cannot set both issuerRef (%q) and clusterIssuerRef (%q)", s.IssuerRef, s.ClusterIssuerRef)
+	}
+
 	switch s.KeyAlgorithm {
 	case "", KeyAlgorithmECDSA:
 		if s.KeySize != 0 {

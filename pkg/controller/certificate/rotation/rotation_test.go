@@ -17,6 +17,7 @@ import (
 	apworkflow "github.com/disaster37/operator-sdk-extra/v3/pkg/apis/workflow"
 	"github.com/disaster37/operator-sdk-extra/v3/pkg/controller/certificate"
 	"github.com/disaster37/operator-sdk-extra/v3/pkg/controller/certificate/byo"
+	"github.com/disaster37/operator-sdk-extra/v3/pkg/controller/certificate/certmanager"
 	"github.com/disaster37/operator-sdk-extra/v3/pkg/controller/certificate/rotation"
 	"github.com/disaster37/operator-sdk-extra/v3/pkg/controller/certificate/selfmanaged"
 	"github.com/disaster37/operator-sdk-extra/v3/pkg/controller/certificate/selfmanaged/pernode"
@@ -29,6 +30,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -1269,6 +1271,18 @@ func TestRead_NonSaga_ForceUnsupported_CustomAnnotation(t *testing.T) {
 	assert.False(t, ok)
 }
 
+func TestRead_NonSaga_ForceUnsupported_RemoveError(t *testing.T) {
+	o := newRotObject()
+	o.TypeMeta = metav1.TypeMeta{APIVersion: rotGV.String(), Kind: "RotObject"}
+	o.SetAnnotations(map[string]string{certificate.AnnotationForceRegenerateAll: "true"})
+	boom := errors.New("update boom")
+	c := &failingUpdateClient{Client: newFakeClientWithRot(t, o), err: boom}
+	step := newStep(c, byo.NewBYOBackend[*rotObject]())
+
+	_, _, err := step.Read(context.Background(), o, map[string]any{}, testLogger())
+	require.ErrorIs(t, err, boom)
+}
+
 func TestOnSuccess_ForceAll_RemovesAnnotations(t *testing.T) {
 	o := newRotObject()
 	o.TypeMeta = metav1.TypeMeta{APIVersion: rotGV.String(), Kind: "RotObject"}
@@ -1308,6 +1322,41 @@ func TestOnSuccess_ForceLeaf_RemovesAnnotation(t *testing.T) {
 
 	_, ok := o.GetAnnotations()[certificate.AnnotationForceRegenerateLeaf]
 	assert.False(t, ok, "force-leaf annotation must be removed on success")
+}
+
+type failingUpdateClient struct {
+	client.Client
+	err error
+}
+
+func (c *failingUpdateClient) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+	return c.err
+}
+
+func TestOnSuccess_ForcedSignalWithoutAnnotations(t *testing.T) {
+	step := newStep(newFakeClient(t), selfmanaged.NewSelfManagedBackend[*rotObject]())
+	o := newRotObject()
+	data := map[string]any{
+		"rotationStartPhase": apworkflow.WorkflowPhase(""),
+		"tls.tls":            &certificate.LayerSignals{Forced: true},
+	}
+	res, err := step.OnSuccess(context.Background(), o, data, multiphase.NewMultiPhaseDiff[client.Object](), testLogger())
+	require.NoError(t, err)
+	assert.Equal(t, reconcile.Result{}, res)
+}
+
+func TestOnSuccess_ForceRegenRemoveAnnotationError(t *testing.T) {
+	o := newRotObject()
+	o.TypeMeta = metav1.TypeMeta{APIVersion: rotGV.String(), Kind: "RotObject"}
+	o.SetAnnotations(map[string]string{certificate.AnnotationForceRegenerateAll: "true"})
+	boom := errors.New("update boom")
+	c := &failingUpdateClient{Client: newFakeClientWithRot(t, o), err: boom}
+	step := newStep(c, certmanager.NewCertManagerBackend[*rotObject]())
+
+	data := map[string]any{"tls.tls": &certificate.LayerSignals{Forced: true, CARotated: true}}
+	_, err := step.OnSuccess(context.Background(), o, data, multiphase.NewMultiPhaseDiff[client.Object](), testLogger())
+	require.ErrorIs(t, err, boom)
+	assert.Contains(t, err.Error(), "remove force-regenerate annotation")
 }
 
 func TestRead_TwoSteps_NamespacedSignals(t *testing.T) {
@@ -1566,4 +1615,202 @@ func TestRead_BYOBackend_SkipsContentValidation(t *testing.T) {
 	read, _, err := step.Read(context.Background(), newRotObject(), map[string]any{}, testLogger())
 	require.NoError(t, err)
 	assert.Empty(t, read.GetExpectedObjects())
+}
+
+func mustNestedString(t *testing.T, u *unstructured.Unstructured, fields ...string) string {
+	t.Helper()
+	v, found, err := unstructured.NestedString(u.Object, fields...)
+	require.NoError(t, err)
+	require.True(t, found)
+	return v
+}
+
+func TestRead_CertManagerBackend_DedicatedCA(t *testing.T) {
+	ca, leaf := newCAAndLeafSecrets(t, 730)
+	c := newFakeClient(t, leaf, ca)
+	step := newStep(c, certmanager.NewCertManagerBackend[*rotObject](),
+		rotation.WithLabelsDecorator(func(o *rotObject, obj client.Object) {
+			obj.SetLabels(map[string]string{"rotated": "true"})
+		}))
+
+	o := newRotObject()
+	data := map[string]any{}
+	read, res, err := step.Read(context.Background(), o, data, testLogger())
+	require.NoError(t, err)
+	assert.Equal(t, reconcile.Result{}, res)
+	assert.Len(t, read.GetExpectedObjects(), 4)
+	assert.Empty(t, read.GetCurrentObjects())
+	assert.NotNil(t, data["tlsSecret"])
+	assert.NotNil(t, data["caSecret"])
+	assert.NotNil(t, data["leafCert"])
+	assert.NotNil(t, data["caCert"])
+	assert.True(t, step.IsPhaseEmpty(o))
+}
+
+func TestRead_CertManagerBackend_IssuerAndClusterIssuer(t *testing.T) {
+	providerFor := func(spec certificate.TLSSpec) certificate.TLSSpecProvider[*rotObject] {
+		return certificate.TLSSpecProviderFunc[*rotObject](func(o *rotObject) certificate.TLSSpec { return spec })
+	}
+
+	t.Run("IssuerRef", func(t *testing.T) {
+		spec := certificate.TLSSpec{SecretName: "test-tls", CommonName: "test.example.com", IssuerRef: "my-issuer"}
+		step := newStepProvider(newFakeClient(t), certmanager.NewCertManagerBackend[*rotObject](), providerFor(spec))
+		read, res, err := step.Read(context.Background(), newRotObject(), map[string]any{}, testLogger())
+		require.NoError(t, err)
+		assert.Equal(t, reconcile.Result{}, res)
+
+		objs := read.GetExpectedObjects()
+		require.Len(t, objs, 1)
+		cert, ok := objs[0].(*unstructured.Unstructured)
+		require.True(t, ok)
+		assert.Equal(t, "Issuer", mustNestedString(t, cert, "spec", "issuerRef", "kind"))
+		assert.Equal(t, "cert-manager.io", mustNestedString(t, cert, "spec", "issuerRef", "group"))
+		assert.Equal(t, "ECDSA", mustNestedString(t, cert, "spec", "privateKey", "algorithm"))
+	})
+
+	t.Run("ClusterIssuerRef", func(t *testing.T) {
+		spec := certificate.TLSSpec{SecretName: "test-tls", CommonName: "test.example.com", ClusterIssuerRef: "my-cluster-issuer"}
+		step := newStepProvider(newFakeClient(t), certmanager.NewCertManagerBackend[*rotObject](), providerFor(spec))
+		read, res, err := step.Read(context.Background(), newRotObject(), map[string]any{}, testLogger())
+		require.NoError(t, err)
+		assert.Equal(t, reconcile.Result{}, res)
+
+		objs := read.GetExpectedObjects()
+		require.Len(t, objs, 1)
+		cert, ok := objs[0].(*unstructured.Unstructured)
+		require.True(t, ok)
+		assert.Equal(t, "ClusterIssuer", mustNestedString(t, cert, "spec", "issuerRef", "kind"))
+		assert.Equal(t, "cert-manager.io", mustNestedString(t, cert, "spec", "issuerRef", "group"))
+		assert.Equal(t, "ECDSA", mustNestedString(t, cert, "spec", "privateKey", "algorithm"))
+	})
+
+	t.Run("ConflictingRefsError", func(t *testing.T) {
+		spec := certificate.TLSSpec{SecretName: "test-tls", CommonName: "test.example.com", IssuerRef: "a", ClusterIssuerRef: "b"}
+		step := newStepProvider(newFakeClient(t), certmanager.NewCertManagerBackend[*rotObject](), providerFor(spec))
+		_, _, err := step.Read(context.Background(), newRotObject(), map[string]any{}, testLogger())
+		require.ErrorIs(t, err, certificate.ErrConflictingIssuerRefs)
+	})
+}
+
+func TestReadAndOnSuccess_CertManagerBackend_ForceRegenerate(t *testing.T) {
+	newForceClient := func(t *testing.T, objs ...client.Object) client.Client {
+		t.Helper()
+		scheme := runtime.NewScheme()
+		utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+		scheme.AddKnownTypes(rotGV, &rotObject{})
+		return fake.NewClientBuilder().
+			WithScheme(scheme).
+			WithStatusSubresource(certmanager.NewCertificateObject()).
+			WithObjects(objs...).
+			Build()
+	}
+
+	cmCondition := func(t *testing.T, c client.Client, name, condType string) map[string]interface{} {
+		t.Helper()
+		cert := certmanager.NewCertificateObject()
+		require.NoError(t, c.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: name}, cert))
+		conds, found, err := unstructured.NestedSlice(cert.Object, "status", "conditions")
+		require.NoError(t, err)
+		if !found {
+			return nil
+		}
+		for _, raw := range conds {
+			if m, ok := raw.(map[string]interface{}); ok && m["type"] == condType {
+				return m
+			}
+		}
+		return nil
+	}
+
+	seedCert := func(name string) *unstructured.Unstructured {
+		cert := certmanager.NewCertificateObject()
+		cert.SetName(name)
+		cert.SetNamespace("default")
+		return cert
+	}
+
+	assertNoEvent := func(t *testing.T, recorder *record.FakeRecorder) {
+		t.Helper()
+		select {
+		case ev := <-recorder.Events:
+			t.Fatalf("unexpected event: %s", ev)
+		default:
+		}
+	}
+
+	t.Run("force-all dedicated mode", func(t *testing.T) {
+		o := newRotObject()
+		o.TypeMeta = metav1.TypeMeta{APIVersion: rotGV.String(), Kind: "RotObject"}
+		o.SetAnnotations(map[string]string{certificate.AnnotationForceRegenerateAll: "true"})
+		o.Status.Conditions = []metav1.Condition{{Type: "TLSCertificatesReady", Status: metav1.ConditionFalse}}
+		c := newForceClient(t, o, seedCert("test-tls-ca"), seedCert("test-tls"))
+		recorder := record.NewFakeRecorder(10)
+		step := newStepRecorder(c, certmanager.NewCertManagerBackend[*rotObject](certmanager.WithClient[*rotObject](c)), recorder)
+
+		data := map[string]any{}
+		_, _, err := step.Read(context.Background(), o, data, testLogger())
+		require.NoError(t, err)
+		assertNoEvent(t, recorder)
+
+		sig, ok := data["tls.tls"].(*certificate.LayerSignals)
+		require.True(t, ok)
+		assert.True(t, sig.Forced)
+		assert.True(t, sig.CARotated)
+		assert.True(t, sig.LeafRegenerated)
+
+		caIssuing := cmCondition(t, c, "test-tls-ca", "Issuing")
+		require.NotNil(t, caIssuing)
+		assert.Equal(t, "True", caIssuing["status"])
+		leafIssuing := cmCondition(t, c, "test-tls", "Issuing")
+		require.NotNil(t, leafIssuing)
+		assert.Equal(t, "True", leafIssuing["status"])
+		assert.Equal(t, "true", o.GetAnnotations()[certificate.AnnotationForceRegenerateAll])
+
+		_, err = step.OnSuccess(context.Background(), o, data, multiphase.NewMultiPhaseDiff[client.Object](), testLogger())
+		require.NoError(t, err)
+		_, present := o.GetAnnotations()[certificate.AnnotationForceRegenerateAll]
+		assert.False(t, present, "force-all annotation must be removed on OnSuccess")
+		assert.True(t, conditionIsTrue(o))
+	})
+
+	t.Run("force-leaf", func(t *testing.T) {
+		o := newRotObject()
+		o.TypeMeta = metav1.TypeMeta{APIVersion: rotGV.String(), Kind: "RotObject"}
+		o.SetAnnotations(map[string]string{certificate.AnnotationForceRegenerateLeaf: "true"})
+		c := newForceClient(t, o, seedCert("test-tls-ca"), seedCert("test-tls"))
+		recorder := record.NewFakeRecorder(10)
+		step := newStepRecorder(c, certmanager.NewCertManagerBackend[*rotObject](certmanager.WithClient[*rotObject](c)), recorder)
+
+		data := map[string]any{}
+		_, _, err := step.Read(context.Background(), o, data, testLogger())
+		require.NoError(t, err)
+		assertNoEvent(t, recorder)
+
+		sig, ok := data["tls.tls"].(*certificate.LayerSignals)
+		require.True(t, ok)
+		assert.True(t, sig.Forced)
+		assert.False(t, sig.CARotated)
+		assert.True(t, sig.LeafRegenerated)
+
+		leafIssuing := cmCondition(t, c, "test-tls", "Issuing")
+		require.NotNil(t, leafIssuing)
+		assert.Equal(t, "True", leafIssuing["status"])
+		assert.Nil(t, cmCondition(t, c, "test-tls-ca", "Issuing"))
+
+		_, err = step.OnSuccess(context.Background(), o, data, multiphase.NewMultiPhaseDiff[client.Object](), testLogger())
+		require.NoError(t, err)
+		_, present := o.GetAnnotations()[certificate.AnnotationForceRegenerateLeaf]
+		assert.False(t, present, "force-leaf annotation must be removed on OnSuccess")
+	})
+
+	t.Run("force error retains annotation and fails Read", func(t *testing.T) {
+		o := newRotObject()
+		o.SetAnnotations(map[string]string{certificate.AnnotationForceRegenerateAll: "true"})
+		recorder := record.NewFakeRecorder(10)
+		step := newStepRecorder(newFakeClient(t), certmanager.NewCertManagerBackend[*rotObject](), recorder)
+
+		_, _, err := step.Read(context.Background(), o, map[string]any{}, testLogger())
+		require.ErrorIs(t, err, certmanager.ErrClientRequired)
+		assert.Equal(t, "true", o.GetAnnotations()[certificate.AnnotationForceRegenerateAll], "annotation must remain after a failed force")
+	})
 }
